@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kino - Кино и тайминги</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 30px 20px; }
+        header { text-align: center; margin-bottom: 40px; }
+        .back-link {
+            display: inline-block;
+            color: #00d9ff;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .subtitle { color: #888; }
+        
+        .search-panel {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .search-box {
+            display: flex;
+            gap: 15px;
+        }
+        input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 1rem;
+        }
+        input:focus { outline: none; border-color: #00d9ff; }
+        input::placeholder { color: #666; }
+        
+        .movie-section {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        .movie-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .video-placeholder {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #000;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        .video-text {
+            color: #666;
+            font-size: 1.2rem;
+        }
+        .play-btn {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: rgba(0,217,255,0.2);
+            border: 2px solid #00d9ff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 2rem;
+            transition: all 0.3s;
+        }
+        .play-btn:hover {
+            background: rgba(0,217,255,0.4);
+            transform: scale(1.1);
+        }
+        
+        .timeline {
+            display: flex;
+            gap: 5px;
+            height: 40px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        .timeline-marker {
+            flex: 1;
+            background: rgba(255,255,255,0.1);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 5px;
+            font-size: 0.7rem;
+            color: #666;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .timeline-marker:hover { background: rgba(0,217,255,0.3); }
+        .timeline-marker.active { background: #00d9ff; color: #000; }
+        
+        .timeline-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .time-display { font-size: 1.2rem; font-weight: bold; }
+        
+        .user-timings {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        .user-timings h3 { margin-bottom: 15px; }
+        .timings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .timing-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+        }
+        .timing-name { font-weight: 600; }
+        .timing-time { color: #00d9ff; }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            color: #000;
+            font-weight: 600;
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        button:hover { transform: translateY(-2px); }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .empty-icon { font-size: 3rem; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← На главную</a>
+        
+        <header>
+            <h1>Kino</h1>
+            <p class="subtitle">Кино и тайминги</p>
+        </header>
+        
+        <div class="search-panel">
+            <div class="search-box">
+                <input type="text" id="search" placeholder="Поиск...">
+            </div>
+        </div>
+        
+        <div class="movie-section" id="movieSection">
+            <h2 class="movie-title" id="movieTitle">Загрузка фильма...</h2>
+            <div class="video-placeholder" id="videoPlaceholder">
+                <span class="video-text">видео плеер</span>
+                <div class="play-btn" onclick="togglePlay()">▶</div>
+            </div>
+            <div class="timeline" id="timeline"></div>
+            <div class="timeline-controls">
+                <span class="time-display" id="currentTime">00:00:00</span>
+                <div class="btn-group">
+                    <button class="btn-secondary" onclick="addTiming()">+ Добавить тайминг</button>
+                    <button class="btn-secondary" onclick="refreshTimings()">Обновить</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="user-timings" id="userTimings">
+            <h3>Пользовательские тайминги</h3>
+            <div class="timings-list" id="timingsList">
+                <div class="timing-item">
+                    <span class="timing-name">Интересный момент</span>
+                    <span class="timing-time">01:23:45</span>
+                </div>
+                <div class="timing-item">
+                    <span class="timing-name">Важная сцена</span>
+                    <span class="timing-time">00:45:30</span>
+                </div>
+                <div class="timing-item">
+                    <span class="timing-name">Экшен</span>
+                    <span class="timing-time">01:55:00</span>
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn-secondary" onclick="closeAll()">Закрыть все</button>
+            </div>
+        </div>
+        
+        <div class="empty-state" id="emptyState" style="display:none;">
+            <div class="empty-icon">🎬</div>
+            <p>Поиск фильма...</p>
+        </div>
+    </div>
+    
+    <script>
+        const timeline = document.getElementById('timeline');
+        for (let i = 0; i < 20; i++) {
+            const marker = document.createElement('div');
+            marker.className = 'timeline-marker';
+            marker.textContent = i * 5 + 'm';
+            marker.onclick = () => jumpToTime(i * 5);
+            timeline.appendChild(marker);
+        }
+        
+        let isPlaying = false;
+        let currentSeconds = 0;
+        
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            document.querySelector('.play-btn').textContent = isPlaying ? '⏸' : '▶';
+            if (isPlaying) {
+                playInterval = setInterval(() => {
+                    currentSeconds++;
+                    updateTime();
+                }, 1000);
+            } else {
+                clearInterval(playInterval);
+            }
+        }
+        
+        let playInterval;
+        
+        function updateTime() {
+            const h = Math.floor(currentSeconds / 3600);
+            const m = Math.floor((currentSeconds % 3600) / 60);
+            const s = currentSeconds % 60;
+            document.getElementById('currentTime').textContent = 
+                String(h).padStart(2,'0') + ':' + 
+                String(m).padStart(2,'0') + ':' + 
+                String(s).padStart(2,'0');
+        }
+        
+        function jumpToTime(minutes) {
+            currentSeconds = minutes * 60;
+            updateTime();
+        }
+        
+        function addTiming() {
+            const time = document.getElementById('currentTime').textContent;
+            const list = document.getElementById('timingsList');
+            const item = document.createElement('div');
+            item.className = 'timing-item';
+            item.innerHTML = `
+                <span class="timing-name">Тайминг ${list.children.length + 1}</span>
+                <span class="timing-time">${time}</span>
+            `;
+            list.appendChild(item);
+        }
+        
+        function refreshTimings() {
+            alert('Обновление таймингов с сервера...');
+        }
+        
+        function closeAll() {
+            const list = document.getElementById('timingsList');
+            list.innerHTML = '';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+skills/
+upload/
+download/
+db/
+prisma/
+examples/
+modules/
+mini-services/
+*.zip
+*.log

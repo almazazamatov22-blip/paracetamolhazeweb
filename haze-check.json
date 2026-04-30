@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "The orange highlight block is not perfectly centered on the text vertically. It is misaligned too low (the block sits below the vertical center of the text, with the text positioned above the block’s vertical midpoint).",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1776221784,
+  "id": "20260415105620368c89a23bfa4044",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "20260415105620368c89a23bfa4044",
+  "usage": {
+    "completion_tokens": 46,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 125,
+    "prompt_tokens_details": {
+      "cached_tokens": 4
+    },
+    "total_tokens": 171
+  }
+}

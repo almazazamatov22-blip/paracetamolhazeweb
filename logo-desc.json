@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "The logo features a **vibrant, cartoon - styled design** with a dominant green color palette (for the leaf - like figure, accents) against a dark, smoky green - black background. The central figure is a leaf - formed character with bright red eyes, a wide grin, and a lit joint in its mouth, surrounded by white smoke clouds and subtle golden star - like sparkles. The text “MATURE 21+” at the top is bold white on a black banner, while “paracetamolHAZE” at the bottom uses white for “paracetamol” and green for “HAZE,” all framed by a green - outlined shield - shaped border. The style is playful, bold, and eye - catching, blending whimsical illustration with a clear, stylized typographic layout.",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1776220899,
+  "id": "20260415104129b0d73860d79c46fc",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "20260415104129b0d73860d79c46fc",
+  "usage": {
+    "completion_tokens": 167,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1123,
+    "prompt_tokens_details": {
+      "cached_tokens": 4
+    },
+    "total_tokens": 1290
+  }
+}

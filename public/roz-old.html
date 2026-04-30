@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roz - Twitch Чат Рулетка</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 30px 20px; }
+        header { text-align: center; margin-bottom: 40px; }
+        .back-link {
+            display: inline-block;
+            color: #00d9ff;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .subtitle { color: #888; margin-top: 10px; }
+        
+        .control-panel {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        input {
+            flex: 1;
+            min-width: 200px;
+            padding: 15px 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 1rem;
+        }
+        input:focus { outline: none; border-color: #00d9ff; }
+        input::placeholder { color: #666; }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            color: #000;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,217,255,0.3); }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .btn-secondary:hover { background: rgba(255,255,255,0.2); }
+        
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-value { font-size: 2rem; font-weight: bold; color: #00d9ff; }
+        .stat-label { color: #888; font-size: 0.9rem; }
+        
+        .games {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        .game-btn {
+            padding: 20px 40px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .game-btn:hover {
+            background: rgba(0,217,255,0.1);
+            border-color: #00d9ff;
+        }
+        
+        .winner-panel, .winner-panel-vases, .winner-panel-cs {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .winner-content {
+            text-align: center;
+            padding: 50px;
+        }
+        .winner-content h2 {
+            font-size: 1.5rem;
+            color: #00ff88;
+            margin-bottom: 20px;
+        }
+        .winner-name {
+            font-size: 3rem;
+            color: #00d9ff;
+            margin: 30px 0;
+        }
+        .close-btn {
+            padding: 15px 40px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        
+        .roulette {
+            display: none;
+            margin: 40px 0;
+            padding: 30px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+        }
+        .roulette-wheel {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+            border: 5px solid #00d9ff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: bold;
+            animation: spin 0.5s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .vases-game {
+            display: none;
+            margin: 40px 0;
+        }
+        .vases-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 20px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .vase {
+            aspect-ratio: 1;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        .vase:hover { transform: scale(1.1); }
+        .vase.broken { background: #333; transform: scale(0.8); opacity: 0.5; }
+        
+        .cs-game {
+            display: none;
+            margin: 40px 0;
+        }
+        .cs-teams {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+        }
+        .cs-team {
+            padding: 20px;
+            border-radius: 15px;
+            min-width: 150px;
+        }
+        .cs-team.t { background: linear-gradient(135deg, #ff4444, #cc0000); }
+        .cs-team.ct { background: linear-gradient(135deg, #4444ff, #0000cc); }
+        .cs-team h3 { margin-bottom: 15px; }
+        .cs-numbers {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        .cs-num {
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← На главную</a>
+        
+        <header>
+            <h1>Roz</h1>
+            <p class="subtitle">Twitch Чат Рулетка</p>
+        </header>
+        
+        <div class="control-panel">
+            <div class="input-group">
+                <input type="text" id="streamer" placeholder="Никнейм стримера">
+                <input type="text" id="keyword" placeholder="Ключевое слово">
+            </div>
+            <div class="btn-group">
+                <button class="btn-primary" onclick="startSelection()">Начать Отбор</button>
+                <button class="btn-secondary" onclick="disconnect()">Отключиться</button>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value" id="participants">0</div>
+                <div class="stat-label">Участников</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="messages">0</div>
+                <div class="stat-label">Сообщений</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="timer">0:00</div>
+                <div class="stat-label">Время работы</div>
+            </div>
+        </div>
+        
+        <div class="games">
+            <button class="game-btn" onclick="startRoulette()">Рулетка</button>
+            <button class="game-btn" onclick="startVases()">Вазы</button>
+            <button class="game-btn" onclick="startCS()">КС</button>
+            <button class="game-btn" onclick="startPixel()">Пиксель Рояль</button>
+        </div>
+        
+        <div class="roulette" id="roulette">
+            <div class="roulette-wheel" id="wheel">🎰</div>
+            <button class="btn-primary" style="display:block;margin:30px auto 0" onclick="spinRoulette()">Крутить рулетку</button>
+        </div>
+        
+        <div class="vases-game" id="vasesGame">
+            <div class="vases-grid">
+                <div class="vase" onclick="breakVase(this)">1</div>
+                <div class="vase" onclick="breakVase(this)">2</div>
+                <div class="vase" onclick="breakVase(this)">3</div>
+                <div class="vase" onclick="breakVase(this)">4</div>
+                <div class="vase" onclick="breakVase(this)">5</div>
+                <div class="vase" onclick="breakVase(this)">6</div>
+                <div class="vase" onclick="breakVase(this)">7</div>
+                <div class="vase" onclick="breakVase(this)">8</div>
+                <div class="vase" onclick="breakVase(this)">9</div>
+                <div class="vase" onclick="breakVase(this)">10</div>
+            </div>
+        </div>
+        
+        <div class="cs-game" id="csGame">
+            <div class="cs-teams">
+                <div class="cs-team t">
+                    <h3>TERRORISTS</h3>
+                    <div class="cs-numbers">
+                        <div class="cs-num">1</div><div class="cs-num">3</div><div class="cs-num">5</div>
+                        <div class="cs-num">7</div><div class="cs-num">9</div>
+                    </div>
+                </div>
+                <div class="cs-team ct">
+                    <h3>COUNTER-TERRORISTS</h3>
+                    <div class="cs-numbers">
+                        <div class="cs-num">2</div><div class="cs-num">4</div><div class="cs-num">6</div>
+                        <div class="cs-num">8</div><div class="cs-num">10</div>
+                    </div>
+                </div>
+            </div>
+            <button class="btn-primary" style="display:block;margin:30px auto 0" onclick="startCSTeamSelect()">Начать отбор</button>
+        </div>
+    </div>
+    
+    <div class="winner-panel" id="winnerPanel">
+        <div class="winner-content">
+            <h2>🎉 Победитель!</h2>
+            <div class="winner-name" id="winnerName">User</div>
+            <p>Поздравляем с победой в розыгрыше!</p>
+            <button class="close-btn" onclick="closeWinner()" style="margin-top:30px">Закрыть</button>
+        </div>
+    </div>
+    
+    <div class="winner-panel-vases" id="winnerPanelVases">
+        <div class="winner-content">
+            <h2>⚱️ Победитель найден!</h2>
+            <div class="winner-name" id="winnerNameVases">User</div>
+            <p>Поздравляем с победой!</p>
+            <button class="close-btn" onclick="closeWinnerVases()" style="margin-top:30px">Закрыть</button>
+        </div>
+    </div>
+    
+    <div class="winner-panel-cs" id="winnerPanelCS">
+        <div class="winner-content">
+            <h2>🎮 Победитель КС!</h2>
+            <div class="winner-name" id="winnerNameCS">User</div>
+            <p>Поздравляем с победой!</p>
+            <button class="close-btn" onclick="closeWinnerCS()" style="margin-top:30px">Закрыть</button>
+        </div>
+    </div>
+    
+    <script>
+        let timer = 0;
+        let timerInterval = setInterval(() => {
+            timer++;
+            document.getElementById('timer').textContent = Math.floor(timer/60) + ':' + String(timer%60).padStart(2,'0');
+        }, 1000);
+        
+        function startSelection() {
+            const streamer = document.getElementById('streamer').value;
+            const keyword = document.getElementById('keyword').value;
+            if (!streamer || !keyword) {
+                alert('Введите никнейм стримера и ключевое слово');
+                return;
+            }
+            document.getElementById('participants').textContent = Math.floor(Math.random() * 50) + 10;
+            document.getElementById('messages').textContent = Math.floor(Math.random() * 500) + 100;
+        }
+        
+        function disconnect() {
+            document.getElementById('streamer').value = '';
+            document.getElementById('keyword').value = '';
+            document.getElementById('participants').textContent = '0';
+            document.getElementById('messages').textContent = '0';
+            timer = 0;
+        }
+        
+        function startRoulette() {
+            document.getElementById('roulette').style.display = 'block';
+            document.getElementById('vasesGame').style.display = 'none';
+            document.getElementById('csGame').style.display = 'none';
+        }
+        
+        function spinRoulette() {
+            const names = ['User1', 'User2', 'User3', 'User4', 'User5'];
+            const winner = names[Math.floor(Math.random() * names.length)];
+            document.getElementById('winnerName').textContent = winner;
+            document.getElementById('winnerPanel').style.display = 'flex';
+        }
+        
+        function closeWinner() {
+            document.getElementById('winnerPanel').style.display = 'none';
+        }
+        
+        function startVases() {
+            document.getElementById('vasesGame').style.display = 'block';
+            document.getElementById('roulette').style.display = 'none';
+            document.getElementById('csGame').style.display = 'none';
+            document.querySelectorAll('.vase').forEach(v => v.classList.remove('broken'));
+        }
+        
+        let vaseWinner = Math.floor(Math.random() * 10);
+        function breakVase(el) {
+            if (el.classList.contains('broken')) return;
+            el.classList.add('broken');
+            const num = parseInt(el.textContent) - 1;
+            if (num === vaseWinner) {
+                const names = ['User1', 'User2', 'User3'];
+                document.getElementById('winnerNameVases').textContent = names[Math.floor(Math.random() * names.length)];
+                document.getElementById('winnerPanelVases').style.display = 'flex';
+            }
+        }
+        
+        function closeWinnerVases() {
+            document.getElementById('winnerPanelVases').style.display = 'none';
+            startVases();
+        }
+        
+        function startCS() {
+            document.getElementById('csGame').style.display = 'block';
+            document.getElementById('roulette').style.display = 'none';
+            document.getElementById('vasesGame').style.display = 'none';
+        }
+        
+        function startCSTeamSelect() {
+            const names = ['User1', 'User2', 'User3', 'User4', 'User5'];
+            document.getElementById('winnerNameCS').textContent = names[Math.floor(Math.random() * names.length)];
+            document.getElementById('winnerPanelCS').style.display = 'flex';
+        }
+        
+        function closeWinnerCS() {
+            document.getElementById('winnerPanelCS').style.display = 'none';
+        }
+        
+        function startPixel() {
+            alert('Пиксель Рояль - в разработке');
+        }
+    </script>
+</body>
+</html>

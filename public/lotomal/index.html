@@ -1,0 +1,2731 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Лото</title>
+  <link rel="icon" type="image/png" href="/lotomal/loto-favicon.png">
+  <script src="/loto-realtime.js?v=12" defer></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    body {
+      font-family:'Arial',sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%);
+      min-height:100vh; color:#fff; overflow-x:hidden;
+    }
+    .level-progress-wrap {
+      margin:8px 0 16px; 
+    }
+    .level-progress-label {
+      display:flex; justify-content:space-between;
+      font-size:11px; color:rgba(255,215,0,.6); margin-bottom:4px;
+    }
+    .level-progress-bar {
+      height:6px; background:rgba(255,215,0,.15); border-radius:4px; overflow:hidden;
+    }
+    .level-progress-fill {
+      height:100%; background:linear-gradient(90deg,#FFD700,#DAA520);
+      border-radius:4px; transition:width .4s ease;
+    }
+    .player-level {
+      font-size:11px; color:rgba(255,215,0,.7); font-weight:700;
+    }
+    .screen { display:none; min-height:100vh; padding:20px; animation:fadeIn .3s ease-out; }
+    .screen.active { display:block; }
+    @keyframes fadeIn { from{opacity:0; transform:translateY(20px);} to{opacity:1; transform:translateY(0);} }
+
+    /* Шапка */
+    .header{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:15px 20px; background:rgba(0,0,0,.3);
+      border-radius:15px; margin-bottom:20px;
+    }
+    .back-btn{ background:none; border:none; color:#FFD700; font-size:24px; cursor:pointer; padding:5px 10px; }
+    .header-title{ font-size:20px; font-weight:700; color:#FFD700; }
+    .header-placeholder{ width:40px; }
+
+    /* Главное меню */
+    .logo-big{ text-align:center; margin:60px 0 50px 0; }
+    .logo-text{
+      font-size:84px; font-weight:900;
+      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+      text-shadow:0 0 30px rgba(255,215,0,.3);
+      letter-spacing:4px;
+    }
+    .logo-subtitle{ color:rgba(255,215,0,.6); font-size:18px; margin-top:10px; letter-spacing:2px; }
+    .menu-buttons{ max-width:480px; margin:0 auto; }
+    .menu-btn{
+      width:100%; padding:26px; margin-bottom:18px;
+      background: linear-gradient(145deg, #2a2a3e 0%, #1f1f2e 100%);
+      border:2px solid #FFD700; border-radius:15px;
+      color:#FFD700; font-size:23px; font-weight:700; cursor:pointer;
+      transition:all .3s ease; display:flex; align-items:center; justify-content:center; gap:12px;
+    }
+    .menu-btn:hover{ transform:translateY(-3px); box-shadow:0 8px 25px rgba(255,215,0,.4);
+      background: linear-gradient(145deg, #3a3a4e 0%, #2f2f3e 100%);
+    }
+    .menu-btn .icon{ font-size:24px; }
+
+    /* Профиль */
+    .profile-card{
+      background: linear-gradient(145deg, #2a2a3e 0%, #1f1f2e 100%);
+      border:2px solid #FFD700; border-radius:20px; padding:30px; margin-bottom:20px;
+    }
+    .profile-avatar{
+      width:100px; height:100px;
+      background: linear-gradient(145deg, #FFD700 0%, #DAA520 100%);
+      border-radius:50%; margin:0 auto 10px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:48px; font-weight:900; color:#000;
+      box-shadow:0 8px 20px rgba(255,215,0,.4);
+      cursor:pointer; position:relative;
+      transition: transform 0.2s ease;
+      overflow:hidden; padding:0;
+    }
+    .profile-avatar:hover { transform: scale(1.05); }
+    .avatar-edit-hint {
+      display:block; margin:6px auto 0;
+      background:#FFD700; color:#000; font-size:10px; font-weight:900;
+      padding:2px 10px; border-radius:8px; white-space:nowrap;
+      width:fit-content; text-align:center;
+    }
+    .avatar-picker-wrap {
+      display:none; margin:0 0 16px;
+      background:rgba(0,0,0,.4); border:2px solid rgba(255,215,0,.3);
+      border-radius:16px; padding:10px;
+      box-sizing:border-box; width:100%;
+    }
+    .avatar-picker-wrap.open { display:block; }
+    .avatar-upload-area {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 12px; padding: 4px 0;
+    }
+    .avatar-upload-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 12px;
+      background: rgba(255,215,0,.08); border: 2px dashed rgba(255,215,0,.4);
+      border-radius: 14px; cursor: pointer; color: #FFD700;
+      font-size: 14px; font-weight: 700; transition: all .2s ease;
+    }
+    .avatar-upload-btn:hover { background: rgba(255,215,0,.15); border-color: #FFD700; }
+
+    .input-group{ margin-bottom:20px; }
+    .input-label{ color:rgba(255,215,0,.7); font-size:14px; margin-bottom:8px; display:block; }
+    .input-field{
+      width:100%; padding:15px;
+      background: rgba(255,215,0,.1);
+      border:2px solid rgba(255,215,0,.3);
+      border-radius:10px; color:#fff; font-size:16px; outline:none; transition:all .3s ease;
+    }
+    .input-field:focus{ border-color:#FFD700; background:rgba(255,215,0,.15); }
+    .stats-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:15px; margin-top:20px; }
+    .stat-card{ background:rgba(0,0,0,.3); padding:15px; border-radius:12px; text-align:center; }
+    .stat-value{ font-size:28px; font-weight:800; color:#FFD700; }
+    .stat-label{ font-size:12px; color:rgba(255,215,0,.6); margin-top:5px; }
+
+    /* Настройки */
+    .settings-item{ display:flex; align-items:center; justify-content:space-between; padding:20px;
+      background:rgba(0,0,0,.3); border-radius:12px; margin-bottom:10px;
+    }
+    .settings-label{ font-size:16px; color:#fff; }
+    .toggle{ position:relative; width:50px; height:26px; background:rgba(255,215,0,.2);
+      border-radius:13px; cursor:pointer; transition:background .3s ease;
+    }
+    .toggle.active{ background:#FFD700; }
+    .toggle-thumb{ position:absolute; top:3px; left:3px; width:20px; height:20px; background:#fff;
+      border-radius:50%; transition:transform .3s ease;
+    }
+    .toggle.active .toggle-thumb{ transform:translateX(24px); }
+
+    /* Лобби */
+    .lobby-header{
+      background: linear-gradient(145deg, #2a2a3e 0%, #1f1f2e 100%);
+      border:2px solid #FFD700; border-radius:15px; padding:20px; margin-bottom:20px; text-align:center;
+    }
+    .lobby-code{ font-size:32px; font-weight:900; color:#FFD700; letter-spacing:8px; margin:10px 0; }
+    .lobby-status{ color:rgba(255,215,0,.7); font-size:14px; }
+
+    .players-list{ background:rgba(0,0,0,.3); border-radius:15px; padding:20px; margin-bottom:20px; }
+    .players-title{ color:#FFD700; font-size:18px; font-weight:700; margin-bottom:15px; }
+    .player-item{ display:flex; align-items:center; gap:15px; padding:15px;
+      background:rgba(255,215,0,.1); border-radius:10px; margin-bottom:10px;
+    }
+    .player-avatar{ width:40px; height:40px;
+      background: linear-gradient(145deg, #FFD700 0%, #DAA520 100%);
+      border-radius:50%; display:flex; align-items:center; justify-content:center;
+      font-weight:700; color:#000;
+    }
+    .player-info{ flex:1; }
+    .player-name{ font-weight:700; color:#fff; }
+    .player-status{ font-size:12px; color:rgba(255,215,0,.6); }
+    .player-badge{ background:#FFD700; color:#000; padding:4px 12px; border-radius:12px;
+      font-size:12px; font-weight:700;
+    }
+
+    /* Создание/поиск лобби */
+    .lobby-action-card{
+      background: linear-gradient(145deg, #2a2a3e 0%, #1f1f2e 100%);
+      border:2px solid #FFD700; border-radius:20px; padding:30px; margin-bottom:20px;
+    }
+    .action-title{ color:#FFD700; font-size:24px; font-weight:700; margin-bottom:20px; text-align:center; }
+    .btn-primary{
+      width:100%; padding:18px;
+      background: linear-gradient(145deg, #FFD700 0%, #DAA520 100%);
+      border:none; border-radius:12px; color:#000; font-size:18px; font-weight:700; cursor:pointer;
+      transition:all .3s ease; margin-top:15px;
+    }
+    .btn-primary:hover{ transform:translateY(-2px); box-shadow:0 8px 25px rgba(255,215,0,.6); }
+    .btn-secondary{
+      width:100%; padding:18px;
+      background: linear-gradient(145deg, #666 0%, #444 100%);
+      border:none; border-radius:12px; color:#fff; font-size:18px; font-weight:700; cursor:pointer;
+      transition:all .3s ease; margin-top:10px;
+    }
+    .btn-danger{ background: linear-gradient(145deg, #ff6b6b 0%, #ee5a6f 100%); }
+
+    /* Карточка лото */
+    .game-container{ max-width:800px; margin:0 auto; }
+    .drawn-numbers{
+      background:rgba(0,0,0,.4);
+      border:2px solid rgba(255,215,0,.3);
+      border-radius:15px; padding:15px; margin-bottom:20px;
+    }
+    .drawn-numbers-title{ color:#FFD700; font-size:16px; font-weight:700; margin-bottom:10px; text-align:center; }
+    .drawn-list{ display:flex; flex-wrap:nowrap; gap:6px; min-height:48px; overflow-x:auto; padding-bottom:6px; align-items:center; }
+    .drawn-list::-webkit-scrollbar { height: 3px; }
+    .drawn-list::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.4); border-radius:3px; }
+    .drawn-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius:3px; }
+    .drawn-number{
+      width:40px; height:40px; min-width:40px;
+      background: linear-gradient(145deg, #FFD700 0%, #DAA520 100%);
+      border-radius:50%; display:flex; align-items:center; justify-content:center;
+      font-weight:800; color:#000; font-size:15px;
+      box-shadow:0 4px 8px rgba(0,0,0,.3);
+      flex-shrink:0;
+    }
+    .card-wrapper{
+      background: linear-gradient(145deg, #2a2a3e 0%, #1f1f2e 100%);
+      border:3px solid #FFD700; border-radius:20px; padding:20px; margin-bottom:20px;
+    }
+    .loto-card{
+      display:grid; grid-template-columns:repeat(9,1fr); grid-template-rows:repeat(3,1fr);
+      gap:4px; background:rgba(0,0,0,.3); padding:8px; border-radius:12px;
+    }
+    .cell{
+      aspect-ratio:1;
+      background: linear-gradient(145deg, #3a3a4e 0%, #2a2a3e 100%);
+      border:2px solid rgba(255,215,0,.2);
+      border-radius:8px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:46px; font-weight:800; color:#fff;
+      cursor:pointer; transition:all .3s cubic-bezier(.34,1.56,.64,1);
+      position:relative; overflow:hidden; user-select:none;
+    }
+    .cell.empty{ background:rgba(0,0,0,.5); border:2px solid rgba(255,215,0,.1); cursor:default; }
+    .cell:not(.empty):not(.marked):not(.disabled):hover{ transform:scale(1.1); border-color:#FFD700; }
+    .cell.marked{
+      background: linear-gradient(145deg, #DAA520 0%, #B8860B 100%);
+      color:#000; border-color:#FFD700; box-shadow:0 0 20px rgba(255,215,0,.6);
+    }
+    .cell.marked::after{ content:'✓'; position:absolute; font-size:24px; color:rgba(0,0,0,.5); }
+    .cell.marked.has-icon::after{ content:''; display:none; }
+    .cell.disabled{ opacity:.5; cursor:not-allowed; }
+    .game-stats{
+      background:rgba(255,215,0,.1);
+      border:2px solid rgba(255,215,0,.3);
+      border-radius:12px; padding:15px; text-align:center; margin-bottom:20px;
+    }
+
+    /* Чат */
+    .chat-card{
+      background: rgba(0,0,0,.3);
+      border: 2px solid rgba(255,215,0,.25);
+      border-radius: 15px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+    .chat-title{
+      color:#FFD700;
+      font-weight:700;
+      margin-bottom:10px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      font-size:14px;
+    }
+    .chat-box{
+      height: 180px;
+      overflow:auto;
+      background: rgba(0,0,0,.35);
+      border-radius: 12px;
+      padding: 10px;
+      border: 1px solid rgba(255,215,0,.15);
+    }
+    .chat-msg{
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(255,215,0,.08);
+      margin-bottom: 8px;
+      border: 1px solid rgba(255,215,0,.10);
+    }
+    .chat-meta{
+      font-size: 12px;
+      color: rgba(255,215,0,.75);
+      margin-bottom: 4px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .chat-text{ font-size: 14px; color:#fff; word-wrap: break-word; }
+    .chat-input-row{
+      display:flex;
+      gap:10px;
+      margin-top:10px;
+    }
+    .chat-input{
+      flex:1;
+      padding: 12px 12px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,215,0,.25);
+      background: rgba(255,215,0,.08);
+      color:#fff;
+      outline:none;
+      font-size: 14px;
+    }
+    .chat-send{
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: none;
+      cursor:pointer;
+      font-weight:800;
+      background: linear-gradient(145deg, #FFD700 0%, #DAA520 100%);
+      color:#000;
+      white-space:nowrap;
+    }
+    .chip-btn{
+      border:none;
+      cursor:pointer;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(255,215,0,.12);
+      color:#FFD700;
+      font-weight:800;
+      font-size: 12px;
+    }
+    .chat-clear-btn{ display:none; }
+
+    /* Админ-панель */
+    .admin-grid{
+      display:grid;
+      gap:12px;
+    }
+    .admin-row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .admin-row .input-field{ margin:0; }
+    .hint{
+      font-size: 12px;
+      color: rgba(255,215,0,.65);
+      margin-top: 8px;
+      line-height: 1.35;
+    }
+
+    /* Модалка */
+    .modal{
+      display:none; position:fixed; top:0; left:0; right:0; bottom:0;
+      background:rgba(0,0,0,.9); z-index:200; align-items:center; justify-content:center; padding:20px;
+    }
+    .modal.show{ display:flex; animation:fadeIn .3s ease-out; }
+    .modal-content{
+      background: linear-gradient(145deg, #2a2a3e 0%, #1f1f2e 100%);
+      border:3px solid #FFD700; border-radius:20px; padding:30px; max-width:400px; width:100%;
+      animation: slideUp .3s ease-out;
+    }
+    @keyframes slideUp { from{transform:translateY(50px); opacity:0;} to{transform:translateY(0); opacity:1;} }
+    .modal-title{ color:#FFD700; font-size:24px; font-weight:700; margin-bottom:20px; text-align:center; }
+    .popup-link{
+      display:block; margin-top:16px; padding:16px;
+      background:linear-gradient(145deg,#FFD700 0%,#DAA520 100%);
+      color:#000; border-radius:12px; text-decoration:none;
+      font-size:18px; font-weight:800; text-align:center;
+    }
+    @keyframes popIn { 0%{transform:scale(0); opacity:0;} 100%{transform:scale(1); opacity:1;} }
+
+
+
+        /* Стили закрашивания */
+        .cell.marked { position: relative; }
+        .cell.marked .mark-icon {
+          position: absolute; font-size: 20px; line-height:1;
+          top:50%; left:50%; transform:translate(-50%,-50%);
+          pointer-events:none; display:flex; align-items:center; justify-content:center;
+          max-width:90%; max-height:90%;
+        }
+        .cell.marked-emoji {
+          background: linear-gradient(145deg, #DAA520 0%, #B8860B 100%) !important;
+        }
+
+        /* Выбор стиля — плитки */
+        .mark-style-picker {
+          display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
+        }
+        .mark-style-btn {
+          width: 48px; height: 48px; border-radius: 12px; border: 2px solid rgba(255,215,0,.3);
+          background: rgba(255,215,0,.08); cursor: pointer; font-size: 22px;
+          display: flex; align-items: center; justify-content: center;
+          transition: all .2s ease; flex-shrink: 0;
+        }
+        .mark-style-btn.active {
+          border-color: #FFD700; background: rgba(255,215,0,.25);
+          box-shadow: 0 0 12px rgba(255,215,0,.4);
+          transform: scale(1.1);
+        }
+        .mark-style-btn:hover { border-color: rgba(255,215,0,.7); background: rgba(255,215,0,.15); }
+        .mark-upload-btn {
+          width: 48px; height: 48px; border-radius: 12px; border: 2px dashed rgba(255,215,0,.5);
+          background: rgba(255,215,0,.05); cursor: pointer; font-size: 20px;
+          display: flex; align-items: center; justify-content: center;
+          transition: all .2s ease; flex-shrink: 0; color: rgba(255,215,0,.7);
+        }
+        .mark-upload-btn:hover { border-color: #FFD700; background: rgba(255,215,0,.15); color: #FFD700; }
+        .mark-custom-wrap { position: relative; }
+        .mark-custom-del {
+          position: absolute; top: -6px; right: -6px;
+          width: 16px; height: 16px; border-radius: 50%;
+          background: #ff4444; color: #fff; font-size: 10px; font-weight: 900;
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer; line-height: 1; z-index: 2;
+        }
+
+
+        /* Тихое уведомление */
+        .toast {
+          position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
+          background: rgba(30,30,50,0.97); border: 2px solid #FFD700; border-radius: 14px;
+          color: #fff; padding: 12px 24px; font-size: 15px; font-weight: 700;
+          z-index: 9999; opacity: 0; transition: all 0.3s ease; pointer-events: none;
+          white-space: nowrap;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* Статус соединения */
+    .conn-status {
+      position: fixed; top: 10px; right: 12px; z-index: 9998;
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(0,0,0,0.7); border-radius: 20px; padding: 5px 10px;
+      font-size: 12px; font-weight: 700; color: #fff;
+      transition: opacity 0.3s;
+    }
+    .conn-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #ff4444;
+      transition: background 0.3s;
+    }
+    .conn-status.connected .conn-dot { background: #44ff88; }
+    .conn-status.connecting .conn-dot { background: #FFD700; animation: blink 1s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* Кроппер аватара */
+    .crop-modal {
+      display:none; position:fixed; inset:0; z-index:10000;
+      background:rgba(0,0,0,.92); flex-direction:column;
+      align-items:center; justify-content:center; gap:16px; padding:20px;
+    }
+    .crop-modal.show { display:flex; }
+    .crop-title { color:#FFD700; font-size:16px; font-weight:900; }
+    .crop-wrap {
+      position:relative; width:280px; height:280px;
+      overflow:hidden; border-radius:12px; cursor:crosshair;
+      background:#111; touch-action:none;
+    }
+    .crop-img {
+      position:absolute; user-select:none; pointer-events:none;
+    }
+    .crop-circle-overlay {
+      position:absolute; inset:0; pointer-events:none;
+      background: radial-gradient(circle closest-side at center, transparent 99%, rgba(0,0,0,0.72) 100%);
+      box-shadow: inset 0 0 0 2px #FFD700;
+      border-radius: 50%;
+      top: 0; left: 0; right: 0; bottom: 0;
+      margin: auto;
+      width: 100%; height: 100%;
+    }
+
+    .crop-controls { display:flex; gap:10px; align-items:center; }
+    .crop-zoom-btn {
+      width:40px; height:40px; border-radius:50%;
+      background:rgba(255,215,0,.15); border:2px solid rgba(255,215,0,.4);
+      color:#FFD700; font-size:22px; font-weight:900; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .crop-zoom-btn:hover { background:rgba(255,215,0,.3); }
+    .crop-zoom-label { color:rgba(255,215,0,.7); font-size:13px; min-width:40px; text-align:center; }
+    .crop-btns { display:flex; gap:12px; }
+    .crop-btn-apply {
+      padding:12px 28px; background:#FFD700; color:#000;
+      border:none; border-radius:12px; font-size:15px; font-weight:900; cursor:pointer;
+    }
+    .crop-btn-cancel {
+      padding:12px 20px; background:rgba(255,255,255,.1); color:#fff;
+      border:2px solid rgba(255,255,255,.2); border-radius:12px; font-size:15px; cursor:pointer;
+    }
+
+    /* Кастомный скроллбар */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,215,0,0.6); }
+        * { scrollbar-width: thin; scrollbar-color: rgba(255,215,0,0.3) transparent; }
+
+    body.no-animations *,
+    body.no-animations *::before,
+    body.no-animations *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+
+    @media (max-width: 600px){
+      .logo-text{ font-size:56px; }
+      .game-container{ max-width:380px; }
+      .card-wrapper{ padding:12px; border-width:2px; border-radius:16px; }
+      .loto-card{ gap:2px; padding:5px; border-radius:10px; }
+      .cell{ font-size:clamp(18px, 5.2vw, 24px); border-width:1px; border-radius:7px; }
+      .cell.marked::after{ font-size:18px; }
+      .drawn-number{ width:36px; height:36px; min-width:36px; font-size:14px; }
+      .chat-box{ height: 160px; }
+    }
+    @media (max-width: 420px){
+      .game-container{ max-width:330px; }
+      .cell{ font-size:clamp(16px, 4.8vw, 20px); }
+      .drawn-numbers{ padding:12px; }
+      .drawn-number{ width:34px; height:34px; min-width:34px; font-size:13px; }
+    }
+  
+        /* Список лобби */
+        .lobbies-list { margin-top: 0; display: flex; flex-direction: column; gap: 10px; }
+        .lobby-row {
+          display: flex; align-items: center; gap: 12px;
+          background: linear-gradient(145deg, #2a2a3e 0%, #1f1f2e 100%);
+          border: 2px solid rgba(255,215,0,0.3);
+          border-radius: 14px; padding: 14px 16px;
+          transition: border-color .2s ease;
+        }
+        .lobby-row:hover { border-color: #FFD700; }
+        .lobby-row-num {
+          width: 36px; height: 36px; border-radius: 50%;
+          background: linear-gradient(145deg, #FFD700, #DAA520);
+          display: flex; align-items: center; justify-content: center;
+          font-weight: 900; color: #000; font-size: 16px; flex-shrink: 0;
+        }
+        .lobby-row-left { flex:1; min-width: 0; }
+        .lobby-row-name { font-weight: 800; font-size: 16px; color: #fff; margin-bottom: 4px; }
+        .lobby-row-meta { font-size: 12px; color: rgba(255,215,0,0.65); }
+        .lobby-join-btn {
+          white-space: nowrap; padding: 10px 18px !important; margin: 0 !important;
+          font-size: 14px !important;
+        }
+        .lobby-join-btn-sm {
+          width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+          background: linear-gradient(145deg, #FFD700, #DAA520);
+          border: none; cursor: pointer; font-size: 18px;
+          display: flex; align-items: center; justify-content: center;
+          transition: transform .2s ease; box-shadow: 0 4px 12px rgba(255,215,0,.4);
+        }
+        .lobby-join-btn-sm:hover { transform: scale(1.1); }
+        .lobby-empty { text-align: center; padding: 30px 0; color: rgba(255,215,0,0.5); font-size: 15px; }
+
+    </style>
+</head>
+<body>
+
+  <!-- Индикатор соединения -->
+  <div class="conn-status connecting" id="connStatus">
+    <div class="conn-dot" id="connDot"></div>
+    <span id="connText">Подключение...</span>
+  </div>
+
+  <!-- Главное меню -->
+  <div class="screen active" id="mainMenu">
+    <div class="logo-big">
+      <div class="logo-text">🎲 ЛОТО</div>
+      <div class="logo-subtitle">Играй и выигрывай</div>
+    </div>
+
+    <div class="menu-buttons">
+      <button class="menu-btn" onclick="showScreen('lobbiesScreen')">
+        <span class="icon">🎮</span><span>Играть</span>
+      </button>
+      <button class="menu-btn" onclick="showScreen('profileScreen')">
+        <span class="icon">👤</span><span>Профиль</span>
+      </button>
+      <button class="menu-btn" onclick="showScreen('settingsScreen')">
+        <span class="icon">⚙️</span><span>Настройки</span>
+      </button>
+      <button class="menu-btn" onclick="showScreen('createLobbyScreen')">
+        <span class="icon">➕</span><span>Создать лобби</span>
+      </button>
+
+      <!-- Админ-кнопка появится только для админов -->
+      <button class="menu-btn" id="adminMenuBtn" style="display:none;" onclick="showScreen('adminPanelScreen')">
+        <span class="icon">🛡️</span><span>Админка</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Профиль -->
+  <div class="screen" id="profileScreen">
+    <div class="header">
+      <button class="back-btn" onclick="showScreen('mainMenu')">‹</button>
+      <div class="header-title">Профиль</div>
+      <div class="header-placeholder"></div>
+    </div>
+
+    <div class="profile-card">
+      <div style="text-align:center; margin-bottom:10px;">
+        <div class="profile-avatar" id="profileAvatar" onclick="toggleAvatarPicker()">👤</div>
+        <span class="avatar-edit-hint" id="avatarHint" onclick="toggleAvatarPicker()" style="cursor:pointer;">ИЗМЕНИТЬ</span>
+      </div>
+
+      <div class="avatar-picker-wrap" id="avatarPickerWrap">
+        <div class="avatar-upload-area">
+          <label class="avatar-upload-btn" id="avatarUploadLabel">
+            📷 Загрузить фото
+            <input type="file" id="avatarFileInput" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none;">
+          </label>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Никнейм</label>
+        <input type="text" class="input-field" id="nicknameInput" placeholder="Введите ник">
+      </div>
+
+      <button class="btn-primary" onclick="saveProfile()">Сохранить</button>
+
+      <!-- Уровень -->
+      <div style="text-align:center;">
+        <div class="level-badge" id="profileLevelBadge">🌱 Ур.1 — Новичок</div>
+      </div>
+      <div class="level-progress-wrap" id="profileLevelProgress" style="display:none;">
+        <div class="level-progress-label">
+          <span id="profileLevelCur"></span><span id="profileLevelNext"></span>
+        </div>
+        <div class="level-progress-bar"><div class="level-progress-fill" id="profileLevelFill" style="width:0%"></div></div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="gamesPlayed">0</div>
+          <div class="stat-label">Игр</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="gamesWon">0</div>
+          <div class="stat-label">Побед</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="winRate">0%</div>
+          <div class="stat-label">Винрейт</div>
+        </div>
+      </div>
+
+      <!-- Стиль закрашивания (перенесён из настроек) -->
+      <div style="padding:16px; background:rgba(0,0,0,.3); border-radius:12px; margin-top:12px;">
+        <div class="settings-label" style="font-size:15px;color:#fff;margin-bottom:8px;">🎯 Стиль закрашивания</div>
+        <div class="mark-style-picker" id="markStylePicker"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Настройки -->
+  <div class="screen" id="settingsScreen">
+    <div class="header">
+      <button class="back-btn" onclick="showScreen('mainMenu')">‹</button>
+      <div class="header-title">Настройки</div>
+      <div class="header-placeholder"></div>
+    </div>
+
+    <div class="profile-card">
+      <div class="settings-item">
+        <div class="settings-label">🔊 Звуковые эффекты</div>
+        <div class="toggle" id="soundToggle" onclick="toggleSetting('sound')">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+      <div class="settings-item">
+        <div class="settings-label">🎉 юбилей?</div>
+        <div class="toggle" id="jubileeToggle" onclick="toggleSetting('jubilee')">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- Модал профиля игрока -->
+  <div class="modal" id="playerProfileModal">
+    <div class="modal-content" style="text-align:center; padding:30px 20px;">
+      <div style="font-size:56px; margin-bottom:10px; width:90px; height:90px; background:linear-gradient(145deg,#FFD700,#DAA520); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 12px;" id="ppAvatar">👤</div>
+      <div style="font-size:22px; font-weight:900; color:#FFD700; margin-bottom:4px;" id="ppName">Игрок</div>
+      <div class="level-badge" id="ppLevel" style="margin:0 auto 16px;">🌱 Ур.1</div>
+      <div class="stats-grid" style="margin-top:0;">
+        <div class="stat-card">
+          <div class="stat-value" id="ppGames">0</div>
+          <div class="stat-label">Игр</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="ppWins">0</div>
+          <div class="stat-label">Побед</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="ppWinrate">0%</div>
+          <div class="stat-label">Винрейт</div>
+        </div>
+      </div>
+      <button class="btn-secondary" style="margin-top:20px;" onclick="closePlayerProfile()">Закрыть</button>
+    </div>
+  </div>
+
+  <div class="modal" id="popupBlockedModal">
+    <div class="modal-content" style="text-align:center; padding:30px 20px;">
+      <div class="modal-title">Новая вкладка заблокирована</div>
+      <div style="color:rgba(255,215,0,.75); line-height:1.45; font-size:14px;">
+        Откройте панель вручную. Игра останется на этой вкладке.
+      </div>
+      <a id="popupBlockedLink" class="popup-link" href="#" target="_blank" rel="noopener noreferrer">Открыть</a>
+      <button class="btn-secondary" style="margin-top:12px;" onclick="closePopupBlockedModal()">Закрыть</button>
+    </div>
+  </div>
+
+  <!-- Список лобби -->
+  <div class="screen" id="lobbiesScreen">
+    <div class="header">
+      <button class="back-btn" onclick="showScreen('mainMenu')">‹</button>
+      <div class="header-title">Лобби</div>
+      <div class="header-placeholder"></div>
+    </div>
+
+    
+    <div class="lobby-action-card">
+      <div class="action-title">Открытые лобби</div>
+      <div id="lobbiesList" class="lobbies-list">
+        <div class="hint">Нажми «Обновить», чтобы загрузить список.</div>
+      </div>
+      <button class="btn-secondary" onclick="refreshLobbyList()">🔄 Обновить</button>
+    </div>
+
+<div class="lobby-action-card">
+      <div class="action-title">Присоединиться к игре</div>
+
+      <div class="input-group">
+        <label class="input-label">Код лобби</label>
+        <input type="text" class="input-field" id="lobbyCodeInput" placeholder="Введите код" maxlength="6">
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Пароль</label>
+        <input type="password" class="input-field" id="lobbyPasswordInput" placeholder="Пароль">
+      </div>
+
+      <button class="btn-primary" onclick="joinLobby()">Войти в лобби</button>
+    </div>
+  </div>
+
+  <!-- Создание лобби -->
+  <div class="screen" id="createLobbyScreen">
+    <div class="header">
+      <button class="back-btn" onclick="showScreen('mainMenu')">‹</button>
+      <div class="header-title">Создать лобби</div>
+      <div class="header-placeholder"></div>
+    </div>
+
+    <div class="lobby-action-card">
+      <div class="action-title">Новая игра</div>
+
+      <div class="input-group">
+        <label class="input-label">Название игры</label>
+        <input type="text" class="input-field" id="lobbyNameInput" placeholder="Моя игра">
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Пароль (необязательно)</label>
+        <input type="password" class="input-field" id="createPasswordInput" placeholder="Оставьте пустым для открытой игры">
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Максимум игроков</label>
+        <input type="number" class="input-field" id="maxPlayersInput" value="10" min="2" max="50">
+      </div>
+
+      <button class="btn-primary" onclick="createLobby()">Создать</button>
+    </div>
+  </div>
+
+  <!-- Лобби (комната ожидания) -->
+  <div class="screen" id="lobbyWaitScreen">
+    <div class="header">
+      <button class="back-btn" onclick="leaveLobby()">‹</button>
+      <div class="header-title">Лобби</div>
+      <div class="header-placeholder"></div>
+    </div>
+
+    <div class="lobby-header">
+      <div class="lobby-status">Код лобби</div>
+      <div class="lobby-code" id="currentLobbyCode">ABC123</div>
+      <div class="lobby-status" id="lobbyPlayerCount">Игроков: 0/10</div>
+    </div>
+
+    <div class="players-list">
+      <div class="players-title">Игроки в лобби</div>
+      <div id="playersContainer"></div>
+    </div>
+
+    <div id="adminControls" style="display:none;">
+      <button class="btn-primary" onclick="startGame()">Начать игру</button>
+      <button class="btn-secondary btn-danger" onclick="closeLobby()">Закрыть лобби</button>
+    </div>
+
+    <div id="playerWaiting" style="text-align:center; color:rgba(255,215,0,.7); margin:20px 0;">
+      Ожидание начала игры...
+    </div>
+
+    <!-- ЧАТ (лобби) -->
+    <div class="chat-card">
+      <div class="chat-title">
+        <span>💬 Чат лобби</span>
+        <button class="chip-btn chat-clear-btn" onclick="clearChatPrompt()">Очистить</button>
+      </div>
+      <div class="chat-box" id="chatBoxLobby"></div>
+      <div class="chat-input-row">
+        <input class="chat-input" id="chatInputLobby" placeholder="Напиши сообщение..." maxlength="200" />
+        <button class="chat-send" onclick="sendChat('lobby')">Отправить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Игра -->
+  <div class="screen" id="gameScreen">
+    <div class="header">
+      <button class="back-btn" onclick="leaveGame()">‹</button>
+      <div class="header-title">Игра</div>
+      <div class="header-placeholder"></div>
+    </div>
+    <div id="creatorButtonsGameContainer" style="display:none; padding:10px; gap:10px; max-width:800px; margin:10px auto; border:1px dashed rgba(255,215,0,0.3); border-radius:10px;"></div>
+
+    <div class="game-container">
+      <div class="drawn-numbers">
+        <div class="drawn-numbers-title">Выпавшие бочонки</div>
+        <div class="drawn-list" id="gameDrawnList"></div>
+      </div>
+
+      <div class="card-wrapper">
+        <div class="loto-card" id="gameLotoCard"></div>
+      </div>
+
+      <div class="game-stats">
+        Отмечено: <span style="color:#FFD700; font-weight:800;" id="gameMarkedCount">0</span>/15
+      </div>
+
+      <!-- УБРАЛ: Новая карточка / Очистить отметки -->
+
+      <!-- ЧАТ (игра) -->
+      <div class="chat-card">
+        <div class="chat-title">
+          <span>💬 Чат игры</span>
+          <button class="chip-btn chat-clear-btn" onclick="clearChatPrompt()">Очистить</button>
+        </div>
+        <div class="chat-box" id="chatBoxGame"></div>
+        <div class="chat-input-row">
+          <input class="chat-input" id="chatInputGame" placeholder="Напиши сообщение..." maxlength="200" />
+          <button class="chat-send" onclick="sendChat('game')">Отправить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Админ-панель -->
+  <div class="screen" id="adminPanelScreen">
+    <div class="header">
+      <button class="back-btn" onclick="showScreen('mainMenu')">‹</button>
+      <div class="header-title">Админка</div>
+      <div class="header-placeholder"></div>
+    </div>
+
+    <div class="profile-card">
+      <div class="action-title" style="margin-top:0;">Управление бочонками</div>
+
+      <div class="admin-grid">
+        <div class="admin-row">
+          <input type="number" class="input-field" id="adminAddNumber" placeholder="Добавить число (1-90)" min="1" max="90">
+          <button class="chat-send" onclick="adminAddBarrel()">Добавить</button>
+        </div>
+
+        <button class="btn-secondary" onclick="adminUndoLast()">↩️ Удалить последнее</button>
+        <button class="btn-secondary btn-danger" onclick="adminResetBarrels()">🧨 Сбросить все бочонки</button>
+
+        <div class="admin-row">
+          <button class="btn-primary" onclick="openOverlay()">🎥 Открыть оверлей</button>
+        </div>
+        <div class="admin-row" style="align-items:center; gap:10px;">
+          <span style="color:#FFD700; font-weight:700; white-space:nowrap;">Вид оверлея:</span>
+          <select class="input-field" id="overlayVariant" style="margin:0;">
+            <option value="clean">1) Прозрачный (текущий)</option>
+            <option value="relay">2) Новый (дерево / relay)</option>
+            <option value="framed">3) Фон + жёлтая рамка</option>
+          </select>
+        </div>
+
+        <div class="hint">
+          Оверлей (<b>overlay.html</b>) берёт данные с сервера через REST API.
+          Открой его в OBS как Browser Source — он автоматически обновляется у всех.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно победы -->
+  <div class="modal" id="winModal">
+    <div class="modal-content">
+      <div class="modal-title">🎉 ЛОТО! 🎉</div>
+      <p style="text-align:center; margin-bottom:20px; font-size:18px;">Поздравляем с победой!</p>
+      <button class="btn-primary" onclick="closeWinModal()">Отлично!</button>
+    </div>
+  </div>
+
+  <!-- Кроппер аватара -->
+  <div class="crop-modal" id="cropModal">
+    <div class="crop-title">Выберите область</div>
+    <div class="crop-wrap" id="cropWrap">
+      <img id="cropImg" class="crop-img" draggable="false">
+      <div class="crop-circle-overlay"></div>
+    </div>
+    <div class="crop-controls">
+      <button class="crop-zoom-btn" onclick="cropZoom(-0.1)">−</button>
+      <div class="crop-zoom-label" id="cropZoomLabel">100%</div>
+      <button class="crop-zoom-btn" onclick="cropZoom(+0.1)">+</button>
+    </div>
+    <div class="crop-btns">
+      <button class="crop-btn-cancel" onclick="closeCropModal()">Отмена</button>
+      <button class="crop-btn-apply" onclick="applyCrop()">Применить</button>
+    </div>
+  </div>
+
+  <script>
+    // ====== НАСТРОЙКА АДМИНОВ ======
+    const ADMIN_IDS = [514468501]; // Almaz
+
+    // ====== BROWSER MODE ======
+
+    // Для браузерных игроков — постоянный ID сохраняется в localStorage
+    function getBrowserUserId() {
+      let id = localStorage.getItem('browserUserId');
+      if (!id) {
+        id = 'b' + Date.now() + Math.floor(Math.random() * 10000);
+        localStorage.setItem('browserUserId', id);
+      }
+      return id;
+    }
+
+    function normalizeLobbyId(value) {
+      if (value === null || value === undefined) return null;
+      const normalized = String(value).trim();
+      if (!normalized || normalized === 'undefined' || normalized === 'null') return null;
+      return normalized;
+    }
+
+    var userId = String(getBrowserUserId());
+    var userName = localStorage.getItem('browserNickname') || 'Игрок';
+    var isSuperAdmin = ADMIN_IDS.includes(Number(userId));
+
+    // ====== СОСТОЯНИЕ ======
+    var currentScreen = 'mainMenu';
+    var currentLobby = null;
+    var currentLobbyId = null;
+    var isAdmin = false;
+    var cardNumbers = []; try { const _saved = localStorage.getItem("cardNumbers"); if(_saved) { cardNumbers = JSON.parse(_saved); } } catch(e) {}
+    var markedCells = new Set(); try { const saved = localStorage.getItem("markedCells"); if(saved) markedCells = new Set(JSON.parse(saved)); } catch(e) {}
+    var drawnNumbers = new Set();
+    var drawnOrder = []; // порядок выпадения
+    var gameScreenShown = false;
+    const DEFAULT_SETTINGS = { sound: true, jubilee: true, vibration: true, animations: true };
+    let settings = { ...DEFAULT_SETTINGS };
+
+    function toBoolSetting(value, fallback) {
+      if (value === undefined || value === null) return fallback;
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'false' || normalized === '0' || normalized === 'off' || normalized === 'no') return false;
+        if (normalized === 'true' || normalized === '1' || normalized === 'on' || normalized === 'yes') return true;
+      }
+      return Boolean(value);
+    }
+
+    function normalizeSettings(raw) {
+      const source = (raw && typeof raw === 'object') ? raw : {};
+      return {
+        sound: toBoolSetting(source.sound, DEFAULT_SETTINGS.sound),
+        jubilee: toBoolSetting(source.jubilee, DEFAULT_SETTINGS.jubilee),
+        vibration: toBoolSetting(source.vibration, DEFAULT_SETTINGS.vibration),
+        animations: toBoolSetting(source.animations, DEFAULT_SETTINGS.animations),
+      };
+    }
+
+    function applySettingsUI() {
+      ['sound', 'jubilee', 'vibration', 'animations'].forEach((setting) => {
+        const el = document.getElementById(setting + 'Toggle');
+        if (el) el.classList.toggle('active', !!settings[setting]);
+      });
+      document.body.classList.toggle('no-animations', !settings.animations);
+    }
+    function vibrate(type = 'light') {
+      if (!settings?.vibration) return;
+      if (!navigator.vibrate) return;
+      const pattern = type === 'success'
+        ? [15, 25, 15]
+        : type === 'error'
+        ? [35, 20, 35]
+        : [12];
+      try { navigator.vibrate(pattern); } catch(_) {}
+    }
+    // Стиль закрашивания ячейки (эмодзи-маркер)
+    const MARK_STYLES = [
+      { id: 'check',    label: '✓',  emoji: null,  img: null },
+      { id: 'star',     label: '⭐', emoji: '⭐',  img: null },
+      { id: 'fire',     label: '🔥', emoji: '🔥',  img: null },
+      { id: 'heart',    label: '❤️', emoji: '❤️', img: null },
+      { id: 'skull',    label: '💀', emoji: '💀',  img: null },
+      { id: 'crown',    label: '👑', emoji: '👑',  img: null },
+      { id: 'boom',     label: '💥', emoji: '💥',  img: null },
+      { id: 'clover',   label: '🍀', emoji: '🍀',  img: null },
+      { id: 'almaz',    label: 'Алмаз',   emoji: null, img: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAABo8ElEQVR4nL392Y9s2ZXmif32cAYbfb5jzAMjGBwyGSQzyRwrs0pV6s6aulsooQAJanQ/SNC7ngRID3rQe/c/IUGAIFRXdQFCddaQyWQymQPJYDAGRsSNuLPPbm7TOWdPelj7mHuwugXkFXSNuOC9Hu7mZrb3Xnutb33ftxTP8PgH334nhRDwPmCtxmqF1hprLb5zpBBAQ1kNMcbSth1VVaKUolmtqeuarutYr9doo9AaytISQgLkuZRSkDTGGKqq4vLyEuc8MUaUThgNk9GI2eU50XvqQSmvoSjY2d9mve5Yrxsmky28jwzqAYlIVdWs10u0gu3phNFoxPn5OW3b8sYbb/DDH/5QfodSdF2HMRZrCwIJrTWgmF3O0VoznEwAGA3GrJuOw8MjBoMaHwIGTYoBay0xRoIPVGXJoC4xCtbrFTEllFKEEKiqiqqqmK+WpJQYlBWESAgBrTUhyWsCGAwGJGC5XFJWFSFFvPf8m59/rv62a2mfZQPEGBmPxwBopSgLjfeBruso64roPdYalNbEFChKTYyeRKKsClmIumQ4qqnrAU2zRmtFjJEYk3yooxGLxRJrLVVVMmGE6xxt16JUQitNjIG33noLqxU3b93g4GAfWxRMd7b5+KOPuZwvuX3rDoPBiIuLC548fcxkMgESO9tbvPrqq3zwwQe0zvG1b3yT4XDIb37/+7zy6qscHx3z6quvUNcD7t27x5//6Edsb21zuVjQdo6UEm3bsr29zWRrjC0amvWYuq7QSuOcgwQg32eMYlBX1IUFIinJRlFKkWJEG0NUabP5lVKYsqBUJT4ErFKUZUmMEVsUGGNAK1AaE4P8+xkez7QB2rYlxkhZllhjWK9atNY0TcOgHhCcw3uHKcp8igzOOUII1GVJSlBVFWDx3tGsW0IIxBQ2GyylyPn5GdbKS/TBE0NAG814MuLVV17lrTdf586tmzjXcXp2ws1bNxiORpyez9ja2aF1iQ8/+ojT03NC8CxXS7a3t9maTvnqO++wt39A0/2Ms/NLBsMjbt+5Q0RzenrOzt4+48kW88WCO3df4DvfTaxWa4rjY4pCos39R484Pz+X96gNVil811GWJUqB0ZroA6N6gNaaGCNt22GMLHAfabTWBBLRh83i+xDk/WpNAgpjID9H5x2GRFRADGgUpiie3wbQWrO1tQ1A167RWqO1pq5rqqrCa433Hd77zRstioKiKNDIv7uu23w9xkTwkaQSWiuM0bRdg1KJ8WREXVeUZYHWMByO+Na3fo2XX3mFi/MzTKlpfeTGzRv40IEec/PWLR48eszR0VPOLmY8ePiQra0pKcHXv/4N9vZ3+W/+m/+Wf/hP/jGvvv46Ryen3H/8mJt37vL6G2/ypz/4U4bDIat1w+NHj5jNZrz77W8zmUxRSvHCiy8xHA5597vf5ZNPPuHBgwccHR5R6oK2aVgtljjvKYxFKyiKAqNNDvkJ59mEfqUUISVCiui8+EkhESRGtNIkBYGIToGUEjEmtHckEqHzFEpj7DMt5bNtgBs3blCWJW3bUlYVRiG7XitUUpAiznX4mHJkWGNtgdKK0DmsrXHO4b2nbTusLTDGEqKjqgqUAq0VW1sT7t69zd7eLtPpBB8cb77xJheXF/yrf/Uv+MpX3mRvb49PP/+MV154kdlsxmLV8osPPubxk6d0nefk+BStDd/5zm9w//59vvXuu/zVX/6YVbPmp+/9lN39PV594zXOz8548PgRk60p73z96/zgB3/G0ekpo8GQy4sL/vqv/hpjDBeXM0KM7O/v03Ud3/nOd/j2d77D/+P/9n/n6PETrDaMhwNCCEBCa0NZFEjO5NE5VPcnP5JAKXRUKK0lzJNQKAprUUqxbhqUMRRlmfMQiEBSgPFU2qKNfn4b4OTkJJ96gyKhVcI5uRfLokArOcU+SnITggcSMUY0Cu8TKUW0RiKFi6ASxhi546zm7PyE/f19tra22Nnd4ejoKYNBzXwx42c//QkHB/u8885X+cX7H7Barnl8eMTdO3d47/1f0DrH629+BaUUrgt8/evf4OTkjB/9xV/w3s9/wSef3ePX3/02f/CHf8j9Lx6gFDgXGQ5H/Mmf/BmvvvoK+/sH/NVf/TWvvvoKN2/fomk6UooMRyM+++xTVqsV1lr+5X/33/HKq6/yvd/8TQiRh/cf8N577zEcDjHGYI2haZr8dwtaoZTBdR2qMCTvSYDSGlNYCfMhYowlJUWMiXogz6WUIiXwMVJVFSklTGkpleRbz20DFH0SAsQYIGezEtodMXhSigRiPglgjJEd7wPOdSilc9IX0MaSQqQoDKv1Eu8dBwf7/OZv/gZvv/0WH3/8S1bLFaPRgCdPnrCzs8Orr73Oet1ycbnghRdf5vatW3z22T3qwZjTi6ccfvxL6mrAd777XVrn+PiTX1JUNZ989hlf3H/A177+db74/D5FUXB+fk6MCWstW1tb/PjHf8l0OuHp0yNSSrz80ksMR1N2drY5Pzvn/OyvUEpx+/Ydtra2uDg/Z71Y8Lu//du88eYbjKZj3nvvPU5OTxgOBhTW4kNg3TQUtmIwHNN6x2p+ibVWKgUSyjtAEWJApQhJYa3FpETXdaSUNlVFjBFImKRwSW0iw9/28bcuGwD+6e98O43HY0IItE2DVom6rgkhELwkazGGTQQANskcMZFS2mwKAOc7trd3WCwvOT055etf/zp/+Id/kO99xYMHD1ks5ty8scfTo0NGozHj0YT33/8F9XC8OVlnZxd8du8ex6fHVGXFiy++jNYW0PzlX/4lRWFxrsMYzd27d9Ha8Oabb3J+fo5zjq9+9asoBf/u3/17UGCN5f79+9y+e5d/9Ed/xGeffcpoNOIHf/oDmmbNN77xNf7e3/17/Ml/+A+cnZ5wfn6OUorvfe971HXNk8eP+csf/5jgA8ZamvUapTTT7V3WqxVd11KWlRyOwqKVwntP5zqIYPLyJCWJcUyR0WhMPahBKZarJSlEtHyc/L/f+/T5lIFnZ2d0XScvLkVUCqzWa2KQaDCoB5RVAV5tFtt7T0oJlV+s9wGloKwKBoOSBw/uURQl//gf/0N+8ze/x4MHDzbVxqNHj3nzzTeYzy64vJzzxutf4emTI0DTrFu0DhweH/H08IiTkxPqQYG1BZ988imFLfEhcXZ6zltvf4WdnR20hq5rGY+mfPHFA27fvs0vfvELjCmoypKXX3qFh48e8f3vfZ+trW0++fRTHj1+woMHD9nZ2eabv/ZN7n/+BcYYPvrgA6bjMb/8+JcYo3n7q2/xs/d+xmg44utfe4d3v/NtPvnkE1znGA4HuM6jlaYqK+q6FowgSq5gtSYlKAGlNCYm+ZyMJNnaGMqyRCvBRwalHLoYwuZzfi4bYFDXtG2LVophXdN2DpDysFk3eOepfQnqakP2V4RRUucmEiollq4hhpK33nqd//SP/hHj0Zh79z7lo48+5pVXXuXw8Cnf/OavsVwu+eiXn/DmW29xejbjvZ//Au8DW9s7fPb55xweHlPXA4aDCS42nJycs1qtqcoBw+GQ3/3d3+XGjRvcuHnAo0eSta+WK+bzBXdu3cFqy2qxYh7mTCdTtiZbBB+pqyFbW9s8fPiQoqgIIXJ2ds7BjRt88IsPePTwMb//+7/Lr737a5ycnHDrzm3KuuLTTz/BFgV7+3u0XcvpyQknJyfM50us7XL9Dz6XtjQtCkVMEWMtVWEIMZESECR/Iilc8jjvKHJiKVVBfyU8pw2wNRlhi4LSSi4wn89JKTEZjVBK7q3laklMAWMshSnQSsK9JhKCo3MNECiN4taNXf63//V/jY+RH/7wh1xcXLK/v8flYkZZV7Su4/D4EFvVuJD4kz/+tywXK6aTLR48lTp/OBgRYmJ2OWexXKCVYm/vgBdffDGHe81iseDnP3+P4+Njnjx5gtaa6XRKUpE3vvIGbdPx5MkTmvaIra0dPv7lJ8xmM5q24/x8xng8pqqGHJ88pKwGzJcN1WDELz76JcEHdnd3+clPf04Igb39WzQuMJ5uoQ6PGYynvDSacnR4yHw2kwVTMBiUGG1om4YQIlqBRUmdT8QYlRdXUdhCQLDCoFRCaQgxYUqD1s8RB1jMF1hr0VpC0Xq93tznZVmSUiL4QNJgInTe0XVLEpHkPbZQbE1H7O1t861vfYvvfPfbxBD44z/+Y4y1vPrKK3z+4AHOC0LmXMvl5SXbu/t8du9zzs9nLJcrhsMx3gfGownz+ZyTkzOM0ezu7rK/v88rr7xMVVWcn59zdHRE13UorRjUQ/b3Djg+OWK5XDKoh4QQuffZ56zXa6qq2myYqq54+NFTXnulYnvbcnp2RoyJjz76mOWq4bfeepuzszMOnx4Sgufk5JTxeMxgMOLRo8fcunXALC+4LQq2dnYoCwHQyrLg4uIShaB8xIjWNifMCoES+/+XnCmltEn4vPfElND22VDAZ94AIUZiJ0CPtXZT4/alYI9mKa1xWtN1Duc6rFZYo2ldx9e/9hX+8//inzKdTlktVvzkgw/Y3dtHac29L77gwcPHnF1ccPPmTUajMbaoODw84qMPP+STTz7lt3/7dzg+PqUoCpr1EmMMZWkZDke8/PJL3Lp1ixACjx8/ZjabsVwuGY/H3L59m/V6DUDbNVRVjXOeJ0+eslqt8N5zcHDA5eUlKSWKsuRgb5fJZLx5HycnJzx+/Jjbt2/jfWAwGFBVJQ8ePOSFF+4yn895/PgRg7rm8KmE6OFwSFVVuK5jWNfML+c8PTwieM963TIajRkNB0QvGAqQN8HVo8dO+n0RQyAqNtjCc9sA21tbAKzX6w2g4b1nNBptavmUkiSEwyEKaJs1bbtmNKr5w7/7+3z3O++CilzOZ7Rrx87uHm3T8G///b/ncrGCpKirmsJWnJ/PWDVrHj9+xKNHT3jnna9R2EKSqJQwRnN8fEFZlty5c4f9/X0ODw85OztDa83Z2Rl37tzBGEvfbDo6OiaRGA5HPH78mOPjY27cuIH3AZANPBjUGGO5+8JdrDFcXl7yxhuvc+/e58QYOTjY5/JyTl1X3Lx1i9VyuYmEIURc55jPF7z00st8/PFHbG1t8Ru/8V1Oj06oBzV/8ec/4pcf/xKA0WgokbJpKXLFFPwVYKQUBB8EIURwg5SiIKjeP/MGeKbisa9JVW5QDIdDyUZzMiJgjmVQ1VgUVWFJyZOS5/f/zm/zG7/xLp1v+Zuf/A2oyHhrynKx4oc//HNcF0gJZpcLyqJmZ3+fwWjEbHbJo4eCAezt7bNcNxRFwXK5ZrVa0zQNN2/eZHd3h4cPH3L//n2WyyUnJyfcuHFDEsThkMvLOX/zNz9hsViSpJTm5OSUsiwxxuKcY7FYCMhiLJ0TnH+5XFKWJU0jDaAbN27QNC1KKZbLFQrNV7/6VS4uLnEuYK2h6VrOzs4ZDce89upreO85PTnl8PAp1lh+63d+h1//1q+zu7uLMRpFYjQeMhjWaK1QRqOMAES6KFDWUA0HjLemTLamDEYj6qG8r7qun2kDPFMEuLy8ZDAY0HUdbdt/CMtNSzjGiNGa0aBGAfP5JXdfuMU//Sf/Ce9++9dZrBb84Ad/yt27t7hxcJPDwxk//el7rJqOy+US1wVefvllXAx89uln3LnzAmVR03UepQyPHj3m4OAGJ2dntF0r2fetW9y9e5fDw0Nms5k0WELgzp27lGVBSomzswsODw9pmg6lEqPRICNsjvF4wnq9Zr1e03Udu7v7rFYNx8fH3Ll7l4vzS8rKbrqAW1vbDAYDVqsVk8mUEAMnJyc8evSIW7du0XWe46NjBnXFD37wA77//e9zdnbOZ/e+4OWXX+Tjjz7ijTff5Pu/9Vv8+re+xWKx4OTwmA8+/IDL1YqUkNIwf55972QwGKCUVFze+032/6xA0DNtADktZtP8CUFawf0GcM6hkWphvV6ztTXkN37jXd5++y0+/fQT3v/FzxkMB3z729+lc54f/uCHPD06ZrlaMRjUHBzsEnzgcj5na7rD9s4uH/3yE54+PeTWrVvcunWbpmlZLpe0XcvBwQGvvPIKZ2dnm7v+8vKSW7du4Zzn7OyCwWAom+PikhQVmERZlpyfXzAY1JRlyWq1yrBtIRj8eo21ViqBpsF5S1FIS3a1WuVk0TCfX1JYy9npKWdnZ4zHY+q65vz8HD8eozU8evSIGzdu8viJ5CS3X7jLo8eP2dvZxRaWW7du8eabb3Dz1g1+/Jc/5t5nXzCdbG26qABN02SwLUgOECPeeVDPeQPIBysJSZHbkH1H0BgjXa4UqQcFXTfna1//Gt/73nepBxX3PvuU/YM93n3329T1gL/565/y0/fe4+mRtFl3d/eZXV6itcGYgrsvvsjh4SEfffgx0+k2Cs10ssXh0aGESaU2hJGLiwtu3DhgsVxwcHDAYrFgPl+wu7PLyckJTdNirWV+uWBndxvnAuv1mhs3bnB6ekqMiRhBqUjTNFxcXFCUJcvlUgCbtiOGxHAwZL6Y473HGLkeDg72iSFx4+AmbdtK/qE08/mCuq44OjqiKAp2drZ58uSxnOa65tETSRa1Vtx/cJ+trQm3b9/CGMPxyTkmKcqqkoS776jmzznGiLGGFCLxeQJBT58+/dJit63wAcbjMSklVusGlTwXZ4/42tfe5p//83/GZDLix3/5I27fucne/j7n52fM50v+7Id/zv2Hj9Bas7O9w+XsEoxh3Sx56623CTHw4UcfQ9IM6ortrR3pqzctzvtNGFytVptMe7Gcs16vWSwWbG1NOZ9dsFqtISmapmU8mQLy956dJCE15Ba1laomf+g+9+VPT0+ZTieSsLmOpmmkd+89MURmsxkpwcsvvoQy0u71bUfbdSwWC2azGVvbW4zHUx49esR0usV0PGK5XPLkyWN2d3dZrZYc3DggxsTlfLXJqYw1DEdDtNKEKFHAh74iUPCMG+CZ4kZfi14nNaSU8F3Herlktbika1a8+sqL/Ff/1f+G6daYz7+4B8D+wQF/8eO/5OzskidPDnnvvV9wfHzC9vYu2lo671mtVuwf3GQ6nfLg/kPOzy4wVjOZTCgrScRW6zXeOaqqYjKdEkNgf2+f46NjVssVq9WK6XTKxcUF69VKyDNEqrIipUAIDqMNo9GI+XxO27aEIGVt2zmOj4/xzkm/3nt2dnbw3jOfz/NVNaBpmk0ltG4arLWs12uePj3m1o1bfPfdb3Pz1m1WqxZQXF5ecnR4TF0N2N3d4ez0hPlywWgyZr5c8ujJI6HZFZaDGzfY29vDe894PCbGxOxixtnZGe26pWs9TdPRNC3rpqVp2ue3AXb2tplMx1RVTV0NmQwnHOzsMapqdPDsToa8cOeAf/bP/gm3b+7y8UfvczGbMRhu8cMf/jVf3HvC/LLjT3/wFxydXPDiq68xGE9ZrDvWreNysWR3b5dP793j8OgpMQmxxBQWbS3L1YKmEcDmYH+f0+NDtqZj5rMz5hfnEKAuShazS9y6Ae+JvqNrVgS3whCwKhGdI7SO5AVP70tEgKeHh7gcBabTbQBefvllvPdcXFzQuY7JZMx6vcolmmc4HDIZj1lcXvKXP/oxru148c4d7ty8wWIxJylYt2tWzZLZ5ZytvW1Oz89oXMdoOmHVNDx4/JB11+JT5J1vfI1XX3+D+XKJLUsmWzsU1QAXFSEptCmJypCURhfV89sAJ6dnnJ+f06wb5vM56/VKTtp6xcGNfd5++yv8r/75/5I33nidDz/+iNnlAmMK/uqv/pof/tmP2N2/xbrt+PDDXzKdblMUFacX55ydn/P48Ck3bt5kMJDW73w+x3tHWVlc27FcyF1f1zXD4Yijp4foBJPRmMvZpUDRxrBerVivVhtwSitFWRYMBjVVVVAUlsIaYvQE7wW5zF3MQVUxHo8FyOo6SJEUI5PxmOlkzGJ+yXqxIjhPVZTEEKS/rxTaGMaTEfP5Jf/2j/+Y+WLO3ZdeYDAc0jQNbbtmdnFBWZTML+YMqprDp08ZDQbcuHGTsqyYzWabaPP6669x9+4dyrKkLEu2t7ep6xprBfQaDcdU9QBjnyMU7BpHlxLjUUGKERc9RoHXhrZb8/Y7X+GlV1/m3r3POTw6pqyGvP/+h/zJn/yQrgs4H3nvvfdpmpbdvTHWGo6OjlksFmit+do7X+P+/fuygJ0j+IhPgRRgkGpUgtIWzM7P0Epx6+YtLi7OicFjtKJp1jRryZh7HgIkyqLaULEgURRW2tMxopP8f/SeajRib3dHqgCjca5lNBoRY2Q6nTCbXeSqJ3P7fCDoAEoxnowI3nHnzh1hGd1/wM7+Lju7O3SuY7lYcn52gS2E7Hp+fkFVlTx8+IgXX3yRCx9YzBcoDF3nKMuSr3zlLT788CPu379P03RoLVzKHouJMW4AoueyAYaDsZA+jWU0GqFVpCwNo1HN7//eb/MHf/D7fP7F53zy2X2WixWdP+LP//wvOTq6YDKZ8PTJU05Pz9jZ2cPYkvtffIHrHK5r+eY3vsnx4VMOnzyhWa05Pz+jqmqhQscAKmG1IXiPVrC3t0NwjtVyQYoB7zwxJOqyQOuKmCIpkz2KosBawdNDiKQQUFpTFJm6nenbyXvGoyE9UhSC4+L8jBs3bhBCYDwasVguSLFAGUPnHEoruq5Ba4XOzJ3t7W3OL86xlQUF060tuqZlOV+ymC9zyewzNf0CrXV+jdLp29vbo20bvHNApK4rVquGEFqCl2aSfUYu4P9PG2BnZ5emaYhRIEijFC44ptN9vvsb3+aLB1/w8/ff55NP7vHWW2/x0U/e4+GDp3Sd4/D4lJA0g+GAyXjCgwcP6NZrfAhsT8bs7W6zmF/SrCWZtMZQlRajgBiFgkZisVqilSIGz7ptaBZLlNZYrdGFRiU5nUUhhFIJz0JjA3murhNGbdSJ9apBhUBhLN16TVGVDIpCyBgJispwfi41/mQyYr1eXTWOlELVFSlFynKA7xyubVHA1tZYsAVruJzNhCNYFRwfnTAZT0gknjx5kkvrgMqU8svLS6pqACSOLo7yeym5cWM/Vyts+jA9Csv9w+ezAebzS9quJXiHNmBsYlgXvP3OWyQNj5884uNPfsnNWy/y6Okx73/wMfPVClD4TmrWvT3py7dtS2ELyqLkxsEN1ksBY+Yz6ZJNRkNhDodIStCtW7SKGJVIJJIPrFcrisJsIGhrDFrJB13YEmOkZO03gFIKlRJt5/CdxwVPLA0xaGICbTS+bSiMJaZEUMJd0Aqi6xgPBizritVqRfKOLkas0YyGA0IneQEh4F2Ld9Lvt1quEuciWhmqasDF5QW7Ozs4Fzg7mwl8PqiZzS6pqorT02Nee+11Uko8fPCY4XCQS02F9yLM0VptgKJneTzTBnj7q28xu7jg5OwYCHTdiuFkwOtvvsbDR494/8OPOLu4YN3Ao8dPaNqOpu2o6yEHN28wmUz45JNPaZoVVV0yrocMBgPqsmK1WHB+do5KsDWZYq0BFFFJKFcqYbTBhZZ6WEMK2Bw6E1AWBXVRoIzeUNGtsdjCYo0VAUoSDr5B4ZSmjIbCKLyPdC4TLqwhpYg1CgU453Pre0lpLbs7O8QQCd6TErRNw3K+YDisSQpKbajrIWdn55SDkma1ZP/ggMVyxWrRMBwMcE3D5fmcne1tLuczjp5KnmO1zdEtcHJyzO3bd4gx8vOf/wKFYr1uMwCnCIGrCPC8NoDzHZ1ruXnzgKLQHJ885d133+XW7dv8i3/xL3j//Q8IIXF+0XF2cYlPiv2Dm1RlxWg0Zja7JBG5fecWO1vbFJki1Xad9BSU4vZNaec659Ba07YtSaesGJpjjWEyHOFDoK5ryrLAGkNhJbsXsmVBXQv1qu9YSuKk0RWUytDaDuccioTVAaM1OvPW1l1HZYQbkLSisJp2LfnGaDRmMhrRNA2kJG1a79ChJEbBDzCG7a0p62YFPnB2dMJous1oZGnblul0h7Zds1yucK1DJc352ZlcdVbz8muv5LY0vPnmm3St4969z5lOS6wtJAJl/Oe5QsHv/eynmSJdU1aWplnw2muvcXEx44MPP6RrO3xINK5jOByzszOg6xxFBo9u3NxnOp0wmYwZD4dYhAp9enoKKTIcDJhMxrRtR4gB7xydq6nKMpNRDFuTXQpbYIOnrEoKY4QTUBQUVjaCNiZHANkQZWFJKSuPYsQMa0yraDOQ5bTHGGkvd11HYQ3eO6phzdDmTVQL72G5mFMWNSHfw0pBu26YDkcoEmVRslotqeuSuigpbcGqWTM7O2MwEiQyAUUhpNDgA20rqqLBsGK1XnF6csKdO3foXMfR0REvvvQiVTXg/v0vWCxWmwpAZy7hc9sAPSV5tVpxcHCHutaUZcG/+u//FY+fHFKVNePJFnujKWVRc3Exo67ljW5Ppky2xuxub2OMRqNRMeK9w/uOyXQs2XHbURaWmOJGQbNarqjrgsl4hFJI3zxFqrrOfXMji2/05muy8IXoFEPYYOaKhGu6/G/ZADZa2p6MoRRlUXB2cY5mwGAgYo/RcMBqvSb4SIyeQV3iQ6SuS5rVeiME3Z5OOdjb5cnjR5RVSYgR6x0hBRaLBbYogETTdAwGEmWGwyGLxYoQAls7E7wPXJyfiz7xM+mK3rx5gxgDH374IavVMjeneL5XwP7+TZpmwXg0YGsy4Xu/9YfcvHHAo0ePqKqSO3dfZDiaZqiy4catfbqmY1DV3NjfZ293l7qqIYlAxLuWdq24deMA7xxt1xGszfi2IsaA6xyVKdiZbm2YsH33saenSX9CY1TMX1NYW6C1yWFck6KQNVKK2NKIukYlQrKkzjFQNV57uq4jqMh0NCY2HYPhGIeojFUItMqhjWI4qAh5U1VlgdUaVRU0XcPe3i537t7l4dMnslmGA1LTgIt0XYOpaly7RhEJIaKUYTAY4r0ndGCVpl05koe6HvDgi/sirOk6mnaNsQhHsFdTP68NsFwu2N4a0zZL2rbhu99+l48+/ghF4vvf/z6/9uvf4S9+/FfEdMl4MmK1WNG2a+7cusnO7jaT8QgQ6nPyntJAoaQ5442isAKCqKRz5q4lRDt/jY6eNtLpHuzpmTOagLEahWwAlBawRwvBwhqIKeKDIsZWJOhlhdFF7r2rzfMN6orZxQW+66irCp27n+FyxqCWk1sYQ1GUuOClrAyRwhh8CEymU+5qOJ9dEGIArdGdoywLLmcLRqMRzjsmkzHOOWIU/eNysWQ0PMBgMUYS2dFoxNnpGbt7u+zu7bJczNGqwPv4fEmhrmsY1Huo1DGdjBlUFT//2c944/XX+Af/s7/H6dkMUuTu3TsYY/jF++9zcOOAuq4YjYbUgxqftfc+RVTUUAgoAlAWJYUV0WhKbDiGRVlS1zU+eFJmym6kLVmKnVLEKoPRNsPCojWMSqGUhqRIKklx70XBa7Qm9smfEk2eMQajjdzxE+E7xJSoi4KYIru7u8wuZuwd7EufwhaUQRo5KiQGg4H8XSvG4zHGWlbNiuW6AW2pypKyrLg4n1GWlZTDhWU8HonsrBBRjLbCqdza2ka7FucdKMXWZIu2aZlfLlHqOUeAF+/cpbSGTsPO9hazi3P293d5482v8P5773Exm7O/s82ibXn86CHT8ZiyFF286xpCVQrhMQVUzrhTkjZsz3y1xoq6yMfccdQYbVAFdE5OdN8T7zmIMUaiTxmNk6xYAQqFVkYiDlmZlOSet8aiCoXGQHIiVcsRRytNWRS5HNSMRmPWzZphXWMKUfqU1lJWJebaNVRkJo8xBpQWqNxaIhGfoKg0wTtefvklxuMzzs9nFBR5o2eSZ0o479nZ28vUtlNu3jxgddHQZzHL+WqDJj7r45mvgMt5R9suaFdLgne89ZU3STERXUddljgfIQaUTpSmYFiVuLahXa9xZcmwHoh8nMwyjv3CKbwLObs1lFaR0tWJ9t5TF+WmBZ0yhNtnxMFIP6D/d6+YUcpsTolSGq3TZqGNtWhjpfe/4RgErC1kwxCpagGrUJGitBhjefnFF1itVuxkkqzSClJWSudyE2OpdM18uaS0JeOR5mK2QClpD2ujqCrhHIQgRJTxaMR8saTtPFprDg4OODk54fjklHW7ZrRYCAJprmT53j/HXsDs8gJjFCl6Prt3D9c5XnnxRX74Fz/m5q0b3P/iEW3TEXygLiqqosS1Tk5LWWC+dDoh6oTdiE0jxipU0pikSSiRUBMhGQnXMYogVVYTm6MGSqNtgTHCpY9Rb35Lv2GMtvKMKaG1RSlBCFNMGz8DceIIpCTfZ7LcO6Uk8G1KxBRRWrM1nWKUysBMzImpQWvhDzZdh0qKwhi5EqJma2vCxcUF5+czyReqgsJYbNQbiLkshIr2ySeO1159la2dHU7OTgDRQA5GNUVV0jYdpOcsDdNlgSISEzRdS1lXNG3Lq6+8yvnFnLbpMnz5gFs3b7K/t8fx8THOiZdN13UE5zFG6n8IVwCN1igQC5gQxJsnycnVJJK66tmnfO/3j5gkvKcQUWjpH1zTv8YEKUcLqwzGaBI5eogak8JY0eTEuFn0nn+nch6R+tI0v1alJH8wVqKM0QqyMjqmAEFeb1kUdN6Tug5jLcYoQpZ9DYZDFosFg0HFcrliNlsRE8xXSz5/+CDzL0vKShxWhHlc0imHc462fTZCyDNtgMlkQgyOQT2lsBIk7959gadHP2U2m3Pr1m1+8t57bE2mTCdbzC5mFFrqcY0RCDUG6aXHIGydrBckIdgAmROvlBgoKEnW4Ar1+tX7P3lJDtXm5r9S1cizitxKIyhdDBGUIiWpoY0WRU5KQZJGpNqICH6vc4hPSQvaaKTLp5QGJRtZo9BKXo8iUWhNFyKdc0Jhy64fw8FAOpp6jcvWMJPJhLaV1rNzgcOTY3Z2dzMnwqP1hEIVYpeT4iYX6HWCz20DtJ3DGM3lfM5oWACa8wxZ7u3t8YMP/5yt6Q6tD8K7qwaslyuG9YiqqtEJjJWWqer18PJpZ46bIXtFYU1/d2uI2WRCSVMnAUZLaFcolFW5cri+8HkRQ0Kbqy5h/3WtDSFKXwDVVx09rJrkjzaoRM4ZYhaPJPH6QRI3lCIhxhhSbQRcjJAy7hClKVRojTKG2IhUbJyvr9YHJuMxxhiRpA0qtrZ3CD5mEy3N+UVgZ3cHiHgvwpuu6yiL4pnbws9WBjqP85GuadjenoI2nJ/PaLuO09Nztne2ULrk+OScqq5xmS8nSVLKDFcpfYTSnDYOGCY7j2zIHEpDjBuefEhJTJGy04aUfuSmTNoAIyn1PgSyEcR7SHx6UpRyzyjR25kojZ+kYi4v879TX2UIPKw32rxwBb7kCKRIJJ03QlKEkLkFILZ5yGb2MVKgUNUAnQTkWrcdZSW2OdPpFBKcnz+R924Sk8mE+fySnZ09aYjlTW/yNelSwj/PCFAWNc511NUWWg85PDnn5RduUdWGnd0J4/GIz+89EoOnomIRIyF4EY7mBQm53PIhEGFT96YESUkiZZTOCZdw10wux5SRsK1iJCEJpLIapSElszmhsj6yCYpSZGEqQdIJpTWdC3TBUVdljhx6EwVS/rmyKFFYqXAQkwYBngyBSFLI5kiJFB0hCECVgmw4HwNaJcpc9haFJURInaPUGp8So7omKijKksvlEp8iBzf2WMwWrJs1LniqQYVPAiDNLy/z4nsmA2Eq6fI54gDrnm6ltdCsRxNpgVYVZVlzOVsymYyZqIL5YklRFiiXGcQoqnpA17ZYa6irCk+gLOSlpBDQ2ZTRZASPmOSkqT4ZFHPJhNqcMp37Cn3k6PMCuAKSrh4StnuPvpgXvAeXrIaoDCQJ5yop8fZJV4LNqMDoK9zCO4c1Ugms1y2dd9Krj+GqalCS3RRao6qSogSfOf1dCJDt49ZtS6s6hqOINhoXPIG04TQURUGzFCGrRm0qqGd5PNMG6D9Q57uNOkcxom1bbt+8TWFr1ivHyekFF+dnDAYDxqMRWsnCaRIxBkxVSt8eMoYvdbMCyCFOaY3LwsgUkoTwECBmY0lUThwNWmdDhZz59+3f6697gwugJJwmxLVE6YxDSF4RQsx0MpWxAElR8u2Ru4qJojD51yVUimLZYg06BVl8sqllvm6sMSgtJWFIic57AbtSQlmLtRVFWbJgIaVzWWIoBGY2WhhSVcVqvpDET2uiu2pyPZcN0OvuxuMJWgU+//xzXnv1Li+9+CJd6zg9PSMEoU8brZiMR1RVSdeKfCwpshxL2rNGFxitscZieo2B85kFdOWAkUIiZAwgISVdyqVYDHFzL/+P/cl76ksPs4koEk1QCg3ESC7P5KrQ2qBSIhoE4JFnIwIuRxyyuxdGU9YVaJUPRoarY8hqJ5OVvZBImKiJRlBJYhLgrCgYDga0TSd4RAzZB4mNCKeuayHBRFEhq+fZDewzzq7rqCsJgaLzT3StAxKL5QIQImRKiaaRpksvJauKEpMXzGoJjaovvULEpbSRn/X+A7Iwkuz0p7lf3JihYXEwKzJMTJZ6cW0TSJ5BUliliQSRVuUPMNKf7rh5Xpe1eBJc5Pj3Pr8u+AwbQ11VFGVBbBtShnRDUKBT3jiyGfqyUymNMQJMhUKQQN91GFtQVzWjkc+GkfIZJRKr9ZqUv094DelL193fei2f5Yeud8qcW+O9FxOGxYyL8xnrtUi2pVYWYyPvPTbz8cqypCwKYkoM6wGF0mglJIzVaoVrW5qmocsmFM653PAwhHD1Rl3XXZkr+kDKC6512FjZ9UygHjtQGVcIQWBoow3O+U13USm1iSoJ8F2HDwHnHSEG2mx9ixIIu3UOBQzrmulkIupdbaiqGlSDjx1EhUJsXSTnyPd5UmiriFqRqFg3jSR0waOUZVAPWFdr3GqF0YqyEgn46fEJBFEMK9lRz7cMjDGbGyeRSj9+9FgIjXXNpZ6zWq0wWlNXPSNX7n2lpHYuS4tSsLu1IxaqbWS9XHF6dsrF+Yy2bcUhLEm4l4UxGCNcOZWJkM55rBajap3zBZXYtIn7BTdG05tQ9ydFEEM5yV3X4Z0Tl28j8jTvHM4LwuZDoHMdnXO0bZe7fwZT2HyKDet1Q+c6MY+eTqlthbaWmBayUEpJlRGltyCGaj6bVsiBssZQGqGou9QRkoA8ZVXKZsxi3LquaZarzc8YbTbv97lsAGCDkgHMZqJZ25qOKIsS74WqXBU1JucLPTsnJUEBX3jhBay1dK3n/Pyc4+MTnjx5Itq3thGtW5Y99/d7yienKMrcyZMIY5p2g4aJjZpUB4I99LBxPn3XQ6XSxCTmy845mrYlQhZ6CvPZe0/bCcwak+QEiYQNhlFRiEevUnTesVguUUY2RlGIYXRZ1dnoOuYo40FF8UtKOc9QmhDlmjBak0KkazvaIOHdWruxhC8z0dVnnUOPeT7r45k3QG8CobVmdjkT9o0RrbzWiqKU7pnskbAxjzKm4I033kBp8RA+PT3hyaMjjo9PODk95fTkRE5k5ruDhFqdQSSdGy8KGNVDqmzPPhwMJEEESlMIKEPIf6Tc68uxqw6hwscg2n8XWOVrJybFbLEQwUdGKHvhiM4boKqqzcJXVY2xcs2tViIWLatyQ1Y1tkArKQc753IOkMGiEAFBGIVpJ+6pwXki0v3ssRNjDG0rSmP6BDlIlHyuEaBvklRlgfeWGKTGDSGyWCwYDkcMBgaSECVTMhtd+8svv8x4MmG+WPDFFw94+viQi7Mli8s53nkSiqQkL/cEUpSdD4oUPNZooXXnzeGCl2uibzJ1juFgiC0MIVoUuS2cDZhBav6Qe4yu61i1a1znaVtH5x1t5+jc1SbUSixxQ39C8wYqq1JcuvoEUyvathUH0KrMtnKVSNC0kgxT9dmkVBM++Jzf6E21I2IPL7lH8OjCUhUl2lrOzs4EMRyNSSR852WzpOeYBCqk9Ol19bYoMboiRCiqAbYosKZmNrsgaU1RlaASu/s77N/Y5/z8gof3n3Dvk0ccHx/TdA3eB1zXiuVZ8CSN3KPK4F2g8w1rL3ewyVm5ska6hYBuhSunFehCUZlaRBn66oNVudYXgYrDJ0mkRLfQiA4xQOdaYgqkJIhiVDmsK0VvZ2+MQcUok05SxKCpq6G4pHuHc575fEHTNNTjWpLe3A9AFbkr6TFaeH0pBRSJELrcG0n4boXzgUKVOBQmJckJ6gpdiH9RSFk3+TxxgJACZVHRrluMtTx9esS9Lz7ntVdeRiGM3PWqk7rXimf+ZDzk1u2bKIXYvX30MQ/vP2a1WtN5MVogSYlZ1yUokVw1TUd0YTM5BNfKiU+R1juhVitY+0CwBcMwzDnIKv9MteEOSCMn5VDc4fKUE+c6ovdE7+m8qIWJQhdDJZKCopDuX1FIG9laizZ5MyC8AxFsRqq6yjB0xPuO9TzQlQZbFOLy3beKgyiS+y5n33YWWxiPUuCDwy08tkqUlVjNzi+XnJ2cbnonVhsGg8Hz2wDGSGInWbMm+CAkTqMoyoq6qrmcLYgxUlcDYhQBZFmUfPLJp7z//vvcv/+AZu3pOkdCzJRNIeTM6924siypBxWubTEarMmGykGuh65pCEpJiNSG5Wq9MV5WWQW0wQuShPIYo4RX1wjW4DpiTz1LAU0GmJS0kNFaEEKjGAwqqrqWkTg5IsgVE9FGTqH3Xf6cpFz03uNjEPEHaiNQjVl2rpKASqiewCLvPeVGlLWSS4m8XJ7bGmmuKaTJ9FxzgNlsRl2PGVRDQuiwRiaI2KKUN6X6rF3q68JaJuMpl5cLPv30Ho8ePWG1XGFMSVlJblCWFqUNRWbx9t1crTV1iLSFpTDQdaKq0a6TJCp5fNRYK1FhuV6hrJSg2kjpqJRY3KMgBTnRohhPwqaJwvFPeUFSiEQliVoCrC6oKinH0CKEDVFa4qUtNh++ttKIaluhZ8WYCC6KJA0lb8tL9tH7KKYUCUlAraBSZi3pTU7Vu4i6HpCCTA7pUcBO8BX9bJXAM22A1bqBZIVxq7Xo2o6O2dvbzk2hEm3AuY6iGFLVJZ1zfPTRR3zwwYeslo2QcrPF3KCyWF3kEytECqMFyEkAWjEwQwprcK3cz8476SLaQnrmbUtIwtpdr1b0bWKlEA6flYoFJa1bpfv+/1XiJYleyHdwBoMMWTcQ8Sll2ZemMLl5lVnFwudbb2hlV46eGp1AWYvS2evfhU0vQjCMK3Aq+JBb2dBT2bx3hIxe9ldEzB4HZJYU7jm2g/cPbpJ8om099aDiYjbns8+/4Otff/tKiFkJ/897R1VOmc8X/Pznv+BytpCdnadhGGOIKJrOYa2AS857jHEbwQVIl9C1rTh+KE1RDYhhLSE8SkcwepfBI4GF66qWxfRkfSCknDCl6PPwCocPIgj12XwpBvDJS9UQFKuuQzei+jGlRAJB4BRGKaKLDIcVW9MJ3ks23jkn+H30KCslZ0C6iUkJ3m+NIeYkVavcqg5XLqtXcLeRDZMCy9VaAlfqeQ6GGJ4zFCyjSgp8cEQfsbakKmsGozHD8YLBQPx3L2fi9j2bXXL49JDZbI5zkjvYrNP33mXAx3C5WLJcruicJxIpK0lsUhRFcIwe78QYqWsb6rLKsi9FCI4UPBpoAesdrRNdXz0YYAotzZ7CSInVRXyK+Fxmds7TtJ20k62laVrarpMmj0rYoqSoa2yEUpcMhkO885SmgBBpmzUfffQJ49GQre1tjNasFithCCXpFEaviNELdwHA6I0uAXruAldwd17olHpjaGka1XVNYeV99JvhufcCiqLEO6FUjUdjjCk2tmshE0C01RS2YLlc8uDBI5p1KzW4DyQVRXgRAqu1Z7Fc0vgOnXGAECOqDSiEgua9x1iTPfUKOt/QdeL+NahrtJXee0wJm6HizgsEW5QFZVVlzr3Gu442C1h9SHQ+0DhHiIkQE6vlAueC6PkKGfHSOE+37ljP5qjTGQno1g07kym7W7vsTCds7xwwu7jg9PQLbhzsURYWlQJtagleC+dBgzXiXBoyLb7/TGUM4FViV5QFA2OxRcWqneOugWPXb/zrTbHnsgHKnHFrbeQOtMVmMlZRlAAYazZt49PsoBlCJnjHuDE3mC/WzC7XaGtRRuNiJKRA6xwXF+ckpRkNR6AN3WJN25wwHY/YHo3omhXr1ZoQPXVdCdMnwiB/wDonUFJa1lirBWZGSi8XgrCCfCDEBMaQYmLdOlJS2SMwcnxyQTKarb0dVIws161IyWzF06MzHnzxhMlwxP7uNvsHu3gfOTw85WBvh2FtxYDCaKxR6KAhCVy9QfAymKSNulIqhYBWhqIQ46kYQ26KZV9CH9Ab+vtzRgJNUWTFTkJraJ2YNg6HA8SDzxOCx3WOJnYcH5+wWq2IIScwubxpmpbZ7BIfDQTHumlRxrC9u8PWzh6dC7gQKOshxlq2d/domzWnh4dE5xhWFdVgQIqeEBOFMcTkabuOuq6wuXFSliV1VQs66J2UXSkbQnQC2iSEptY6T1VWOB8ycFOyd7DH1u4Ot1+8yyeffY578gRrCk7PZtRFRaoU89UK3zZ0Xcvu9hZd07BcrdCqxhggabzXIoWzxZf8DGLuWYuXoSCNIXMR+orEGos1YnTlXEdygaQSkYSxeuNS/lw2wL37D1FYSIrJaMBitSSkkAc8Gr74/D6ucWhluLycsVo1ksGGSHCR4BPeRVaLFpUMsQvMLucURcn27pjt8ZTBdMyTp09IJNquYXW+xGrN/t4+ZVmwtb1FaS3npydiCKUMdTnEpQYlrRaUlVl708mUuh4I2aSKhDag00I4flomcFS2oms7VBFZrVp82wieP6jY2tliMhlBCFTWYEjUpUVQwogeWHR06Ji4PD8nuo7tnSkJyTOsLUAHutChVYXPIBbaioDkGgyc8vg8i8DU1ih89GLEpSEEh8rXgI4aW+R28vNEAg9PzqmrGpWk+bNaXghEWVb4PPGqsAVd27FarekVNr33fYqOzkmSFWNiMh5z584dbCEdLlMWeOd45e4LtL5jPJ1IV27VUBclBYnhoEYrxVzLZI9BvUtRWKpiTHQdGii0pcjy8So3kKIpsMpsSq+6rjfmEku95HI25/LykrqumU6mVIMxOgTaxZLQdWwNBrz+4osMhkNu7x2glKbpWlyzpoyR1XLJYrlgtVpQVwUkuY58ErGLNiYrFlTPVEEpZNi0UflqTRgUxoj1XD9+b75aEqIwmYy22RVNcI30PJNAUxRgLCkKJrBqpcuntYEIwQXms3lu0jhRdeVuXErCtYsxADIgcWd3yiCzW4uikLBGZHdrQuccW1tTQR6HTgZVlZYQI65r2Z6OOWyWpBTZ2poQnKNbS9Y+rGvqshLZVZ5NqHTu5efwa7OrSEqJtmmp64obN24wGAw2RJbYttRlRbNcYQvLQGvKCNWgRmmNr0oYDdEElsOaqra0zRrn3QYhNUajK5unpJqsgOqHZ/XZfn+Kc89BW3ymxMcobOmylOdIuSIotcL77vkKQ0xR4GMUMyNToPWa07MzrC0Juts4egkTR06btQVFIU4gIYqMem9/j6qqUUrTtitBxYKckEhCpyh1dtMIJyAmfPAUCrSSaaN3bt3ghbu38V4sXSygYmQ0GrG9NWVYSyPGgChwkoBHg6pmVA/xQaqLrm2pBzUvvvgiy+VSmEneMayH1LbEdysqUyDKco9fL3J/P6NNKtF2K7rOUdcFg2FFcDJFvbBWpPHDCUXGR6SXIAznvt2rsxJKK0VMKmsXI7ETVrBMY0+46HOjS23cx56rOFQXFTolJoMxoa4YDwtu3LhFVRTM1mtc52TXhkRV1hTFmul0gnM1w8GQ6bajqoZYI67cl7MLXNsRPMTQyXh0pVDJQVI0q7lM59YafCcJm+tIMeBaz2g8ZjSZ4kNH0JL5T0cTxqMxVVFSmUL0hZlpXGaQaDwa0rStCDBSwofIet1syCsgvQOfpDHjfLOxi+9cRwwBH6I0fogkAsNhxXgyoaqqPtCTUqKsKoaDAVqDKSTTTyptSLBoIaIWNglI5oWuXBpLo8RuzjuxtOsPlhBlPaT4fDcAuexw3uE7MVuejMeEXGuvV2tKW3CwJ61f7xzD4ZBET6YUWLZzHc26wRpYrVa0TYPL9CxSwmcShlGZ768zozZKcmWMkfo+081sUUJyWG3FR4jM8nVOQmmUPMTnXrvVRqTmVqxius5tXEOFdCJ6gJiyHZzSQGTRLOUgaMH3tVIUpqKsRgwGAwaDYWY9V2j0lwiriYAPbkOR70Ec5zzJX4VxlSFrMvch+A5jFfVgmEUrsr20Ek7BaDTmp4/On88GOD0+lnpVaarC4tcLjg6fELuOhw8e0nUtVVmyXrbYomBne1uYMEjDpG0lAbRFwchYxtlIeb1e07WtMHE2dPAeHQtXAk0yx74voZLg/QloE9RWaFOFNqgAIebTkcDFLk/vzB21nJiqSn5HYcVvUCsZ1FAMaozVG+JoDGHDwulJGLbozakk1Ft7NdTBKgnbJmsBEgnn2tx78Jmo0k8D1yh1hZUYIxiLdy0pBCaTEd55fPCygdCYIg+pcs9RHVwoIEp5tl7LkxTGUARPVVcYa3CdKHWNUhSDWlyxlMp0aY0tbd79Yo44Go82SVDKjJngBdmLUVA5nbWAznnatqFr2islUBAauTU2T/syoiFUPcomvYfYyXxjnduyoQubhd+eTPFJ3M+SgnJQU5RldhwTuZpo/4XD37/YXo8ogx2v2rlGy2uIhCs2UhaVynyClCskRdxMWxOUb1CWLJ0juJZBVWJVYj2bkVJid3uH4D3HR0ckbakmI7r0HDdAaTTrVceLt2/z9ttv8dFHH7BYXKIKw8X5WZZMSAu2qgZyklMiaZU9bhI6y6BQCt8KbbuXPJus2JWwqzYKnxCiTNgkYcqS2tjNLOL1ao0KkaqwlGXNsKqz4FSLnVyIRCXsoV7ZY43FK0/jZFSbKUvqrLQNKVIPBqIZDDAY1qIvzLaxxgopxChBHbQ22KLK5VjKWXxfn/dM5J7elmncSRpPMfsjhOCJXuTrXfBYrahHY2YX5+gUefnll3j3W9/ixTt3mQzHvPezn/Hf/w//hoV3zxcKbtuOv/v7v8f/5f/8fyIGxy9+8RNMGfns449pXcflbEZVDLFFwXQ8FXZtDHTeAZqiGBFiEJp111FmO9iQshBUQ0xC6BDcQCyifRA6ep1Vw1qJs8fs4mKzsVKULn5ZVmglYArRY5LGpyAs3CSCFK2SYA/Rb+bw1VXJZDym6dqNiiklBSriXUdhLKWV/ruJZCoX6CKhYtzI2SU/kDscZWTTZVIpuetH8HTX2r89SziRqOuSZdOiFXzn3W+R4q+xs73FdDymubzALxa88eIL/OHv/jb/+t//h2eeHvpsQ6O2d/k//O//d7SHT/j5T/+GnZs7vP32V1m7QIyW4WBKqS2DgThlV3WJXy6xSmGslTImBkiBUvV8SbkuUkwE5ygUGPKHqhQ+JAorEzIgbXQJy8USrQJaRUH0dMGkHjG0BZPhkNJarBFiB042UYprjDJ0KoBOmMIQoqMua1QKKCLjfI10/opwmaLgE8kHyqqWEjUpjNIU2ubNGrNTCCIu7TdxSoIEJkOhDD6CUUJyce2KFKRC8cnlbqV0RLWGvb1dLArfrFmenaGCUNCPHj/izquv8/XXXuevf/7e89sA3/zKm3z2wYc8+vRjdrYmrAeK87NTXKFxuaNXlTXDwQCjNPPFQoYqxIjSMTOFI6UxRC2llspAke7lU7EfNd+PogWtLOThjlpp5ssFwYv3UKxKiqqkLiqG1YDt3V0O9vdkTIx32bsnUQ9GKK3FvBHB2FWWgqmsANWIs4c1GoXBJyUnVgs3UEUZEkEK2YZWMHvh+yeizy4mCmIQ0giICFVnXkDP//N56mdvarUhsGpRKZMis/NzSqXAe3CO+fkpR4+esLg4JSbNS3fu8tkXXwAnz2cDFCnxJ3/8bwjrFV/96ptE65menmKmQ1IKaCOEyfVqie8czWpJP7albRwqkpM2LyUcCqKc/t7Grc/+BUJmQ70mpY3hglGaQVmzWIpLhmsdg9GUF15+mcIYTs/PiMHjulYs3JVk1YPRiPFkwsnFKcn7/Pya4D2+y2wfm4Skmq1puuBIIWLy5G4Rq8hAKZUFIz0FKYnL28YfwG1s3SU/6Ced9Y5k1z3/+z8anTuGkeViTodCOc9ydsGTzz9nfTlnVBYcP33KwXjK9nj8LEv5jB5BVUGJ4otHD9mZ1OzEPYbHE3aqO6AVXdcxu+woyH1v122gzuB7QUnWzgugJxr8xMY/qMfqUzaLFHlXJHgn10QKFFrTOofVhs4FdramvPzyS8zmMy5nM6bjMYUVI4XWy+iZthVMAGCSR9J2rqOuaynVkPJWSXswy8wMlbGgDMkLZawuSlBKOnNJoQy5g6c2NrYxj9XzvRmGF9OokKS124tfe+Os67I1nZCBJTHh2lYAp9Zx9OQphMjOeIzynq51pM6xvLx8fhvALVdMJmMMiYuzE+rtOrdVW1ZNx9DWKGVYzBcbWxbvfO4HqC+JMb1zEk5RGw4BSm9Ej73eQWd5bkL69IIVgGta2qbBWsP2ZItHDx9zcnqO0YrFYs6wrjJz2dOsO1rnWTUNhdFsT6eMBgMaIPqALaQPr6IsgPgT5JOcT6rJyWfsVT2hJ3ZKgpoiAjrlqyv0V1sWqbroQaWN6KT/0/f64UrJTEobmhgh0DRrtsZjPAq/WjGsSjlQKAr9HJPAUmsIXuDMKKygzjfUg5rlqpHJmedzQtdJm3YwJDhHDBEfRETRdV3mzRXo3C0sMnCCkZo9ZM9dGY0ikcH2k0lzZIgp0TYNu7dvc3R4xPHpiSRYWhg4Mm5GUZUlPibm85WUmNbmBLVme3ubR48ekeqaQVmRfECXkJzPyiJPYYyUkj7kiSRC1PApEWKgMMWVI0mSMO+CvzKlyHd86ztxDM3XQB8Frs8zAIl4Lg+nDMaiYsD7jr3plDbB2jnKwlCmjuQ76udZBWhFRvsKdnd3Wa6WYqgQEKiycaSI8OyaBYPOEVye/acty6YlBOmTR5Vt04YDOTHBZyOFK5PHfjMAm8jRK277qd5d2/H06VMu5ws8iaossUYzqCpI+eRaGTrZm0ssFwuZ+3PzJtOtLc5Pz6iLUiqMbN3WYxUoydJFDHJlQWNyK7m3mwGxj5Fur9poEICNwjcim1kkB/pLJz9kx9CYN5vHY4shq+Wa2hiq0QCbIqFbEzuhsRXWMqjK57cBQohMpiOaruPu3buctHOqeiBE0MtLRmYgAxC6Fp88l/MZVdE7hFiMsnlhpR1cVdVV9otCmf4D0Rv6WN8LIInTd0yJ1WpJDIGd7R2eHh5yOb+kaVuSEoMp30WC69CI9zB0mKJAKU3nnAx7HA2Zz+cA7Oxss1qvGQ6HrNcNg0FFCJm5nDdDv2C94tkYI94B1+b3yth3cRWhh7T7KEDaJHz9Zu6vgD5P6pNL7z3KZqcynajGQ1RZYOsSWxZSsfhAaS3DwXMcH7+9s4PJ49jefuernHZL1HQocq1G1C/eeXwSZw859VJ7e+eoinxqcrsmIRElJfHZDSFs7tDMfJfTE8Vvr3OO1ksy98KLL6BUomkbMVmGjQzcapVVtgnXugzVakJ0Qvi0ijrWzOaXlEXBzRs36JyTq6GqNsKM6+YRRhtxG1eIH0HP6E2iHQDEMzL3CmKS1x5S3CS5McUvbYDr43chs657EwovRtMvvvQSo0GN8ZJUloNaTKVaaYOPhqNn2gDPxCSMSrHuWn73D/6A3/v7f5+XXnqJ4WCISopBVbNu1qxzmI8pMZ8vcD4QkrROm2aVPQIz1329EgtYa3DR07hOnLKck/ZnFAGkj56161g3De1ySZk7bMfHJyilGdRDirJisVgyv5xndC9l8qUhAA8ePeGzLx4wX63pUKzajsYFlLbML+eMsld/URQyPNrmyWGhl5QJiBViFAMJ14FSciIzciiln4yddcHjslOY31jdxF/5I95HCbkSjBXTCGPEkfyjDz7k4vyC4DzrrsXFgCoLktYbk+lnI4Q9YwRoQqRxjhe/8hoffvBz/vW//Jd89d1vU02mtCvp9DnlCT7h2kiMiq7zuNZTGOm1+9DRtLLzC1Pk1qjaJFKFNqTgN505HyMuZEVMcALvBsuTL+5zci7s4baLnM+WfPLFY4LzfPOd19jb3cY5Rz2oODqZ8bNf3qMJicHjU1546RavvfwSY6VYrYVoqQdiSzu/lDE3PomTd4yRuq5x3qOizgqi3JIuS1DgohBildb46PNd7je+AjFla1pRH+JDoO1yp1JdzwVk8klaNxw9eIrrWp5+fh/dyfuwSjEYT7hctmhTUdgaH54jJ3D3xg3OTyOnJ8f8zV//iC8eP+DVr71DNd2mKkUW3rqG6MRVdIN2xYRR2VsvJnxuYhhl8sCEK53ddYqUhMds3hyFTuZdx7ztmM0XNG1HsgUPHz3mo3sPSCSqQnExu2R/b1dcwGKiripu37zB6cWKy9WCj395j9XlnK++/hp2MhET7Iw1oKJYuV1zN+klZJn5tgnhbZdJKlkwqzdCjbRJ/EIIG35B/96u+xj271l+l8kdzsh6tWZ/ZwurdHYrUeiiYmt3m/ZyReQSXVjWTff8NsDlckFRVowmYxbrFdYUGGOxpWVxvEQZsW332cG6V+aC3JObew8ZzKSzh4/kSRkSlcSb3qxZBCWetu1oV2vapqHrHE3XEYHzszOeHB7ig8z625pOGQ3HLJdLBlVJCpHRoOKVF+5SV+ekRy1N13F+dMJ9QL/wAkzGpLrOQlXp4zdtg9UFxhp57UmcyDf5SUoiLedK3Hs9zF9f4JhEEveri9/z+Tamk95jUOzv71FaS1GI4lpF6RSKPF3saarhEF0UrNrm+W2A84sLfu0bX+X04pzVMk8EdV7auClRVDWrpdidX2e+piTASD/o2FohcXR5NqALLsudxAihH+xMgM47fNbz9+4d63ZN1wWMKbIzh2NYakaTLXZ29tBaIFvnPYVJKG0ZD2ru3txHecfh8SEpOKLriK6j64RmllKNsgpb5Xs9Ciso5cZO309Wmd/QQ9hKa1RQGweV60RNk/GLXgMAVyf+6uQLR8I5j8czmm4xmUypq5rJaExRFZtxOiFFIpHRdEwbAueL54gEns8XHNy8xWcfvSf07xBYN+LsZa2hyyaLwXuRa8Ugi5kSBvH86dumnevQ5HsUCInNUIgQxcMvZcqU80IVU1lg6YMoiFLnKKuCvb1d0IatrR1Kq4leHL4q5GoJzoNRDKuC1155gb2dMcv5nEGWs7VdQ/Ca4WQg9rYa8fu3JT5FdNKbyLDR4uVNEEVRusnu5T+pq/DfR4EYN8nplxzL8r91hsmNNnStYzgcCewcBRtonRemUlmKNe94ilfQ+edIC0eBLSxdK4OfuixXLmyJNTIyzceALYrNG3a+ozRWev3kpkmmSmklgxOjzly8jPunmHJ5JWVXYSzKJkIoKGso2o7lWu5fbSzj0YiqGlDWNaU1VMUIiGLWXFiKUSlegkFOXLW7Szcei9FE27BerRiOB5jCUNY1xhrIvASS/lI1gMmcAqF9bk78pufRgz/XTnn/9+tmlz0ErK9tCiXdKeaLOVUui4NPJBOwVsyyIwmnYDKe8NmTp3TP0yPIVFWmNAXKsiD5QLNcEoMIPo02kqyF+CXQA5XxfiUOmzFp6rIWR838/TFboWqtN1Hjeoj03lNVFcPRUD6k5YrT03NiBGNLoWCXBcO6FBMFIsFLo8WWBWVZyzWybkkp4HzHer3COyfU7a0J9WBIUdrs5JHfdMpqI4VcC0k2Z2/2sJlWcu1Pv8j9RticHr4877fXCXwpKsRIDIHRaIyOKY+oDySrUKagI5GMZt40fPHoEWv/HJPAo+MTDo8OGQwGtEuxLl9cLHCrNdF5iIpCF3Sq23wAkrRIkuO8lErEyKpZU5d1rtel5NsAL9kgoW8Fa60ZjyckRBenjWa5bmizuZPNjiPDuqAelJRlgfMtLiQhoGgYjAbYqsxWMZ7ReEBRCtt4a3vKzs4ew2Et/oNGvP9jUiStNqCQyr38mITC3S/wdUj3P174HOq5YgL3Ib//mesQc0his1ttKdbLFevVkrVrSUXAE0nGUI1HPD465fPHj+h4jhFgWJZMJ1ssTg7lxBUlXdNAZsv6zAAGNuicDG00RCcqlsqIaVJ/P15vmkjXL6NtSF2eMrZe17UIQF1LVVfcvHmL4WBM23piSBitGObFV0bRdMI20tZgyhJdFNRVJR4/wUuLFtlMVVkxGAwoSouGPIxK0XlQ2mBy+JZBVnlRszp3M5jyVxb/OsK3+YlfiQ79z/zqNTAYjRno3H1MgZVvSUrRui6rs6Qln5RiUA+fZSmfbQNUowmT8ZRhPSStlpkh3Irdea6dg8+hP9/3KpMbrBU7+BAj5C5YCOID2JtF90mW1jpjlQmjMq8+iX2LcOwVw6HBmoK27YgBqlLUNIXN83y0fNgxJYqyJiELW46yhtB7irLIJg1C+CjKMv/aRIxK6Ga9b0+MfX2ar4N+5kBmFNHf93mwJV/GNFIubVVe+BRj9jKSazMEwTnKsmK5WKCqOg+TnEMUzaBCUxQVy3XDvS++IBX1M57/Z9wAXZCRL9N6zGz9mP2DfYa3brEILU10on5JkZi9njrXobCya+OVxKlnCWmRz6BS743TV4/ZX9gaysJSZ499lCZRIsMmgaTyrGChZ+ksJEkpUaNIUbLxYVUzHNTIIMiSVJTU5EwfNjz+EMQrQBmN1QpDJDhH0AlrsqtnL3KJYJQYY13R14TLd5X8XaGcMXhU9kFSSVhFmkwX0yaXlJrd7W2GVU1dWF64dVumkJclW3t77Ny+xbJt+ejeQ9ZeMRqPqOrn2A38/NFDVusVB7duYvF8//d+m8/Pz5h5RxtDVsFYXJsnWuo8dCFeNVfI96EPAVL8UqftV//e/5ucDyRkNJyc5oJoOwpVUBZVZgoHkhE3MaFZa0prqWxBZasNAqmNlbwjKmIKmY94PYRHErKhvDUQrxK3foBUTgMlGigyHpAZTvFqslmvhkriOpWfP/WQwMZroW8xa60ZjEdYBcdnZ6zbljsvvUQ9HHB6MeP08pL5qmH34IB6NHmmxX/mDfDg8Jg/+fMf8d23X+fVN97gYrHg4cMHMByBMVR1xWKep2hpi9FZ/ZKBoZR1eqAIXur8fgJ4r/i5ao3qqyELyAcpwx16n9xIYcVsQZBCuVbqshLP4CJSW5lRYLVFpywbL0uSluojeEnmdA/05AVRKqOQSueFyhn+5lpjYwL9q0mfUuItdPXf+ufuI0LvXH6VJ/Q8yF5G/tkX99AxYjP9fdU1zB+sWHnPYLLNyfkZy9ax7q7g9ueyAcZVyXRvh8fHxywXF0y2xvzF3/yErZu3+ca3f42jsyMhPGRql1Ymt0fT5kPUaJQ2ECPWyrQQQcHkdBYZQ7DZFVvrPNwxXalpJRQrBmVJ8IHz01Nm55cYDMPhkLquGQwG1IMBy8WS+WzOPIlde1FWVKMhw/GIQT3Ijt5+k4DGzZUUNpujfygUMU8Yu75Rr5esecQgvVWtQNxK0Mk8kKp/NvnvZvOzkYjRiq3JhLOTE9Cyud97/3PQljfeeYd1cDI1FMV6vX6+8vCdvX1G0ynvvPoC//r/9f/k7/yd36Oqap4+esxbb3+FsixpG4MxuQrQQqOOG0wgioO2NRCyLDqXiD3EeoUdkEmgcYPMXdGmrPgMzeecnZ5xcXaGbzyhS5ymU4wxTLcmjEZDVssl6/V64xZuCks9GbO/t8d0e0v67z0NHbKNTMqWdjFHpfwtKrJR+4AkLFoJjNkvqxLx51XHXaP1lQPY9YiREpSl3ngMKhSnJye88dprqO7qZBdFxd6NG0z39viLv/kpOmmqqkTbX7HB/1s8nmkD1GXNw4eP+Y1f/xp3X3mJy8UKrTQv3b3LuB6gdWIxn6N1dsJSauP/p8ibQiHsWcR72CBf0zn5ikmSv5gSjWs3uYDPjZfCStLTrtecHJ2wuJjTrBtUhNDJVdF1Lc26oQ+zRVEQk0DTSilWTUOzXLO7WLK1vUVRFtiyxBglM/1SylPKr6xxlbmm8FGgTV/XX1G8QDx++u4hZCWx6pNB8teunMf7q6enuxlgfTnn1v4Bw5GQPUxRsG4dx+cXnJ+ckSLoPAjzuXoEzZdL/uZnP+N//vd+j//1f/lf8qf/9t/xxquvcev2HT6/9zmvvPkqzfY2J+cznBduW0xJ7NGQKZ4+yAeLVphemKGuOmW/eq8qpQiZUQwK5xpWqzXzixnz8xlt04LzYrUSRcMXAiwWK2L0G2k5SB/CFha8JzphJq/XK8bjMZPpFGWEpaSU3PcOMX1GSR5xRfH6ldPc5wj5Pr/eF+i/7yoZvGL/9JSwopCmVtO0DIuSi7Mz2N4Ry/mqxBrLqpnzxYNHHB2fojO51ql+kNVz2gAX5xd0bcHW7i5BwcHBAe+8+Rb/w7/5dxyeHXP77i0RW2rR3cec+PR5QI/shShy634EzHUk7Po1IOFN4yMsluvMCwgs5ksWF5c0qxXJR3SIkIwodKJ0ATeWqkpRlnk4JZAUoGRc+2KxYLlcsLW1xXK1oqwrTPYWMlahtDCB+oFXKSXQfZi/lhtcw/z7qHMd6bvCB9g8j2zuq3kB3nsuZhfoFCmtISDsq/F0SlSGs8tLHjx5zNn8ktFwjFKJ0vZJ6t/+8WycwOkWy+UFn3z6GW++fJe3336bP/k3/5bjp09FGNI0YPVVtoxM6op9Bp3LrRjz9M/Maf+PYNOUaVTOESJ0LjJfLFit1wQXWC2WXJ7PCJ3DJkXKTROVKdoq9+b7MSsJMYZs2pYYRTHkg7SitbHMti7Zv7HPeCzVjDEGWyiUhaosMxCVN08KKGXZpHMZ3LlK7dQmocvv6FcQwatHv1Gcc6xWK5aLBcOy5HK1gMLSNYnWKDof+OiTTzmaXbC1u8vaOZQxaPOcXcL6eTf37n3O6dk3+emPfsT7739ASDCfzzk6OuGF115Gm9k1VqycaoMihvyxKVBZabuJDHljhCAOWb2ff+ciq7V4+rXrjvlsJlNGGs/OZMpkOMqiDcXW9h79bD3vHbYQ5nFZyhwfH2TSV3Ati8Wc+WLBk6NDzk9OOTs9ZTSdMt2aUFQlWivKgWFne1vmEWlBC9mUhRLhVCK/r768U9dKvT4C/McL30eLftDVer2WI2IN9588Zd8HquGA9uiYJ0dHHJ+fEVSBzgTXtmty3+TZHs+mC7CKyXTMT37yc27s3eDw4UNWWFRhKMeaw8Mz7rz8KuhE0lEMGpPc/ShDSk6kXYXZhGOlNYE8VKm/H2PEBRnisFismM1WrBZLVsslq/mCrfGUt77xDjf3DyiMZVBUECPGilVN7zOwWi2pqpIQPIOhWKz44EjeMy4GHOze4KW7L3NxecGDJ485PDtnfvmYoqrY2pkwNQOaThxMxrl9rPTVKVdJTCbzNHpCkhL1qrrJuQ0ZAPuVxM+HQMqw8Hy5oB7UeODo7JyHxydUgyEhQdN12VzKEPMmNmhULqGf2wbolJhC3j98wp/+6EfcOrhBkxJWKU5ml7SHh9x8+UUoNbawxH5qplaEbGueYiREqZdDYFNLbzZZf0XkU+KDJ0bParlgvVpy6+YNXrrzIoOq5uT0WIyfipqyqEhpQUoxD3aC1XLJxSzQtg2j0RClNe26Qes8BTUlVGkYjod8/evv8JUYhO2rNecXp9RDy2Q8kWspZiVQab8k/pA/uZcVc2WgQKn+CsikT6WBK97AdY7Aer3eIIERhSkriiB+xRpNSEIm1UpRIBL0qOV7n+sGaKNItlCKD+7d44vHj9meTlgtFrStjIo/W63YroaURclytcjqWynBxBZFEjvVD269ljBd58v3SGBRWCaTMXu7uyTnscawble0zZq6KLhcLGmKhkEt5lDGakInqKCyeThToWhDh1UGVQigFPNIGGNkvm8gUtYl9WhAUZUMJzXr1eUGlGq7VhDD7HCyGfIU++aPyu/nKsRLlZCuEgSusYCS0MJd5+i6jqIoGI3HYC2t8xJNfMBHl2dOCX9S7OUEsYz/X/KL/79sgKIe0HhPVRRoY1l6j5vNNhOyV23D0cUlewdbWRksP+e9IzgZM6PyVJDU/+9XEsCNdWoSkmRdV2xtDXDO0a2lAtNWo0Oi8x3aimHSsl1gC4vxhtB6YpLpZm3XiXeRd1hlN5WITPG0+ZNIBBWxFpKKLFYLBsMKayd0XbcRrVxn9fR4gHwtZfBnwyK59p7iphLqAS6QaOGDmEVpI4Oh68EAhyIaTfDZmCpdkUZT6OVnApBFxfPdAClImAqZsWOLQqTRSlPUlm6VODo+5tfeeYPl5Ty7dOaxrCmgtd0sekgpEzGv3kCMEZ8h4f5qKIoilzoRUyhiJ2E4dDLh02or9m1K04Ruk0fEGGi9pe06+tmGRZJxK2L+JKc2aQGehJ+f0NZQmQLvOxRsBlOC3Nmaq9Mtc4qvexqwOfVX848gpbCZ9Ss9DWkmifA1YqxlMBoxmUxYeI8pxAE9KTBJbGRFSCqRQAwlwwYaf5bHM6qDDUbJLPv+0ZMWvAtUpuT46JT1uqEv+UKQsG+zHYtwBXJD5dqYlT6kGqU2wgspv+IV6cJaYpKR8qrQWLI5U+8h6CXK9JTyxrf5tGR2kU6UdYXKZotaI76DGEgBvIy6FbePgLkW7jdC0BSkqQVijJkLQh/EyaT/PqkUrpjCwCZkizfA1XDMwlp2dnbELzmBi54UIaSE1aKQ1rm55n0keUfUYr61kZQ/jw2wPZyQ3/uVpClnsSkTJtpVy8MHj7lz64BVI/y7EMSfb2OqkBExlT+c68jfpnpOfbfsqq7vMXeV37hOWkylEqQYKIu+sdTShU74AoUlRi/RK2pUtGik1PRJDJtCuko6Tep7+1dUrU2OEhNJX93j15M5pcQcKiZpQ8vVIBPVlbpi/MQkzig+Rdq2paoHjEYj+X3WUsaESYrZYi5Do8siA2AdXskQTXmoaxHnOW2AK+BzQ3GXN2w0xhqstrTrBccnp9y9c1OUuC5bsfzKdKsUhUZ2nSnbQ6XXk8LNwhhLUhI2fSQLSmK+W/O/sy5fWrCGqwRTLN6btqVzgWow2Ez96v/E/HoU2SDCXNHVNv89J3R9Y+k6xeuqKxhkSlg+/TrD0Jvvj3FT+oUUKcuKqqzw0WMLi2paKmuYDIdUwyGunyWkreRQFOJZaIxcJM+zGeSDzPkJCuT+FJ5+yth5yvq48/Nz1uu10LO8Q2uFd3mSNhI9YoyYHEV6BZE0eb/8UKqvFpBQT0TlTmJUorwVgmYgJmEnC+5uUEoSMJm1lxNPJQwcvfEElgTOaCPKn6Q2tjXOOxR6c63IC/pyBICrrF+uFXE2EzngFdE1pT4hTPjsnF6W5cZg05giVzGGUV2Lh2ICFSNVmV1Me3kZaTMm57lugLISZUrqTf208NQVaoOIaWM4Pj7hYrbgxt423gn86p2XTmCUe0xOUe5l51Cm4hUjiJwn9P9dPnuN1RZV5rs1QlJK+vdRo0rhHXrnZZonMo+nfyKjNdoaCiuYv8pdPKOLPLNPQa8AyqQVcQOVnxfs4Kr/fj3899iFUiYPhrxKIHsn0L4lHLxMFa+qOjuOaKq6Ev9kJUaUzjuUz85oKWVqfMhuIjGzkNTz3QDrdStz9GI2XtR60/0qrMU7j04R1zb88rMv2N3dZd156kJOXG/WHMmmSkmJBqDvxSsFyhCj2MoKdUzg1iI7ictCKrqYp34oiQC+R+GMyT4/ZkOx6hdBWEcSQo3S2ddPbSKD0j1G0G8+hQ+RmLw0lIwmevLVQy5rr4ghIJWMVgZl9ZeuN3kNV9eWURqrNVaccTAkjIQzTGUJBhovc44Lo6mHYy4vZ0TE9MIHsd5/ru3go6Mj0ApblsQoHbWeDauVLKY1hhg63nv/F7z5xusUZUXTrDe9AaV6WDRn91zj4kUhWSpjv/SBbq6FfNder+U1UuL110Rv994vSq/C2VDMlAgsrws04ErJK7i/JsQ81hY2p/xLGABkjsFVArmRgW3mJ11Jw3rs/1dfmzEGm0mh/fvd2t5CP36SB2SKsfUqG23YUrwJq7Ikqitc4W/7eKYNIKhYwWgkUz7WTSMTMTLat+HOacNi1fLLT+/xG+9+k+PlAk26dgL6pIhNDnCVUcuwpOsfnM41df8Rqtzw6WljhRXrmRT9hlfYs2z6E9IvUFmWGFNsevG9Vcv1hBNk+lm6lrypTGfsv997cf2SCCCvdYMtJDZj7uVz+zLABbKJqqravI/+Oa21jMdj2qZhON7GFAXns0u0MplK3vejsnTtGXfAs9nEeYcpbJ6urbKnviBu0ofPdx1CvfrJT3/Oq6+8zGA8pZnPhNeXorRUEySu+HT9I4SQw3m6VntffWhlbs8anecEb1jEkILe/LuPBNZKmGzblpRS3gDSILLWbjx6+lPd+/YpJUnp1aJJO3sDAQcZ9S6YSP7vST6X/jT3m0EW94oICnKl9TlCX0EI8jmkTTJ7SWsZjm2VzGt03gk2oZVsAK7/rr/d49mqgGveN5vkJwiSZULAd2KLghJP+8YF3v/FR/zmd38dbcWK3a3bLKyUrloiXiV52S2jz6g3oMq1zJv8u3XuSRgtTFotY76/tFl6okX/Ifc5gWj/JPxXVbUJ7zL/sCD4gAvZ3XxzFQl4028W8UHsr5G+ZBQ2kfxdifooZjfweEWB759D2tRX11nwnsoYqqJkZ3uby2UDA5hOp4QoyGtRyPVU2ALXPRsjGJ5VHKoNLqt6TCE+fMpI5885l00UQGsr/Xil+PiXv+SVl15gMq7xXYvWFrJZU0h+k31v6mySuG2pL2e4SSU05kvwp49RRsgq+bD1teZSf1L7jdOzeoSBFDcLcf33lGUp4tcoFq8os4kQSv0q108LrzFGYpCkNWYTDHlOvsTYvaKMxU34vx7lvHMorUV3GSKlLfDdJfPLOShNFI4Nbec2BpbX846/7eMZbeICOmv7TGHz3DohXXamBXr/35hnBCdWTcdPfvoz/t4f/D6uWeEiFLog+kay73g1gYPM/yexcdvuP6D+7wkxYzJJKNNz7yWRMgaCzyfcfilU9wvQgz4p9Tj+lxO4L9X1wHUaV4xXC3jFXL7iAcL1SSfqS98X45e1AHVdb66A/rFerxkMBpAShS0wSkOugGxZZPMtcTV1zgnVrRavgGd5PFsSuAmvV5w4YwzVoKbJjBYQWLavv6uq4v7jpzw5OuLu7ZscPX6ASQqlrQyHuva4ngymGDdu2zYLRPqT3XWd6OVyyA8hQFEIRn6tlQx8qbMor90gTlxX18X1k9T3JQSWDtcW/crYuf+a6m3jVP97rhDKqw1A/rr0RKoqC1GLYuMe4pyjbVv29/fpsuPKYDCgriowJo/nTXjtsYV8po1rUVbxD/6Tv89/+MlHf+u1fGaDCKmrI5H+A9XUVc2i/0DVpsMqi2FliOOf/fmP+cPf+x329m9wdvI0++6yqaOvGijpCpZViqgU3mhMAhXle2IUD+Iydwq1NgLhpisbGm1y2/na6ZbTL6ftV2HnL6t0+o7ll40fXDasvrq3Y/4dKm+wq6tH/q1yH6BXHPGlzL/fgIv5guFwiLWWxrVoa9nf3+fx02Na5+hCwBQVRVEwu7zgj/7oP+Ub736T8faId7/1Lf6P/9f/9vlsAJ2TNO+d2LxnJK285vIloz9y2zIpfAgYY5nNl/z05+/zm9/9dQbjKbPzM0otci/psF0tgs93rrSLtdDLVSQZuQhT6oc4hUzslHBeWUNfrwUXZMiS1pvN2G8Ma8tNfd1vvD7B60s5UrzC/Ptk8loSKJuih4TZLLggnT5/XSDqq36G9P2LPLASxDm97Rr2Dl4QN/OUwAdu3jjA6I9EUl+VzJdznPd85e03efe73+E733sXZRMuPEeDiBQSClHRXiF3UtL0Ei+jDVFl/FvpzNeHoBWnl5f89P0P+c3vfBsXE+vZGSpGjBYIV2PFhy+l7L8jGjwbHF5pvMnQKwLr+piVtn2IDTlfkBoOkV3lTZmFFCmqTf0vMrTsZdRv8l6oEcV3oL9yrmvwRMp9pcqRpsxVznCVmF3hEUVZMN6aMspijxRkXvDl5SWjyQRlDctmjUZRpMTuZMytg13Wjx7hg+flV19i7+YB3//+9/jqN77K2cUZw2FBVT1Hq9j/qcdV1XvtofKkXEWeGaio6prWOT77/HNeefEufrWEJCQQq4y0Z1VfUkV89MQuEJXZGEj12XfadOgyY8YYYkb8ZOBCT8y4elUKKRvR6kvlYXb/E4YQspmcd7guO517qVquIgab5DWmtIkU/c/GGDeCj6qq8M4zGAwYj8cy7zDX7ovFAu88e7t78nqck1G8Gex58cU7/PyjD9g6OOC/+F/85/zO7/0un92/x/HpIePJiBgtbfscI8D/2EMrnUuma1/cfPgJECYtLs/+CZFPPvuM4aBmf2eHi7NTqsGQ9XJJoWSmb2/BEoLYzCYV8VzBwNLAkUkdm3DsRX9vjLRKTd4oKodlcSyTG8JYu3keCesRpRNd5zcdN+89bXY1ieG6B0CPUF5dKz1OAVcb4Lo93Hg8ZjKZyqziKFL51WrFYrHg4GBfOIfeUdcD8V1yLZPRkHo05I/+0R/xD/+z/4zJzg6Pnz6S4dbbE7Rm47j2TOv2jOv9P/H4lV5//9Ucrvs7OJEoyoq283z2+RcoYzm4dYcuBAZDIUVsTJeQxaMnUyRR6TjvZeqG95t2qPeezjl8iLiQbddjIiTo8syinoiitMH7wHLdsFyvhXVMwvkgE02bRv60TdYmCJU9JvH17f/EPkfgKkm87hPYL761lul0yng4hAwJ++BZr9dsb21R14NNztA0jXgqqMi6XTOZTvijf/IPeePtr3B+dsLF7ILhsJbrMkvHnysUDFeARj+3T5gwbF5Iyvf3l34mRopCqE1RKZSxnJzP+Nn7H/Cdd7/Fzt4+lxdn6ML+yhhVaeeqEDbqIpUXUhA2lz+MvLiqHzWTO2/5eTR5MLMChaiOYkibBRT4NgrP7hp62L8nwR9STnq59vqu6v3rOUI/BGIwGHDjxg3quoZrLePVfAlJrN5C8PgQCUqs8pxz+OCwKtH5lvd//j4nFxeMpxP29ncJKaCTJNjS2Xy2pXw2RpDqnTvY1OXaGAEuckdOeuagrjV0IF0LmYKwaat48Pgp2rzH7/zW95hfzvKVAbGThY19XR17gCZP5ALStQZOIM/a2bzGhMtjVo0xJHWlzO3LzJQSySd05gaG0A9zCiid8ojcKxCq7w9cawt8qe4HNjlKCGHT1OlLPueclHnLFYv5nLt378pGi0JkSUoRkrCEq4EYWPaei+PxmO3dXTCKpm1FtXwNbHpuG6Dvikni9GVTJEHPejTtV0OADIZEa7S16MJmJg/8/IOPeO2N13nh5Ze5f+8zjJYmE2h0BEUk6WtVR/9QIpGm/7oShBDYSMUiV1L0K4Apa/nynS1AYR5lmxK9W4hSmqQE5Qn5SvoScJQXoKe2ARt00VrLjRs3GI1GVxETRD/ROfb29iiKgtVqlVnWmeCRFK136BiIOPZu3ebV117DFCWgGI+naLMCEuPxBO8Cq9XqWZby2XKAkK6dRLiWIOXxbiltFkHlIUv9qVFK+vamKCnKAT6CKgqSNvz5j37EdHubvb19WQBrxFjS9Jw9s2n+9FWCztl8H/q1ykMclMp9BqGehyjzinyIdD6Ij7/zkhj2GTziOGoKiy0KbB4fs4lf1xpR/am7miNwZRWfkjB3dnd3N3Bvf/pjjMznCwZ1zXgsZtb9c/fP03XihbxcNuzfvMk777zD3t4+0+0dmtZx/4sHrFZryrLi/Pyctm0ZP+PYuP8P6H7rprI+dugAAAAASUVORK5CYII=',    isPhoto: true  },
+    ];
+    const LEVELS = [
+      { level:1, xp:0, icon:'🌱', name:'Новичок' },
+      { level:2, xp:5, icon:'🔥', name:'Игрок' },
+      { level:3, xp:15, icon:'⚡', name:'Опытный' },
+      { level:4, xp:30, icon:'💫', name:'Мастер' },
+      { level:5, xp:50, icon:'👑', name:'Профи' },
+      { level:6, xp:75, icon:'💎', name:'Элита' },
+      { level:7, xp:100, icon:'🏆', name:'Легенда' },
+      { level:8, xp:150, icon:'🌟', name:'Гранд' },
+      { level:9, xp:200, icon:'🎯', name:'Снайпер' },
+      { level:10, xp:300, icon:'🚀', name:'Космос' },
+    ];
+
+    function getLevel(gamesPlayed) {
+      let cur = LEVELS[0];
+      for (const l of LEVELS) {
+        if (gamesPlayed >= l.xp) cur = l;
+        else break;
+      }
+      return cur;
+    }
+
+    function getNextLevel(gamesPlayed) {
+      for (const l of LEVELS) {
+        if (gamesPlayed < l.xp) return l;
+      }
+      return null;
+    }
+
+    function getMaxCustomSlots(gamesPlayed) {
+      // Слот 1 — всем, слот N — нужен уровень N
+      return Math.min(5, getLevel(gamesPlayed).level);
+    }
+
+    let currentMarkStyle = 'check';
+    let userProfile = { nickname: userName, avatar:'👤', gamesPlayed:0, gamesWon:0 };
+    try {
+      const cachedProfile = JSON.parse(localStorage.getItem('userProfile') || 'null');
+      if (cachedProfile && typeof cachedProfile === 'object') {
+        if (cachedProfile.nickname) {
+          userProfile.nickname = cachedProfile.nickname;
+          userName = cachedProfile.nickname;
+        }
+        if (cachedProfile.avatar) userProfile.avatar = cachedProfile.avatar;
+      }
+    } catch (_) {}
+
+    // ====== ЗВУКИ (Web Audio API — не нужен sounds.json) ======
+    let audioCtx = null;
+    const JUBILEE_SOUND_URL = '/lotomal/jubilee-sound.mp3';
+    let jubileeAudio = null;
+
+    function getAudioCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    function ensureJubileeAudio() {
+      if (jubileeAudio) return jubileeAudio;
+      const audio = new Audio(JUBILEE_SOUND_URL);
+      audio.preload = 'auto';
+      audio.volume = 1;
+      jubileeAudio = audio;
+      return jubileeAudio;
+    }
+
+    async function loadSounds() {
+      // Web Audio не требует загрузки файлов
+      try {
+        ensureJubileeAudio();
+      } catch (_) {}
+    }
+
+    function playJubileeSound() {
+      if (!settings.jubilee) return;
+      try {
+        const audio = ensureJubileeAudio();
+        audio.currentTime = 0;
+        const played = audio.play();
+        if (played && typeof played.catch === 'function') played.catch(() => {});
+      } catch (_) {}
+    }
+
+    function playSound(name) {
+      if (!settings.sound) return;
+      try {
+        const ctx = getAudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+
+        if (name === 'click') {
+          // Короткий щелчок
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.frequency.setValueAtTime(800, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.05);
+          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+          osc.start(); osc.stop(ctx.currentTime + 0.08);
+
+        } else if (name === 'barrel') {
+          // Бочонок — "бум"
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(300, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.3);
+          gain.gain.setValueAtTime(0.5, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+          osc.start(); osc.stop(ctx.currentTime + 0.35);
+
+          // Второй осциллятор — "звон"
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.connect(gain2); gain2.connect(ctx.destination);
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(600, ctx.currentTime);
+          osc2.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.15);
+          gain2.gain.setValueAtTime(0.2, ctx.currentTime);
+          gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+          osc2.start(); osc2.stop(ctx.currentTime + 0.2);
+
+        } else if (name === 'win') {
+          // Победная фанфара
+          const notes = [523, 659, 784, 1047];
+          notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.type = 'sine';
+            const t = ctx.currentTime + i * 0.12;
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(0.0, t);
+            gain.gain.linearRampToValueAtTime(0.4, t + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+            osc.start(t); osc.stop(t + 0.3);
+          });
+        }
+      } catch(_) {}
+    }
+
+
+    function setConnStatus(state, text) {
+      const el = document.getElementById('connStatus');
+      if (!el) return;
+      el.className = 'conn-status ' + (state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : '');
+      document.getElementById('connText').textContent = text;
+      // Hide when connected after 3s
+      if (state === 'connected') setTimeout(() => { el.style.opacity = '0'; }, 3000);
+      else el.style.opacity = '1';
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])
+      );
+    }
+
+    function sameNumberSet(a, b) {
+      if (a.size !== b.size) return false;
+      for (const value of a) if (!b.has(value)) return false;
+      return true;
+    }
+
+    // ====== POLLING & API ======
+    let pollInterval = null;
+    let lastKnownVersion = -1; // Версия состояния, известная клиенту
+    let wsReady = false; const chatMessagesList = []; const chatMessagesIds = new Set(); let chatLobbyId = null;
+    let creatingLobby = false;
+    let startingGame = false;
+    let markSyncInFlight = false;
+    let markSyncPendingCount = 0;
+    let lastLocalMarkEditAt = 0;
+    let lastMarkSyncFinishedAt = 0;
+
+    window.initWS = function() {
+      wsReady = true;
+      // Восстановление сессии — localStorage переживает закрытие вкладки
+      const _sid   = normalizeLobbyId(localStorage.getItem('currentLobbyId'));
+      const _adm   = localStorage.getItem('isAdmin') === 'true';
+      const _card  = localStorage.getItem('cardNumbers');
+      const _marks = localStorage.getItem('markedCells');
+      const _game  = localStorage.getItem('gameScreenShown') === 'true';
+      if (_sid) {
+        currentLobbyId = _sid;
+        isAdmin        = _adm;
+        try { if (_card)   cardNumbers = JSON.parse(_card);           } catch(e){}
+        try { if (_marks)  markedCells = new Set(JSON.parse(_marks)); } catch(e){}
+        if (_game) {
+          gameScreenShown = true;
+          document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+          const gs = document.getElementById('gameScreen');
+          if (gs) { gs.classList.add('active'); currentScreen = 'gameScreen'; }
+          // Не генерируем карту локально — загружаем с сервера через get_state
+          if (cardNumbers && cardNumbers.length) {
+            setTimeout(() => { renderCard(); updateGameStats(); updateGameDisplay(); }, 100);
+          }
+        }
+      }
+      else {
+        localStorage.removeItem('currentLobbyId');
+      }
+      // Авторизация
+      setConnStatus('connecting', 'Подключение...');
+      sendAPI({ action: 'auth', userId, nickname: userProfile.nickname })
+        .then(msg => {
+          handleWsMessage(msg);
+          setConnStatus('connected', 'Онлайн');
+          setTimeout(() => { const el = document.getElementById('connStatus'); if(el) el.style.opacity='0'; }, 2000);
+        })
+        .catch(() => setConnStatus('error', 'Ошибка'));
+      // Поллинг — умный, version-based
+      if (!pollInterval) {
+        pollInterval = setInterval(async () => {
+          if (!currentLobbyId) return;
+          const requestedLobbyId = currentLobbyId;
+          try {
+            // Передаём клиентскую версию — сервер вернёт no_change если ничего не изменилось (1 Redis-команда)
+            const res = await fetch(`/api/loto?action=get_state&lobbyId=${encodeURIComponent(requestedLobbyId)}&userId=${encodeURIComponent(userId)}&v=${encodeURIComponent(lastKnownVersion)}`);
+            if (res.status === 404 || res.status === 410) { clearGameSession(); showScreen('mainMenu'); return; }
+            if (res.ok) {
+              const msg = await res.json();
+              if (requestedLobbyId !== currentLobbyId) return;
+              if (msg.type === 'no_change') return; // Ничего не изменилось — пропускаем
+              if (msg.version !== undefined) lastKnownVersion = String(msg.version);
+              handleWsMessage(msg);
+            }
+          } catch(e) {}
+        }, 1000); // 1 сек вместо 2.5 сек — безопасно т.к. большинство запросов = 1 Redis-команда
+      }
+    }
+
+    window.sendAPI = async function(data) {
+      try {
+        const res = await fetch('/api/loto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const resp = await res.json();
+        // В режиме поллинга мы можем сразу обработать ответ
+        if (resp && resp.type) handleWsMessage(resp);
+        return resp;
+      } catch(e) {
+        return { type: 'error', message: 'Ошибка связи с сервером' };
+      }
+    }
+
+    window.sendWS = function(msg) {
+      // Прокси для обратной совместимости
+      const nickname = (userProfile && userProfile.nickname) || userName || localStorage.getItem('browserNickname') || 'Игрок';
+      const avatar = (userProfile && userProfile.avatar) || '👤';
+      return sendAPI({ ...msg, action: msg.type, userId, lobbyId: currentLobbyId, nickname, avatar });
+    }
+
+    function handleWsMessage(msg) {
+      if (!msg || !msg.type) return;
+      try {
+        switch (msg.type) {
+        case 'auth_success':
+          setConnStatus('connected', 'Онлайн');
+          if (msg.user) {
+            userProfile.gamesPlayed = Number(msg.user.games_played) || 0;
+            userProfile.gamesWon = Number(msg.user.games_won) || 0;
+          }
+          break;
+
+        case 'state_update':
+          if (msg.version !== undefined) lastKnownVersion = String(msg.version);
+          let cardNeedsRefresh = false;
+
+          // ── V5: сервер подтверждает права админа ──────────────────
+          if (msg.isAdmin !== undefined) {
+            isAdmin = msg.isAdmin;
+            localStorage.setItem('isAdmin', String(isAdmin));
+          }
+
+          // ── V5: восстанавливаем карточку с сервера после F5 ───────
+          if (msg.card && Array.isArray(msg.card) && msg.card.length === 3) {
+            cardNumbers = msg.card;
+            localStorage.setItem('cardNumbers', JSON.stringify(cardNumbers));
+          }
+
+          // ── V5: восстанавливаем отмеченные числа ──────────────────
+          if (Array.isArray(msg.markedCells)) {
+            const nextMarked = new Set(msg.markedCells.map(Number).filter(Number.isFinite));
+            const now = Date.now();
+            const protectLocalMarks =
+              markSyncInFlight ||
+              (now - lastLocalMarkEditAt < 1400) ||
+              (now - lastMarkSyncFinishedAt < 450);
+            if ((!protectLocalMarks || sameNumberSet(nextMarked, markedCells)) && !sameNumberSet(nextMarked, markedCells)) {
+              markedCells = nextMarked;
+              cardNeedsRefresh = true;
+            }
+            localStorage.setItem('markedCells', JSON.stringify([...markedCells]));
+          }
+
+          if (msg.lobby) {
+            // Обновляем лобби
+            currentLobbyId = normalizeLobbyId(msg.lobby.id) || currentLobbyId || normalizeLobbyId(localStorage.getItem('currentLobbyId'));
+            currentLobby = {
+              id: currentLobbyId,
+              code: msg.lobby.code || currentLobby?.code || '',
+              name: msg.lobby.name || currentLobby?.name || '',
+              maxPlayers: msg.lobby.max_players || msg.lobby.maxPlayers || currentLobby?.maxPlayers || 10,
+              players: msg.lobby.players || currentLobby?.players || []
+            };
+            // isAdmin уже обновлён выше из msg.isAdmin (серверная проверка)
+            if (msg.lobby.admin_id !== undefined && msg.isAdmin === undefined) {
+              isAdmin = (String(msg.lobby.admin_id).trim() === String(userId).trim());
+            }
+            if (currentLobbyId) localStorage.setItem('currentLobbyId', currentLobbyId);
+            localStorage.setItem('isAdmin', String(isAdmin));
+
+            if (msg.lobby.status === 'playing' && !gameScreenShown && currentScreen !== 'mainMenu') {
+              gameScreenShown = true;
+              localStorage.setItem('gameScreenShown', 'true');
+              // Карточка уже восстановлена из msg.card выше — НЕ генерируем рандомную
+              if (cardNumbers && cardNumbers.length) {
+                showScreen('gameScreen');
+                updateGameDisplay(); renderCard(); updateGameStats();
+              }
+              // Если карточки нет — мост сам подгрузит её через _loadMyCard при game_started
+            }
+            updateLobbyDisplay(); updateGameDisplay();
+            const incomingLobbyId = normalizeLobbyId(msg.lobby?.id || currentLobbyId);
+            if (incomingLobbyId && incomingLobbyId !== chatLobbyId) {
+              resetChatCache(incomingLobbyId);
+            } else if (!chatLobbyId && incomingLobbyId) {
+              chatLobbyId = incomingLobbyId;
+            }
+          }
+
+          const barrels = msg.all || msg.drawn;
+          if (barrels) {
+            const newCount = barrels.length;
+            const oldCount = drawnNumbers.size;
+            drawnNumbers = new Set(barrels.map(Number));
+            drawnOrder = barrels.map(Number);
+            const syncedMarks = new Set([...markedCells].filter(n => drawnNumbers.has(n)));
+            if (!sameNumberSet(syncedMarks, markedCells)) {
+              markedCells = syncedMarks;
+              cardNeedsRefresh = true;
+              localStorage.setItem('markedCells', JSON.stringify([...markedCells]));
+              alreadyWon = false;
+              alreadyNotified14 = false;
+            }
+            updateDrawnNumbersDisplay();
+            if (newCount > oldCount) {
+              playSound('barrel');
+              vibrate('light');
+            }
+          }
+          if (cardNeedsRefresh && cardNumbers && cardNumbers.length) {
+            renderCard();
+            updateGameStats();
+          }
+          if (msg.chat) {
+            const scopedLobbyId = normalizeLobbyId(msg.lobby?.id || currentLobbyId || chatLobbyId);
+            if (Array.isArray(msg.chat) && msg.chat.length === 0 && chatMessagesList.length > 0) {
+              resetChatCache(scopedLobbyId);
+            }
+            msg.chat.forEach(m => appendChatMessage({ ...m, lobbyId: scopedLobbyId }));
+          }
+          break;
+
+        case 'lobby_created':
+          currentLobbyId = normalizeLobbyId(msg.lobby?.id);
+          currentLobby = {
+            id: currentLobbyId,
+            code: msg.lobby.code,
+            name: msg.lobby.name,
+            maxPlayers: msg.lobby.maxPlayers || 10,
+            players: [{ id: userId, nickname: userProfile.nickname, isAdmin: true }]
+          };
+          isAdmin = true;
+          gameScreenShown = false;
+          resetChatCache(currentLobbyId);
+          if (currentLobbyId) localStorage.setItem('currentLobbyId', currentLobbyId);
+          else localStorage.removeItem('currentLobbyId');
+          showScreen('lobbyWaitScreen');
+          updateLobbyDisplay();
+          break;
+
+        case 'lobby_joined':
+          currentLobbyId = normalizeLobbyId(msg.lobbyId || msg.lobby?.id);
+          if (!currentLobbyId) {
+            alert('Ошибка: не удалось определить lobbyId');
+            break;
+          }
+          localStorage.setItem('currentLobbyId', currentLobbyId);
+          isAdmin = msg.isAdmin || false;
+          gameScreenShown = false;
+          lastKnownVersion = -1; // Новое лобби — сбрасываем версию
+          resetChatCache(currentLobbyId);
+          showScreen('lobbyWaitScreen');
+          // Сразу запрашиваем состояние
+          const requestedLobbyId = currentLobbyId;
+          fetch(`/api/loto?action=get_state&lobbyId=${encodeURIComponent(requestedLobbyId)}&userId=${encodeURIComponent(userId)}`)
+            .then(r => r.json())
+            .then(m => {
+              if (requestedLobbyId !== currentLobbyId) return;
+              if (m.version !== undefined) lastKnownVersion = String(m.version);
+              handleWsMessage(m);
+            });
+          break;
+
+        case 'player_joined':
+          if (currentLobby && msg.player) {
+            const nick = (typeof msg.player.nickname === 'object' ? msg.player.nickname?.nickname : msg.player.nickname) || 'Игрок';
+            const av = (typeof msg.player.nickname === 'object' ? msg.player.nickname?.avatar : msg.player.avatar) || '👤';
+            if (!currentLobby.players.find(x => x.id === msg.player.id)) {
+              currentLobby.players.push({ id: msg.player.id, nickname: nick, avatar: av, isAdmin: false });
+            }
+            updateLobbyDisplay();
+          }
+          break;
+
+        case 'player_left':
+          if (currentLobby) {
+            currentLobby.players = currentLobby.players.filter(p => p.id !== msg.userId);
+            updateLobbyDisplay();
+          }
+          break;
+
+        case 'game_started':
+          if (msg.card) {
+            cardNumbers = msg.card;
+          } else {
+            // Карточка придёт от Bridge через _loadMyCard — не генерируем локально
+            if (!cardNumbers || !cardNumbers.length) {
+              // Оставляем пустой массив, Bridge подгрузит карту через Supabase Realtime
+              console.log('[index] game_started: waiting for card from Bridge');
+            }
+          }
+          markedCells.clear();
+          drawnNumbers.clear();
+          drawnOrder = [];
+          alreadyWon = false;
+          alreadyNotified14 = false;
+          gameScreenShown = true;
+          localStorage.setItem('cardNumbers', JSON.stringify(cardNumbers));
+          localStorage.setItem('markedCells', '[]');
+          localStorage.setItem('gameScreenShown', 'true');
+          if (cardNumbers && cardNumbers.length) { renderCard(); updateGameStats(); }
+          if (currentScreen !== 'gameScreen') showScreen('gameScreen');
+          break;
+
+        case 'number_drawn':
+          if (msg.all) {
+            drawnNumbers = new Set(msg.all.map(Number));
+            drawnOrder = msg.all.map(Number);
+          } else {
+            const n = Number(msg.number);
+            drawnNumbers.add(n);
+            if (!drawnOrder.includes(n)) drawnOrder.push(n);
+          }
+          updateDrawnNumbersDisplay();
+          playSound('barrel');
+          vibrate('light');
+          break;
+
+        case 'numbers_updated':
+          drawnNumbers = new Set((msg.all || []).map(Number));
+          drawnOrder = msg.all || [];
+          updateDrawnNumbersDisplay();
+          break;
+
+        case 'chat_message':
+          if (msg.message) appendChatMessage(msg.message);
+          break;
+
+        case 'chat_cleared':
+          resetChatCache(normalizeLobbyId(msg.lobbyId || currentLobbyId));
+          break;
+
+        case 'game_won':
+          if (msg.winnerId === userId) {
+            showWinModal();
+          } else {
+            // Показываем небольшое уведомление
+            const banner = document.createElement('div');
+            banner.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#FFD700;color:#000;padding:15px 25px;border-radius:15px;font-weight:800;font-size:16px;z-index:999;animation:fadeIn .3s ease';
+            banner.textContent = `🎉 ${msg.winnerName} кричит ЛОТО!`;
+            document.body.appendChild(banner);
+            setTimeout(() => banner.remove(), 4000);
+          }
+          break;
+
+        case 'left_lobby':
+          currentLobby = null;
+          currentLobbyId = null;
+          isAdmin = false;
+          gameScreenShown = false;
+          showScreen('mainMenu');
+          break;
+
+        case 'error':
+          alert('❌ ' + msg.message);
+          break;
+      }
+    } catch(err) {
+      console.error('handleWsMessage Error:', err, 'Msg:', msg);
+    }
+    }
+
+    // ====== СПИСОК ЛОББИ (REST /api/lobbies) ======
+    async function refreshLobbyList() {
+      const box = document.getElementById('lobbiesList');
+      if (!box) return;
+      box.innerHTML = '<div class="lobby-empty">⏳ Загрузка...</div>';
+      try {
+        const res = await fetch('/api/loto?action=list_lobbies', { cache: 'no-store' });
+        const lobbies = await res.json();
+        if (!Array.isArray(lobbies) || lobbies.length === 0) {
+          box.innerHTML = '<div class="lobby-empty">🎲 Нет активных лобби.<br><span style="font-size:13px;">Создайте первое!</span></div>';
+          return;
+        }
+        const openLobbies = lobbies.filter((l) => {
+          const raw = l?.has_password;
+          const locked = raw === true || raw === '1' || Number(raw || 0) === 1;
+          return !locked;
+        });
+        if (openLobbies.length === 0) {
+          box.innerHTML = '<div class="lobby-empty">🔓 Нет открытых лобби без пароля.</div>';
+          return;
+        }
+        box.innerHTML = '';
+        openLobbies.forEach((l, idx) => {
+          const row = document.createElement('div');
+          row.className = 'lobby-row';
+          const name = escapeHtml(l.name || 'Лобби');
+          const code = escapeHtml(l.code || '');
+          const pc = Number(l.players_count || 0);
+          const mp = Number(l.max_players || 10);
+          row.innerHTML = `
+            <div class="lobby-row-num">${idx + 1}</div>
+            <div class="lobby-row-left">
+              <div class="lobby-row-name">${name}</div>
+              <div class="lobby-row-meta">👥 ${pc} из ${mp}</div>
+            </div>
+            <button class="lobby-join-btn-sm">▶</button>
+          `;
+          row.querySelector('button').onclick = () => {
+            playSound('click');
+            document.getElementById('lobbyCodeInput').value = code;
+            document.getElementById('lobbyPasswordInput').value = '';
+            joinLobby();
+          };
+          box.appendChild(row);
+        });
+      } catch(e) {
+        box.innerHTML = '<div class="lobby-empty">❌ Ошибка загрузки.<br><span style="font-size:13px;">Проверь соединение.</span></div>';
+      }
+    }
+
+    // ====== НАВИГАЦИЯ ======
+    function resetChatCache(nextLobbyId = null) {
+      chatLobbyId = normalizeLobbyId(nextLobbyId);
+      chatMessagesList.length = 0;
+      chatMessagesIds.clear();
+      ['chatBoxLobby', 'chatBoxGame'].forEach(boxId => {
+        const box = document.getElementById(boxId);
+        if (box) box.innerHTML = '';
+      });
+    }
+
+    function renderChatMessages() {
+      // Re-render all cached chat messages into both chat boxes
+      ['chatBoxLobby', 'chatBoxGame'].forEach(boxId => {
+        const box = document.getElementById(boxId);
+        if (!box) return;
+        // Only add messages that aren't already in this box
+        chatMessagesList.forEach(msg => {
+          if (box.querySelector(`[data-msgid="${msg.id}"]`)) return;
+          const el = document.createElement('div');
+          el.className = 'chat-msg';
+          el.dataset.msgid = msg.id;
+          const dt = new Date(msg.timestamp || Date.now());
+          const hh = String(dt.getHours()).padStart(2,'0');
+          const mm = String(dt.getMinutes()).padStart(2,'0');
+          el.innerHTML = `<div class="chat-meta"><span class="chat-nick" style="cursor:pointer;color:#FFD700;"
+            data-uid="${escapeHtml(String(msg.userId||''))}"
+            data-nick="${escapeHtml(msg.nickname||'Игрок')}"
+            data-av="${escapeHtml(msg.avatar||'👤')}">${escapeHtml(msg.nickname||'Игрок')}</span>
+            <span>${hh}:${mm}</span></div>
+            <div class="chat-text">${escapeHtml(msg.text||'')}</div>`;
+          el.querySelector('.chat-nick').addEventListener('click', e => {
+            const t = e.target;
+            showPlayerProfile({ id: t.dataset.uid, nickname: t.dataset.nick, avatar: t.dataset.av });
+          });
+          box.appendChild(el);
+        });
+        box.scrollTop = box.scrollHeight;
+      });
+    }
+
+    function showScreen(screenId) {
+      // Закрываем пикер аватара при смене экрана
+      const avatarWrap = document.getElementById('avatarPickerWrap');
+      if (avatarWrap) avatarWrap.classList.remove('open');
+      if (screenId === 'adminPanelScreen' && !isSuperAdmin) { alert('❌ Нет доступа'); return; }
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+      currentScreen = screenId; renderChatMessages();
+      if (screenId === 'lobbiesScreen') refreshLobbyList();
+      if (screenId === 'profileScreen') { loadProfile(); initMarkPicker(); }
+    }
+
+    // ====== ПРОФИЛЬ ======
+    async function loadProfile() {
+      const saved = localStorage.getItem('userProfile');
+      if (saved) {
+        try {
+          const p = JSON.parse(saved);
+          userProfile.nickname = p.nickname || userName;
+          // Принимаем только data: URL или короткие emoji
+          const av = p.avatar || '👤';
+          userProfile.avatar = (av.startsWith('data:') || av.length <= 10) ? av : '👤';
+        } catch(_) {}
+      }
+      // Подтягиваем свежую статистику с сервера
+      try {
+        const res = await fetch(`/api/users/${userId}/stats`, { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.nickname && /^Игрок\d*$/.test(userProfile.nickname || '')) {
+            userProfile.nickname = data.nickname;
+          }
+          if (data.avatar && data.avatar !== '👤') {
+            userProfile.avatar = data.avatar;
+          }
+          userProfile.gamesPlayed = data.games_played || 0;
+          userProfile.gamesWon = data.games_won || 0;
+        }
+      } catch(_) {}
+      document.getElementById('nicknameInput').value = userProfile.nickname;
+      updateAvatarDisplay(userProfile.avatar || '👤');
+      document.getElementById('gamesPlayed').textContent = userProfile.gamesPlayed;
+      document.getElementById('gamesWon').textContent = userProfile.gamesWon;
+      const wr = userProfile.gamesPlayed > 0
+        ? Math.round(userProfile.gamesWon / userProfile.gamesPlayed * 100) : 0;
+      document.getElementById('winRate').textContent = wr + '%';
+      updateLevelDisplay(userProfile.gamesPlayed);
+    }
+
+
+    function showToast(msg, duration = 2000) {
+      let t = document.getElementById('toastEl');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'toastEl';
+        t.className = 'toast';
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.classList.remove('show'), duration);
+    }
+
+
+    function initAvatarPicker() {
+      const input = document.getElementById('avatarFileInput');
+      if (!input) return;
+      input.onchange = (e) => handleAvatarUpload(e.target.files[0]);
+    }
+
+    // ====== КРОППЕР ======
+    let _cropState = { scale:1, ox:0, oy:0, dragging:false, lastX:0, lastY:0, naturalW:0, naturalH:0, src:'' };
+    let _cropMode = 'avatar'; // 'avatar' | 'mark'
+    const CROP_SIZE = 280; // px размер области кроппера
+
+    function handleAvatarUpload(file) {
+      if (!file) return;
+      const allowed = ['image/png','image/jpeg','image/webp','image/gif'];
+      if (!allowed.includes(file.type)) { showToast('❌ Только PNG, JPG, WebP, GIF'); return; }
+      if (file.size > 2 * 1024 * 1024) { showToast('❌ Файл слишком большой (макс 2 МБ)'); return; }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          _cropState.naturalW = img.naturalWidth;
+          _cropState.naturalH = img.naturalHeight;
+          _cropState.src = e.target.result;
+          // Начальный масштаб — вписать картинку в квадрат
+          const fit = CROP_SIZE / Math.min(img.naturalWidth, img.naturalHeight);
+          _cropState.scale = fit;
+          _cropState.ox = (CROP_SIZE - img.naturalWidth * fit) / 2;
+          _cropState.oy = (CROP_SIZE - img.naturalHeight * fit) / 2;
+          const cropImg = document.getElementById('cropImg');
+          cropImg.src = e.target.result;
+          openCropModal();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function openCropModal() {
+      document.getElementById('cropModal').classList.add('show');
+      updateCropView();
+      initCropDrag();
+    }
+
+    function closeCropModal() {
+      document.getElementById('cropModal').classList.remove('show');
+    }
+
+    function updateCropView() {
+      const s = _cropState;
+      const img = document.getElementById('cropImg');
+      const w = s.naturalW * s.scale;
+      const h = s.naturalH * s.scale;
+      img.style.width = w + 'px';
+      img.style.height = h + 'px';
+      img.style.left = s.ox + 'px';
+      img.style.top = s.oy + 'px';
+
+      document.getElementById('cropZoomLabel').textContent = Math.round(s.scale * 100) + '%';
+    }
+
+    function cropZoom(delta) {
+      const s = _cropState;
+      const cx = CROP_SIZE / 2, cy = CROP_SIZE / 2;
+      const oldScale = s.scale;
+      s.scale = Math.max(0.3, Math.min(5, s.scale + delta));
+      // Масштабируем относительно центра
+      s.ox = cx - (cx - s.ox) * (s.scale / oldScale);
+      s.oy = cy - (cy - s.oy) * (s.scale / oldScale);
+      updateCropView();
+    }
+
+    function initCropDrag() {
+      const wrap = document.getElementById('cropWrap');
+      wrap.onmousedown = (e) => { _cropState.dragging=true; _cropState.lastX=e.clientX; _cropState.lastY=e.clientY; e.preventDefault(); };
+      wrap.ontouchstart = (e) => { _cropState.dragging=true; _cropState.lastX=e.touches[0].clientX; _cropState.lastY=e.touches[0].clientY; };
+      document.onmousemove = (e) => {
+        if (!_cropState.dragging) return;
+        _cropState.ox += e.clientX - _cropState.lastX;
+        _cropState.oy += e.clientY - _cropState.lastY;
+        _cropState.lastX = e.clientX; _cropState.lastY = e.clientY;
+        updateCropView();
+      };
+      document.ontouchmove = (e) => {
+        if (!_cropState.dragging) return;
+        _cropState.ox += e.touches[0].clientX - _cropState.lastX;
+        _cropState.oy += e.touches[0].clientY - _cropState.lastY;
+        _cropState.lastX = e.touches[0].clientX; _cropState.lastY = e.touches[0].clientY;
+        updateCropView();
+      };
+      document.onmouseup = () => { _cropState.dragging = false; };
+      document.ontouchend = () => { _cropState.dragging = false; };
+    }
+
+    function applyCrop() {
+      const s = _cropState;
+      // Загружаем свежий Image из сохранённого src — без CSS-масштабирования
+      const freshImg = new Image();
+      freshImg.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128; canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.beginPath();
+        ctx.arc(64, 64, 64, 0, Math.PI * 2);
+        ctx.clip();
+        // ox,oy,scale — позиция в CSS-пикселях кроппера (CROP_SIZE×CROP_SIZE)
+        // Пересчитываем в натуральные пиксели изображения
+        const ratio = s.naturalW / (s.naturalW * s.scale) * CROP_SIZE / 128;
+        // Источник: кусок натурального изображения соответствующий CROP_SIZE окну
+        const srcX = -s.ox / s.scale;
+        const srcY = -s.oy / s.scale;
+        const srcW = CROP_SIZE / s.scale;
+        const srcH = CROP_SIZE / s.scale;
+        ctx.drawImage(freshImg, srcX, srcY, srcW, srcH, 0, 0, 128, 128);
+        const dataUrl = canvas.toDataURL('image/png');
+        if (_cropMode === 'mark') {
+          applyMarkCrop(dataUrl);
+          closeCropModal();
+        } else {
+          userProfile.avatar = dataUrl;
+          localStorage.setItem('userProfile', JSON.stringify(userProfile));
+          sendWS({ type: 'update_profile', nickname: userProfile.nickname, avatar: userProfile.avatar });
+          updateAvatarDisplay(dataUrl);
+          const wrap = document.getElementById('avatarPickerWrap');
+          if (wrap) wrap.classList.remove('open');
+          closeCropModal();
+          showToast('✅ Аватар обновлён');
+        }
+      };
+      freshImg.src = s.src;
+    }
+
+    function updateAvatarDisplay(src) {
+      const av = document.getElementById('profileAvatar');
+      if (!av) return;
+      if (src && src.startsWith('data:')) {
+        av.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = src;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+        av.appendChild(img);
+      } else {
+        // Показываем только если это emoji или короткий текст (не userId/base64)
+        const isValid = src && src.length <= 10 && !src.startsWith('b') && !src.startsWith('http');
+        av.innerHTML = isValid ? src : '👤';
+      }
+    }
+
+    function toggleAvatarPicker() {
+      const wrap = document.getElementById('avatarPickerWrap');
+      if (!wrap) return;
+      const isOpen = wrap.classList.toggle('open');
+      if (isOpen) initAvatarPicker();
+    }
+
+
+    function updateLevelDisplay(gamesPlayed) {
+      const cur = getLevel(gamesPlayed);
+      const next = getNextLevel(gamesPlayed);
+      const badge = document.getElementById('profileLevelBadge');
+      if (badge) badge.textContent = cur.icon + ' Ур.' + cur.level + ' — ' + cur.name;
+      const progressWrap = document.getElementById('profileLevelProgress');
+      if (progressWrap) {
+        if (next) {
+          progressWrap.style.display = 'block';
+          const prevXp = cur.xp;
+          const pct = Math.min(100, Math.round((gamesPlayed - prevXp) / (next.xp - prevXp) * 100));
+          document.getElementById('profileLevelCur').textContent = cur.icon + ' ' + gamesPlayed + ' игр';
+          document.getElementById('profileLevelNext').textContent = next.icon + ' ' + next.xp + ' для ур.' + next.level;
+          document.getElementById('profileLevelFill').style.width = pct + '%';
+        } else {
+          progressWrap.style.display = 'none';
+        }
+      }
+    }
+
+    async function saveProfile() {
+      const newNick = document.getElementById('nicknameInput').value || userName;
+      // Check nickname uniqueness via API
+      const resp = await sendAPI({ action: 'update_profile', userId, nickname: newNick, avatar: userProfile.avatar, lobbyId: currentLobbyId });
+      if (resp && resp.type === 'error') {
+        showToast('❌ ' + resp.message);
+        return;
+      }
+      userProfile.nickname = newNick;
+      localStorage.setItem('userProfile', JSON.stringify(userProfile));
+      localStorage.setItem('browserNickname', userProfile.nickname);
+      vibrate('success');
+      showToast('✅ Профиль сохранён');
+    }
+
+    // ====== НАСТРОЙКИ ======
+    function toggleSetting(setting) {
+      if (!(setting in settings)) return;
+      settings[setting] = !settings[setting];
+      applySettingsUI();
+      localStorage.setItem('settings', JSON.stringify(settings));
+
+      if (setting !== 'sound') playSound('click');
+      vibrate('light');
+    }
+
+    // ====== ЛОББИ (через WebSocket) ======
+    async function createLobby() {
+      if (creatingLobby) return;
+      creatingLobby = true;
+      currentLobbyId = null; localStorage.removeItem("currentLobbyId");  // Сброс перед созданием
+      playSound('click');
+      if (!wsReady) { alert('Нет связи с сервером. Проверь подключение.'); creatingLobby = false; return; }
+      const name = document.getElementById('lobbyNameInput').value || 'Моя игра';
+      const password = document.getElementById('createPasswordInput').value;
+      const maxPlayers = parseInt(document.getElementById('maxPlayersInput').value) || 10;
+      try {
+        await sendWS({ type: 'create_lobby', name, password, maxPlayers, mode: 'classic', rounds: 1 });
+      } finally {
+        creatingLobby = false;
+      }
+      vibrate('success');
+    }
+
+    function joinLobby() {
+      playSound('click');
+      if (!wsReady) { alert('Нет связи с сервером. Проверь подключение.'); return; }
+      const code = document.getElementById('lobbyCodeInput').value.trim().toUpperCase();
+      const password = document.getElementById('lobbyPasswordInput').value;
+      if (!code) { alert('Введите код лобби!'); return; }
+      sendWS({ type: 'join_lobby', code, password });
+    }
+
+    
+    function clearGameSession() {
+      currentLobbyId = null; isAdmin = false; gameScreenShown = false;
+      cardNumbers = []; markedCells.clear(); drawnNumbers.clear(); drawnOrder = [];
+      alreadyWon = false; alreadyNotified14 = false;
+      resetChatCache(null);
+      updateChatClearButtons();
+      lastKnownVersion = -1;
+      localStorage.removeItem('currentLobbyId'); localStorage.removeItem('isAdmin');
+      localStorage.removeItem('cardNumbers'); localStorage.removeItem('markedCells');
+      localStorage.removeItem('gameScreenShown');
+    }
+
+    function leaveLobby() {
+      if (currentLobbyId) sendWS({ type: 'leave_lobby' });
+      clearGameSession();
+      showScreen('mainMenu');
+    }
+
+    function leaveGame() {
+      if (!confirm('Выйти из игры?')) return;
+      if (currentLobbyId) sendWS({ type: 'leave_lobby' });
+      clearGameSession();
+      showScreen('mainMenu');
+    }
+
+    function closeLobby() {
+      if (!confirm('Закрыть лобби и выгнать всех?')) return;
+      leaveLobby();
+    }
+
+    function getActiveLobbyId() {
+      return normalizeLobbyId(currentLobbyId || currentLobby?.id || localStorage.getItem('currentLobbyId'));
+    }
+
+    const OVERLAY_VARIANT_STORAGE_KEY = 'lotomalOverlayVariant';
+    const DEFAULT_OVERLAY_VARIANT = 'clean';
+    const AVAILABLE_OVERLAY_VARIANTS = new Set(['clean', 'relay', 'framed']);
+
+    function normalizeOverlayVariant(value) {
+      const candidate = String(value || '').trim().toLowerCase();
+      return AVAILABLE_OVERLAY_VARIANTS.has(candidate) ? candidate : DEFAULT_OVERLAY_VARIANT;
+    }
+
+    function getSelectedOverlayVariant() {
+      const picker = document.getElementById('overlayVariant');
+      if (picker) {
+        const variant = normalizeOverlayVariant(picker.value);
+        if (picker.value !== variant) picker.value = variant;
+        try { localStorage.setItem(OVERLAY_VARIANT_STORAGE_KEY, variant); } catch (_) {}
+        return variant;
+      }
+      return normalizeOverlayVariant(localStorage.getItem(OVERLAY_VARIANT_STORAGE_KEY));
+    }
+
+    function initOverlayVariantPicker() {
+      const picker = document.getElementById('overlayVariant');
+      if (!picker) return;
+      const fromQuery = new URLSearchParams(window.location.search).get('overlayVariant');
+      const variant = normalizeOverlayVariant(fromQuery || localStorage.getItem(OVERLAY_VARIANT_STORAGE_KEY));
+      picker.value = variant;
+      try { localStorage.setItem(OVERLAY_VARIANT_STORAGE_KEY, variant); } catch (_) {}
+      picker.addEventListener('change', () => {
+        const next = normalizeOverlayVariant(picker.value);
+        picker.value = next;
+        try { localStorage.setItem(OVERLAY_VARIANT_STORAGE_KEY, next); } catch (_) {}
+      });
+    }
+
+    function getPanelUrl(kind) {
+      const lid = getActiveLobbyId();
+      if (!lid) return null;
+      currentLobbyId = lid;
+      localStorage.setItem('currentLobbyId', lid);
+      if (kind === 'admin') {
+        return '/lotomal/admin.html?lobbyId=' + encodeURIComponent(lid) + '&userId=' + encodeURIComponent(userId);
+      }
+      const variant = getSelectedOverlayVariant();
+      return '/lotomal/overlay.html?lobbyId=' + encodeURIComponent(lid) + '&variant=' + encodeURIComponent(variant);
+    }
+
+    function openPanelUrl(url) {
+      try {
+        const opened = window.open(url, '_blank');
+        if (opened) {
+          try { opened.opener = null; opened.focus(); } catch (_) {}
+        }
+        if (!opened) showPopupBlockedModal(url);
+      } catch (_) {
+        showPopupBlockedModal(url);
+      }
+    }
+
+    function showPopupBlockedModal(url) {
+      const modal = document.getElementById('popupBlockedModal');
+      const link = document.getElementById('popupBlockedLink');
+      if (!modal || !link) return;
+      link.href = url;
+      modal.classList.add('show');
+    }
+
+    function closePopupBlockedModal() {
+      const modal = document.getElementById('popupBlockedModal');
+      if (modal) modal.classList.remove('show');
+    }
+
+    function openAdminPanel() {
+      const url = getPanelUrl('admin');
+      if (!url) {
+        alert('Сначала создайте или откройте лобби');
+        return;
+      }
+      openPanelUrl(url);
+    }
+
+    function openOverlayPanel() {
+      const url = getPanelUrl('overlay');
+      if (!url) {
+        alert('Сначала создайте или откройте лобби');
+        return;
+      }
+      openPanelUrl(url);
+    }
+
+    function renderCreatorButtons(container, compact) {
+      const lid = getActiveLobbyId() || '';
+      const key = `${lid}:${userId}:${compact ? 'game' : 'lobby'}`;
+      if (container.dataset.creatorButtonsKey === key && container.children.length) return;
+      container.dataset.creatorButtonsKey = key;
+      const size = compact ? 'font-size:12px; padding:8px;' : '';
+      container.innerHTML = `
+          <button class="btn-secondary" style="flex:1; ${size}" onclick="openAdminPanel()">🛡️ Админ.панель</button>
+          <button class="btn-secondary" style="flex:1; ${size}" onclick="openOverlayPanel()">🎥 Оверлей</button>
+      `;
+    }
+    function updateChatClearButtons() {
+      const canClear = !!isAdmin && !!normalizeLobbyId(currentLobbyId || currentLobby?.id);
+      document.querySelectorAll('.chat-clear-btn').forEach(btn => {
+        btn.style.display = canClear ? 'inline-flex' : 'none';
+      });
+    }
+    function updateGameDisplay() {
+      updateChatClearButtons();
+      const container = document.getElementById('creatorButtonsGameContainer');
+      if (!container) return;
+      if (isAdmin) {
+          container.style.display = 'flex';
+          renderCreatorButtons(container, true);
+      } else {
+          container.style.display = 'none';
+          container.innerHTML = '';
+          delete container.dataset.creatorButtonsKey;
+      }
+    }
+
+    function updateLobbyDisplay() {
+      updateChatClearButtons();
+      if (!currentLobby) return;
+      document.getElementById('currentLobbyCode').textContent = currentLobby.code;
+      document.getElementById('lobbyPlayerCount').textContent =
+        `Игроков: ${currentLobby.players.length}/${currentLobby.maxPlayers}`;
+
+      const container = document.getElementById('playersContainer');
+      container.innerHTML = '';
+      currentLobby.players.forEach(player => {
+        const item = document.createElement('div');
+        item.className = 'player-item';
+        item.style.cursor = 'pointer';
+        item.innerHTML = `
+          <div class="player-avatar">${player.avatar ? (player.avatar.startsWith('data:') ? `<img src="${player.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : escapeHtml(player.avatar)) : (player.nickname || 'И').charAt(0).toUpperCase()}</div>
+          <div class="player-info">
+            <div class="player-name">${escapeHtml(player.nickname || 'Игрок')}</div>
+            <div class="player-status">${(()=>{const g=player.games_played||player.gamesPlayed||0;const l=getLevel(g);return l.icon+' Ур.'+l.level+' · '+l.name;})()}</div>
+          </div>
+          ${player.isAdmin ? '<div class="player-badge">АДМИН</div>' : ''}
+        `;
+        item.onclick = () => showPlayerProfile(player);
+        container.appendChild(item);
+      });
+
+      const adminControls = document.getElementById('adminControls');
+      if (isAdmin) {
+        adminControls.style.display = 'block';
+        // Добавляем кнопки Админки и Оверлея если их нет
+        if (!document.getElementById('creatorButtons')) {
+            const div = document.createElement('div');
+            div.id = 'creatorButtons';
+            div.style.cssText = 'display:flex; gap:10px; margin-top:10px;';
+            adminControls.appendChild(div);
+        }
+        renderCreatorButtons(document.getElementById('creatorButtons'), false);
+      } else {
+        adminControls.style.display = 'none';
+      }
+      document.getElementById('playerWaiting').style.display = isAdmin ? 'none' : 'block';
+    }
+
+
+    async function showPlayerProfile(player) {
+      const ppAv = document.getElementById('ppAvatar');
+      const avSrc = player.avatar || '👤';
+      if (avSrc.startsWith('data:')) {
+        ppAv.innerHTML = '';
+        const _img = document.createElement('img');
+        _img.src = avSrc;
+        _img.style.cssText = 'width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;';
+        ppAv.appendChild(_img);
+      } else {
+        ppAv.textContent = avSrc;
+      }
+      document.getElementById('ppName').textContent = player.nickname || 'Игрок';
+      document.getElementById('ppGames').textContent = '...';
+      document.getElementById('ppWins').textContent = '...';
+      document.getElementById('ppWinrate').textContent = '...';
+      document.getElementById('playerProfileModal').classList.add('show');
+
+      // Получаем свежую статистику с сервера
+      try {
+        const userId = player.id || player.userId;
+        if (userId) {
+          const res = await fetch(`/api/users/${userId}/stats`, { cache: 'no-store' });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.avatar && data.avatar.startsWith && data.avatar.startsWith('data:')) {
+              ppAv.innerHTML = '';
+              const fresh = document.createElement('img');
+              fresh.src = data.avatar;
+              fresh.style.cssText = 'width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;';
+              ppAv.appendChild(fresh);
+            } else if (data.avatar && data.avatar !== '👤') {
+              ppAv.textContent = data.avatar;
+            }
+            const games = data.games_played || 0;
+            const wins  = data.games_won || 0;
+            const wr = games > 0 ? Math.round(wins / games * 100) : 0;
+            document.getElementById('ppGames').textContent = games;
+            document.getElementById('ppWins').textContent = wins;
+            document.getElementById('ppWinrate').textContent = wr + '%';
+            return;
+          }
+        }
+      } catch(_) {}
+
+      // Fallback — данные из локального объекта
+      const games = player.gamesPlayed || player.games_played || 0;
+      const wins  = player.gamesWon   || player.games_won   || 0;
+      const wr = games > 0 ? Math.round(wins / games * 100) : 0;
+      document.getElementById('ppGames').textContent = games;
+      document.getElementById('ppWins').textContent = wins;
+      document.getElementById('ppWinrate').textContent = wr + '%';
+    }
+
+    function closePlayerProfile() {
+      document.getElementById('playerProfileModal').classList.remove('show');
+    }
+
+    async function startGame() {
+      if (!isAdmin) return;
+      if (startingGame) return;
+      startingGame = true;
+      try {
+        await sendWS({ type: 'start_game' });
+      } finally {
+        setTimeout(() => { startingGame = false; }, 300);
+      }
+    }
+
+    // ====== ГЕНЕРАЦИЯ КАРТОЧКИ ======
+    function generateLotoCard() {
+      // Русское лото: 3×9, ровно 5 чисел в каждой строке,
+      // в каждом столбце МИНИМУМ 1 число, максимум 2, числа по возрастанию
+      const ranges = [[1,9],[10,19],[20,29],[30,39],[40,49],[50,59],[60,69],[70,79],[80,90]];
+
+      for (let attempt = 0; attempt < 2000; attempt++) {
+        const colCount = Array(9).fill(0);
+        const mask = Array(3).fill(null).map(() => Array(9).fill(false));
+        let ok = true;
+
+        // Шаг 1: гарантируем каждому столбцу хотя бы 1 число
+        // Раскладываем по одному числу в каждый столбец по рядам (9 штук на 3 ряда)
+        const cols9 = [0,1,2,3,4,5,6,7,8];
+        shuffleArr(cols9);
+        // Назначаем каждый столбец случайному ряду (3 столбца на ряд)
+        for (let i = 0; i < 9; i++) {
+          const row = Math.floor(i / 3);
+          const col = cols9[i];
+          mask[row][col] = true;
+          colCount[col]++;
+        }
+
+        // Шаг 2: в каждой строке сейчас ровно 3 числа, нужно добавить ещё 2 (до 5)
+        // Добавляем в столбцы где colCount < 2
+        for (let row = 0; row < 3; row++) {
+          const rowCols = mask[row].map((v,i) => v ? i : -1).filter(i => i >= 0);
+          const need = 5 - rowCols.length; // нужно добавить 2
+          const available = [];
+          for (let c = 0; c < 9; c++) {
+            if (!mask[row][c] && colCount[c] < 2) available.push(c);
+          }
+          if (available.length < need) { ok = false; break; }
+          shuffleArr(available);
+          const extra = available.slice(0, need);
+          for (const c of extra) { mask[row][c] = true; colCount[c]++; }
+        }
+        if (!ok) continue;
+
+        // Проверяем: каждый ряд ровно 5, каждый столбец 1-2
+        let valid = true;
+        for (let r = 0; r < 3; r++) {
+          if (mask[r].filter(Boolean).length !== 5) { valid = false; break; }
+        }
+        for (let c = 0; c < 9; c++) {
+          if (colCount[c] < 1 || colCount[c] > 2) { valid = false; break; }
+        }
+        if (!valid) continue;
+
+        // Раскладываем числа по возрастанию в каждом столбце
+        const card = Array(3).fill(null).map(() => Array(9).fill(null));
+        for (let col = 0; col < 9; col++) {
+          const [min, max] = ranges[col];
+          const rows = [0,1,2].filter(r => mask[r][col]);
+          const pool = [];
+          for (let n = min; n <= max; n++) pool.push(n);
+          shuffleArr(pool);
+          const chosen = pool.slice(0, rows.length).sort((a,b) => a-b);
+          rows.sort((a,b)=>a-b).forEach((r, i) => { card[r][col] = chosen[i]; });
+        }
+        return card;
+      }
+      return Array(3).fill(null).map(() => Array(9).fill(null)); // fallback
+    }
+
+    function shuffleArr(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    function renderCard() {
+      const cardEl = document.getElementById('gameLotoCard');
+      cardEl.innerHTML = '';
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 9; col++) {
+          const cell = document.createElement('div');
+          const number = cardNumbers[row]?.[col];
+          if (number === null || number === undefined) {
+            cell.className = 'cell empty';
+          } else {
+            cell.className = 'cell';
+            cell.textContent = number;
+            cell.dataset.number = number;
+            if (!drawnNumbers.has(number)) cell.classList.add('disabled');
+            if (markedCells.has(number)) {
+              cell.classList.add('marked');
+              applyMarkIcon(cell);
+            }
+            cell.addEventListener('click', () => toggleCell(number, cell));
+          }
+          cardEl.appendChild(cell);
+        }
+      }
+    }
+
+    async function syncMarksToServer() {
+      if (!currentLobbyId) return;
+      const requestedLobbyId = currentLobbyId;
+      markSyncPendingCount += 1;
+      markSyncInFlight = true;
+      try {
+        const resp = await sendAPI({ action: 'mark_cell', userId, lobbyId: requestedLobbyId, cells: [...markedCells] });
+        if (requestedLobbyId !== currentLobbyId) return;
+        if (resp && (resp.type === 'error' || resp.error)) {
+          const res = await fetch(`/api/loto?action=get_state&lobbyId=${encodeURIComponent(requestedLobbyId)}&userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+          if (res.ok) {
+            const msg = await res.json();
+            if (requestedLobbyId !== currentLobbyId) return;
+            if (msg && msg.type && msg.type !== 'no_change') handleWsMessage(msg);
+          }
+        }
+      } finally {
+        markSyncPendingCount = Math.max(0, markSyncPendingCount - 1);
+        markSyncInFlight = markSyncPendingCount > 0;
+        lastMarkSyncFinishedAt = Date.now();
+      }
+    }
+
+    function toggleCell(number, cell) {
+      if (!drawnNumbers.has(number)) {
+        vibrate('error');
+        return;
+      }
+      lastLocalMarkEditAt = Date.now();
+      if (markedCells.has(number)) {
+        markedCells.delete(number);
+        cell.classList.remove('marked');
+        cell.querySelector('.mark-icon')?.remove();
+        cell.textContent = number; // restore number
+      } else {
+        markedCells.add(number);
+        cell.classList.add('marked');
+        cell.classList.add('just-marked');
+        setTimeout(() => cell.classList.remove('just-marked'), 500);
+        applyMarkIcon(cell);
+        const isJubileeNumber = Number.isFinite(Number(number)) && Number(number) % 5 === 0;
+        if (isJubileeNumber && settings.jubilee) playJubileeSound();
+        else playSound('click');
+        vibrate('light');
+      }
+      updateGameStats();
+      checkWinLocal();
+      localStorage.setItem('markedCells', JSON.stringify([...markedCells]));
+      // V5: отправляем реальные числа для восстановления после F5
+      if (currentLobbyId) syncMarksToServer();
+    }
+
+    function applyMarkIcon(cell) {
+      const allStyles = [...MARK_STYLES, ...loadCustomStyles()];
+      const style = allStyles.find(s => s.id === currentMarkStyle) || MARK_STYLES[0];
+      cell.querySelector('.mark-icon')?.remove();
+      cell.classList.remove('has-icon');
+
+      if (style.emoji) {
+        cell.classList.add('has-icon');
+        const icon = document.createElement('span');
+        icon.className = 'mark-icon';
+        icon.textContent = style.emoji;
+        cell.appendChild(icon);
+      } else if (style.img) {
+        cell.classList.add('has-icon');
+        const icon = document.createElement('img');
+        icon.className = 'mark-icon';
+        icon.src = style.img;
+        if (style.isPhoto) {
+          icon.style.cssText = 'width:86%;height:86%;border-radius:50%;object-fit:cover;';
+        } else {
+          icon.style.cssText = 'width:86%;height:86%;object-fit:contain;border-radius:6px;';
+        }
+        cell.appendChild(icon);
+      }
+      // else: style.id === 'check' — CSS ::after handles the ✓
+    }
+
+
+    // Загружаем кастомные стили пользователя
+    function loadCustomStyles() {
+      try {
+        const saved = localStorage.getItem('customMarkStyles');
+        return saved ? JSON.parse(saved) : [];
+      } catch(_) { return []; }
+    }
+
+    function saveCustomStyles(arr) {
+      localStorage.setItem('customMarkStyles', JSON.stringify(arr));
+    }
+
+    function initMarkPicker() {
+      const picker = document.getElementById('markStylePicker');
+      if (!picker) return;
+      picker.innerHTML = '';
+
+      const allStyles = [...MARK_STYLES, ...loadCustomStyles()];
+
+      allStyles.forEach(style => {
+        const wrap = document.createElement('div');
+        wrap.className = 'mark-custom-wrap';
+        wrap.style.position = 'relative';
+
+        const btn = document.createElement('button');
+        btn.className = 'mark-style-btn' + (style.id === currentMarkStyle ? ' active' : '');
+        btn.title = style.label;
+
+        if (style.isPhoto || (style.img && style.isCustom)) {
+          const img = document.createElement('img');
+          img.src = style.img;
+          img.style.cssText = 'width:32px;height:32px;border-radius:50%;object-fit:cover;';
+          btn.appendChild(img);
+        } else if (style.img) {
+          const img = document.createElement('img');
+          img.src = style.img;
+          img.style.cssText = 'width:28px;height:28px;';
+          btn.appendChild(img);
+        } else {
+          btn.textContent = style.emoji || style.label;
+        }
+
+        btn.onclick = () => {
+          currentMarkStyle = style.id;
+          localStorage.setItem('markStyle', style.id);
+          picker.querySelectorAll('.mark-style-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          if (cardNumbers.length) renderCard();
+          showToast('Стиль сохранён');
+        };
+        wrap.appendChild(btn);
+
+        // Кнопка удаления для кастомных
+        if (style.isCustom) {
+          const del = document.createElement('div');
+          del.className = 'mark-custom-del';
+          del.textContent = '×';
+          del.title = 'Удалить';
+          del.onclick = (e) => {
+            e.stopPropagation();
+            const customs = loadCustomStyles().filter(s => s.id !== style.id);
+            saveCustomStyles(customs);
+            if (currentMarkStyle === style.id) {
+              currentMarkStyle = 'check';
+              localStorage.setItem('markStyle', 'check');
+            }
+            initMarkPicker();
+            if (cardNumbers.length) renderCard();
+          };
+          wrap.appendChild(del);
+        }
+
+        picker.appendChild(wrap);
+      });
+
+      // Кнопки загрузки — по одной на каждый доступный слот
+      const maxSlots = getMaxCustomSlots(userProfile.gamesPlayed);
+      const totalSlots = 5;
+      for (let slot = 1; slot <= totalSlots; slot++) {
+        const unlocked = slot <= maxSlots;
+        const customsFilled = loadCustomStyles().length;
+        if (slot <= customsFilled) continue; // уже занят — показан выше
+        const wrap2 = document.createElement('div');
+        wrap2.className = 'mark-custom-wrap';
+        if (!unlocked) {
+          // Заблокированный слот
+          const locked = document.createElement('div');
+          locked.className = 'mark-style-btn';
+          locked.style.cssText = 'opacity:.4;cursor:default;font-size:14px;flex-direction:column;gap:2px;';
+          const lvlNeeded = LEVELS.find(l => l.level === slot);
+          locked.innerHTML = '🔒<span style="font-size:9px;">Ур.'+slot+'</span>';
+          locked.title = 'Открывается на ' + (lvlNeeded ? lvlNeeded.name : 'ур.'+slot);
+          wrap2.appendChild(locked);
+        } else {
+          const uploadBtn = document.createElement('label');
+          uploadBtn.className = 'mark-upload-btn';
+          uploadBtn.title = 'Загрузить изображение (слот ' + slot + ')';
+          uploadBtn.innerHTML = '＋';
+          const fileInput = document.createElement('input');
+          fileInput.type = 'file';
+          fileInput.accept = 'image/png,image/jpeg,image/webp,image/gif';
+          fileInput.style.display = 'none';
+          fileInput.onchange = (e) => handleCustomImageUpload(e.target.files[0]);
+          uploadBtn.appendChild(fileInput);
+          wrap2.appendChild(uploadBtn);
+        }
+        picker.appendChild(wrap2);
+      }
+    }
+
+    let _markCropFileName = '';
+
+    function handleCustomImageUpload(file) {
+      if (!file) return;
+      const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+      if (!allowed.includes(file.type)) { showToast('❌ Только PNG, JPG, WebP, GIF'); return; }
+      if (file.size > 2 * 1024 * 1024) { showToast('❌ Файл слишком большой (макс 2 МБ)'); return; }
+      const customs = loadCustomStyles();
+      const maxSlots = getMaxCustomSlots(userProfile.gamesPlayed);
+      if (customs.length >= maxSlots) {
+        const needLevel = customs.length + 1;
+        if (customs.length >= 5) { showToast('❌ Все слоты заполнены'); return; }
+        showToast('🔒 Нужен уровень ' + needLevel + ' для слота ' + needLevel);
+        return;
+      }
+      _markCropFileName = file.name.replace(/\.[^.]+$/, '').slice(0, 20) || 'Моё';
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Открываем тот же кроппер что и для аватара, но с другим колбэком
+          _cropState.naturalW = img.naturalWidth;
+          _cropState.naturalH = img.naturalHeight;
+          _cropState.src = e.target.result;
+          const fit = CROP_SIZE / Math.min(img.naturalWidth, img.naturalHeight);
+          _cropState.scale = fit;
+          _cropState.ox = (CROP_SIZE - img.naturalWidth * fit) / 2;
+          _cropState.oy = (CROP_SIZE - img.naturalHeight * fit) / 2;
+          document.getElementById('cropImg').src = e.target.result;
+          _cropMode = 'mark'; // режим: mark или avatar
+          openCropModal();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function applyMarkCrop(dataUrl) {
+      const id = 'custom_' + Date.now();
+      const customs = loadCustomStyles();
+      customs.push({ id, label: _markCropFileName, emoji: null, img: dataUrl, isPhoto: true, isCustom: true });
+      saveCustomStyles(customs);
+      currentMarkStyle = id;
+      localStorage.setItem('markStyle', id);
+      initMarkPicker();
+      if (cardNumbers.length) renderCard();
+      showToast('✅ Стиль загружен');
+    }
+
+    function updateGameStats() {
+      document.getElementById('gameMarkedCount').textContent = markedCells.size;
+    }
+
+    let alreadyNotified14 = false;
+    let alreadyWon = false;
+
+    function checkWinLocal() {
+      const allNums = [];
+      for (let r = 0; r < 3; r++)
+        for (let c = 0; c < 9; c++)
+          if (cardNumbers[r]?.[c]) allNums.push(cardNumbers[r][c]);
+      const total = allNums.length;
+      const marked = allNums.filter(n => markedCells.has(n)).length;
+
+      // 14/15 уведомление — только один раз
+      if (marked === 14 && total === 15 && currentLobbyId && !alreadyNotified14) {
+        alreadyNotified14 = true;
+        sendWS({ type: 'chat_message', text: '⚡ У меня закрыто 14/15! Почти ЛОТО!' });
+      }
+
+      // Победа — только один раз, без mark_cell -1
+      if (total > 0 && marked === total && !alreadyWon) {
+        alreadyWon = true;
+        if (currentLobbyId) {
+          sendWS({ type: 'chat_message', text: '🎉 ЛОТО! Я закрыл все числа!' });
+        }
+        showWinModal();
+      }
+    }
+
+    function showWinModal() {
+      document.getElementById('winModal').classList.add('show');
+      playSound('win');
+      userProfile.gamesWon++;
+      localStorage.setItem('userProfile', JSON.stringify(userProfile));
+      vibrate('success');
+    }
+
+    function closeWinModal() {
+      document.getElementById('winModal').classList.remove('show');
+    }
+
+    function updateDrawnNumbersDisplay() {
+      // Показываем в порядке выпадения (drawnOrder), не по возрастанию
+      const drawnList = document.getElementById('gameDrawnList');
+      drawnList.innerHTML = '';
+      drawnOrder.forEach(num => {
+        const barrel = document.createElement('div');
+        barrel.className = 'drawn-number';
+        barrel.textContent = num;
+        drawnList.appendChild(barrel);
+      });
+      // Скроллим к последнему
+      drawnList.scrollLeft = drawnList.scrollWidth;
+      renderCard();
+      updateGameStats();
+    }
+
+
+
+    // ====== ЧАТ ======
+    function appendChatMessage(msg) {
+      if (!msg || !msg.id || chatMessagesIds.has(msg.id)) return;
+      const messageLobbyId = normalizeLobbyId(msg.lobbyId || msg.lobby_id || currentLobbyId);
+      if (chatLobbyId && messageLobbyId && chatLobbyId !== messageLobbyId) return;
+      if (!chatLobbyId && messageLobbyId) chatLobbyId = messageLobbyId;
+      const linkedPlayer = (currentLobby?.players || []).find(p => String(p.id) === String(msg.userId));
+      const resolvedNick = msg.nickname || linkedPlayer?.nickname || 'Игрок';
+      const resolvedAvatar = msg.avatar || linkedPlayer?.avatar || '👤';
+      const resolvedGames = linkedPlayer?.games_played || linkedPlayer?.gamesPlayed || 0;
+      const resolvedWins = linkedPlayer?.games_won || linkedPlayer?.gamesWon || 0;
+      chatMessagesIds.add(msg.id);
+      chatMessagesList.push({
+        ...msg,
+        nickname: resolvedNick,
+        avatar: resolvedAvatar
+      });
+      // Рендерим в ОБА чата сразу — виден и в лобби и в игре
+      ['chatBoxLobby', 'chatBoxGame'].forEach(boxId => {
+        const box = document.getElementById(boxId);
+        if (!box) return;
+        if (box.querySelector(`[data-msgid="${msg.id}"]`)) return;
+        const atBottom = (box.scrollTop + box.clientHeight + 40) >= box.scrollHeight;
+        const el = document.createElement('div');
+        el.className = 'chat-msg';
+        el.dataset.msgid = msg.id;
+        const dt = new Date(msg.timestamp || Date.now());
+        const hh = String(dt.getHours()).padStart(2,'0');
+        const mm = String(dt.getMinutes()).padStart(2,'0');
+        el.innerHTML = `<div class="chat-meta"><span class="chat-nick" style="cursor:pointer;color:#FFD700;"
+          data-uid="${escapeHtml(String(msg.userId||''))}"
+          data-nick="${escapeHtml(resolvedNick)}"
+          data-av="${escapeHtml(resolvedAvatar)}"
+          data-gp="${escapeHtml(String(resolvedGames))}"
+          data-gw="${escapeHtml(String(resolvedWins))}">${escapeHtml(resolvedNick)}</span>
+          <span>${hh}:${mm}</span></div>
+          <div class="chat-text">${escapeHtml(msg.text||'')}</div>`;
+        el.querySelector('.chat-nick').addEventListener('click', e => {
+          const t = e.target;
+          showPlayerProfile({
+            id: t.dataset.uid,
+            nickname: t.dataset.nick,
+            avatar: t.dataset.av,
+            games_played: Number(t.dataset.gp || 0),
+            games_won: Number(t.dataset.gw || 0)
+          });
+        });
+        box.appendChild(el);
+        if (atBottom) box.scrollTop = box.scrollHeight;
+      });
+    }
+
+
+    function sendChat(where) {
+      if (!currentLobbyId) { alert('Сначала зайди в лобби'); return; }
+      const inputId = where === 'lobby' ? 'chatInputLobby' : 'chatInputGame';
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      const text = (input.value || '').trim();
+      if (!text) return;
+      input.value = '';
+      vibrate('light');
+      // Отправляем через API напрямую с данными пользователя
+      sendAPI({ action: 'chat_message', userId, lobbyId: currentLobbyId, text,
+        nickname: userProfile.nickname, avatar: userProfile.avatar || '👤' })
+        .then(resp => {
+          if (resp && resp.type === 'chat_message' && resp.message) {
+            appendChatMessage(resp.message);
+          }
+        });
+    }
+
+    async function clearChatPrompt() {
+      if (!isAdmin) { alert('❌ Только для хоста лобби'); return; }
+      if (!currentLobbyId) { alert('Сначала зайди в лобби'); return; }
+      if (!confirm('Очистить чат у всех игроков в этом лобби?')) return;
+      const resp = await sendAPI({ action: 'clear_chat', userId, lobbyId: currentLobbyId });
+      if (resp?.type === 'chat_cleared') {
+        resetChatCache(currentLobbyId);
+        return;
+      }
+      alert('Не удалось очистить чат');
+    }
+
+    // ====== АДМИН-ПАНЕЛЬ: управление бочонками (REST API) ======
+    async function adminAddBarrel() {
+      playSound('barrel');
+      if (!isSuperAdmin) { alert('❌ Нет доступа'); return; }
+      const el = document.getElementById('adminAddNumber');
+      const n = Number(el.value);
+      if (!(n >= 1 && n <= 90)) { alert('Введите число 1-90'); return; }
+      try {
+        await fetch('/api/drawn', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ number: n })
+        });
+        el.value = '';
+      } catch(e) { alert('Ошибка связи с сервером'); }
+    }
+
+    async function adminUndoLast() {
+      if (!isSuperAdmin) { alert('❌ Нет доступа'); return; }
+      try {
+        const res = await fetch('/api/drawn');
+        const { drawn } = await res.json();
+        if (!drawn.length) return;
+        const last = drawn[drawn.length - 1];
+        await fetch(`/api/drawn/${last}`, { method: 'DELETE' });
+      } catch(e) { alert('Ошибка связи с сервером'); }
+    }
+
+    async function adminResetBarrels() {
+      if (!isSuperAdmin) { alert('❌ Нет доступа'); return; }
+      if (!confirm('Сбросить все выпавшие бочонки?')) return;
+      try {
+        await fetch('/api/drawn/all', { method: 'DELETE' });
+      } catch(e) { alert('Ошибка связи с сервером'); }
+    }
+
+    function openOverlay() {
+      if (!isSuperAdmin) { alert('❌ Нет доступа'); return; }
+      const variant = getSelectedOverlayVariant();
+      const lid = normalizeLobbyId(currentLobbyId || localStorage.getItem('currentLobbyId'));
+      if (lid) {
+        localStorage.setItem('currentLobbyId', lid);
+        window.open('/lotomal/overlay.html?lobbyId=' + encodeURIComponent(lid) + '&variant=' + encodeURIComponent(variant), '_blank');
+        return;
+      }
+      window.open('/lotomal/overlay.html?variant=' + encodeURIComponent(variant), '_blank');
+    }
+
+    // ====== ИНИЦИАЛИЗАЦИЯ ======
+    window.addEventListener('DOMContentLoaded', async () => {
+      await loadSounds();
+      const savedSettings = localStorage.getItem('settings');
+      if (savedSettings) {
+        try {
+          const s = JSON.parse(savedSettings);
+          settings = normalizeSettings(s);
+        } catch(_) {}
+      } else {
+        settings = { ...DEFAULT_SETTINGS };
+      }
+      settings = normalizeSettings(settings);
+      localStorage.setItem('settings', JSON.stringify(settings));
+      // Применяем настройки к UI
+      applySettingsUI();
+      loadProfile();
+      if (isSuperAdmin) document.getElementById('adminMenuBtn').style.display = 'flex';
+      initOverlayVariantPicker();
+      // Загружаем стиль закрашивания
+      const savedMark = localStorage.getItem('markStyle');
+      if (savedMark) {
+        const allStyles = [...MARK_STYLES, ...loadCustomStyles()];
+        if (allStyles.find(s => s.id === savedMark)) currentMarkStyle = savedMark;
+      }
+      initMarkPicker();
+      initWS();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      if (currentScreen === 'lobbyWaitScreen') sendChat('lobby');
+      if (currentScreen === 'gameScreen') sendChat('game');
+    });
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Лото - Админ панель</title>
+    <script src="/loto-realtime.js?v=12"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo {
+            font-size: 42px;
+            font-weight: 900;
+            color: #FFD700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            letter-spacing: 4px;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: rgba(255, 215, 0, 0.7);
+            font-size: 18px;
+            letter-spacing: 2px;
+        }
+
+        .panel {
+            background: linear-gradient(145deg, #2a2a3e 0%, #1f1f2e 100%);
+            border: 3px solid #FFD700;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            color: #FFD700;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        /* Ввод числа */
+        .input-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            align-items: center;
+        }
+
+        .number-input {
+            flex: 1;
+            padding: 15px 20px;
+            font-size: 24px;
+            font-weight: 700;
+            text-align: center;
+            border: 3px solid #FFD700;
+            border-radius: 12px;
+            background: rgba(255, 215, 0, 0.1);
+            color: #FFD700;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .number-input:focus {
+            background: rgba(255, 215, 0, 0.2);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-add {
+            background: linear-gradient(145deg, #FFD700 0%, #DAA520 100%);
+            color: #000;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+        }
+
+        .btn-add:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 215, 0, 0.6);
+        }
+
+        .btn-add:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-clear {
+            background: linear-gradient(145deg, #ff6b6b 0%, #ee5a6f 100%);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-clear:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+        }
+
+        /* Сетка всех чисел 1-90 */
+        .numbers-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .grid-number {
+            aspect-ratio: 1;
+            background: linear-gradient(145deg, #3a3a4e 0%, #2a2a3e 100%);
+            border: 2px solid rgba(255, 215, 0, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 800;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+
+        .grid-number:hover {
+            transform: scale(1.1);
+            border-color: #FFD700;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+        }
+
+        .grid-number.drawn {
+            background: linear-gradient(145deg, #FFD700 0%, #DAA520 100%);
+            color: #000;
+            border-color: #FFD700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        /* Список выпавших чисел */
+        .drawn-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            min-height: 60px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+        }
+
+        .drawn-barrel {
+            width: 45px;
+            height: 45px;
+            background: linear-gradient(145deg, #FFD700 0%, #DAA520 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            color: #000;
+            font-size: 18px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            position: relative;
+            animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .drawn-barrel:hover {
+            transform: scale(1.1);
+        }
+
+        .drawn-barrel .remove {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 18px;
+            height: 18px;
+            background: #ff6b6b;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #fff;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .drawn-barrel:hover .remove {
+            opacity: 1;
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Статистика */
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(255, 215, 0, 0.1);
+            border: 2px solid rgba(255, 215, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-label {
+            color: rgba(255, 215, 0, 0.7);
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            color: #FFD700;
+            font-size: 32px;
+            font-weight: 800;
+        }
+
+        /* Последнее выпавшее число */
+        .last-number {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .last-number-label {
+            color: rgba(255, 215, 0, 0.7);
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .last-number-value {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(145deg, #FFD700 0%, #DAA520 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            color: #000;
+            font-size: 48px;
+            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.6);
+            margin: 0 auto;
+            animation: bounce 1s ease-in-out;
+        }
+
+        @keyframes bounce {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+        }
+
+        .empty-last {
+            background: rgba(255, 215, 0, 0.1);
+            border: 3px dashed rgba(255, 215, 0, 0.3);
+            color: rgba(255, 215, 0, 0.3);
+            font-size: 24px;
+        }
+
+
+        .lobby-admin-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            background: rgba(255,215,0,.08); border: 1px solid rgba(255,215,0,.2);
+            border-radius: 12px; padding: 14px 16px;
+        }
+        .lobby-admin-info { flex: 1; }
+        .lobby-admin-name { font-weight: 800; color: #FFD700; margin-bottom: 4px; }
+        .lobby-admin-meta { font-size: 12px; color: rgba(255,215,0,.6); }
+        .player-progress-row {
+            display: flex; align-items: center; gap: 12px;
+            background: rgba(0,0,0,.3); border-radius: 10px; padding: 12px 14px;
+        }
+        .player-progress-avatar {
+            width: 38px; height: 38px; border-radius: 50%;
+            background: linear-gradient(145deg,#FFD700,#DAA520);
+            display:flex;align-items:center;justify-content:center;
+            font-weight:800;color:#000;font-size:16px;flex-shrink:0;
+        }
+        .player-progress-info { flex:1; }
+        .player-progress-name { font-weight:700;color:#fff;margin-bottom:4px; }
+        .player-progress-bar-wrap { height:8px;background:rgba(255,215,0,.15);border-radius:4px;overflow:hidden; }
+        .player-progress-bar { height:100%;background:linear-gradient(90deg,#FFD700,#DAA520);border-radius:4px;transition:width .4s ease; }
+        .player-progress-count { font-size:13px;color:#FFD700;font-weight:800;min-width:40px;text-align:right; }
+
+        @media (max-width: 768px) {
+            .numbers-grid {
+                grid-template-columns: repeat(9, 1fr);
+                gap: 5px;
+            }
+
+            .grid-number {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">LOTO ADMIN</div>
+            <div class="subtitle">Панель ведущего</div>
+        </div>
+
+        <div class="panel">
+            <div class="section-title">Последний бочонок</div>
+            <div class="last-number">
+                <div id="lastNumber" class="last-number-value empty-last">—</div>
+            </div>
+
+            <div class="section-title">Ввести номер бочонка</div>
+            <div class="input-section">
+                <input 
+                    type="number" 
+                    id="numberInput" 
+                    class="number-input" 
+                    min="1" 
+                    max="90" 
+                    placeholder="1-90"
+                    autofocus
+                >
+                <button class="btn btn-add" onclick="addNumber()">Добавить</button>
+                <button class="btn btn-clear" onclick="clearAll()">Очистить всё</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="section-title">Выпавшие бочонки</div>
+            <div class="drawn-list" id="drawnList"></div>
+        </div>
+
+        <div class="panel">
+            <div class="section-title">Все числа (1-90)</div>
+            <div class="numbers-grid" id="numbersGrid"></div>
+        </div>
+
+        <div class="panel">
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-label">Выпало</div>
+                    <div class="stat-value" id="drawnCount">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Осталось</div>
+                    <div class="stat-value" id="remainingCount">90</div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="panel" id="playersPanel" style="display:none;">
+            <div class="section-title" id="playersPanelTitle">Игроки</div>
+            <div id="playersList" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+
+    </div>
+
+    <script>
+        var drawnNumbers = new Set();  // для быстрой проверки наличия
+        var drawnOrder = [];           // порядок выпадения
+
+        // Инициализация сетки чисел
+        function initGrid() {
+            const grid = document.getElementById('numbersGrid');
+            grid.innerHTML = '';
+            for (let i = 1; i <= 90; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-number';
+                cell.textContent = i;
+                cell.dataset.number = i;
+                cell.addEventListener('click', () => toggleNumber(i));
+                grid.appendChild(cell);
+            }
+        }
+
+        function toggleNumber(num) {
+            if (drawnNumbers.has(num)) removeNumber(num);
+            else addNumberToDrawn(num);
+        }
+
+        async function addNumber() {
+            const input = document.getElementById('numberInput');
+            const num = parseInt(input.value);
+            if (!num || num < 1 || num > 90) { alert('Введите число от 1 до 90'); return; }
+            if (drawnNumbers.has(num)) { alert('Это число уже выпало!'); return; }
+            await addNumberToDrawn(num);
+            input.value = '';
+            input.focus();
+        }
+
+        function normalizeId(value) {
+            if (value === null || value === undefined) return null;
+            const normalized = String(value).trim();
+            if (!normalized || normalized === 'undefined' || normalized === 'null') return null;
+            return normalized;
+        }
+
+        function getBrowserUserId() {
+            let id = localStorage.getItem('browserUserId');
+            if (!id) {
+                id = 'b' + Date.now() + Math.floor(Math.random() * 10000);
+                localStorage.setItem('browserUserId', id);
+            }
+            return id;
+        }
+
+        const query = new URLSearchParams(window.location.search);
+        const lobbyId = normalizeId(query.get('lobbyId')) || normalizeId(localStorage.getItem('currentLobbyId'));
+        const userId = normalizeId(query.get('userId')) || normalizeId(localStorage.getItem('browserUserId')) || getBrowserUserId();
+        let adminPollTimer = null;
+        let adminPollBusy = false;
+        let adminMutating = false;
+        let adminLastVersion = '';
+        if (lobbyId) localStorage.setItem('currentLobbyId', lobbyId);
+        if (userId) localStorage.setItem('browserUserId', userId);
+
+        async function addNumberToDrawn(num) {
+            if (!lobbyId || !userId) {
+                alert('Ошибка: Отсутствует ID лобби или пользователя в URL. Перезайдите в админку из игры.');
+                return;
+            }
+            if (adminMutating) return;
+            adminMutating = true;
+            // OPTIMISTIC UPDATE — рисуем сразу, не ждём Supabase
+            drawnOrder = [...drawnOrder, num];
+            drawnNumbers = new Set(drawnOrder);
+            updateDisplay();
+            showLastNumber(num);
+            try {
+                const res = await fetch('/api/loto', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'draw_number', lobbyId, userId, number: num })
+                });
+                const data = await res.json();
+                if (data.type === 'error' || data.error) {
+                    // Откатываем если ошибка
+                    drawnOrder = drawnOrder.filter(n => n !== num);
+                    drawnNumbers = new Set(drawnOrder);
+                    updateDisplay();
+                    alert('Ошибка: ' + (data.message || data.error));
+                } else {
+                    const barrels = data.all || data.drawn;
+                    if (barrels) {
+                        drawnOrder = barrels.map(Number);
+                        drawnNumbers = new Set(drawnOrder);
+                        updateDisplay();
+                    }
+                    if (data.version !== undefined) adminLastVersion = String(data.version);
+                }
+            } catch(e) {
+                console.error('API Error:', e);
+                drawnOrder = drawnOrder.filter(n => n !== num);
+                drawnNumbers = new Set(drawnOrder);
+                updateDisplay();
+                await loadFromServer(true);
+            } finally {
+                adminMutating = false;
+            }
+        }
+
+        async function removeNumber(num) {
+            if (!lobbyId || !userId) return;
+            if (!confirm(`Удалить бочонок ${num}?`)) return;
+            if (adminMutating) return;
+            adminMutating = true;
+            try {
+                const res = await fetch('/api/loto', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'undo_number', lobbyId, userId, number: num })
+                });
+                const data = await res.json();
+                const barrels = data.all || data.drawn;
+                if (barrels) {
+                    drawnOrder = barrels.map(Number);
+                    drawnNumbers = new Set(drawnOrder);
+                    updateDisplay();
+                }
+                if (data.version !== undefined) adminLastVersion = String(data.version);
+            } catch(e) {
+                await loadFromServer(true);
+            } finally {
+                adminMutating = false;
+            }
+        }
+
+        function showLastNumber(num) {
+            const el = document.getElementById('lastNumber');
+            el.textContent = num;
+            el.classList.remove('empty-last');
+            el.style.animation = 'none';
+            setTimeout(() => { el.style.animation = 'bounce 1s ease-in-out'; }, 10);
+        }
+
+        function updateDisplay() {
+            document.querySelectorAll('.grid-number').forEach(cell => {
+                const num = parseInt(cell.dataset.number);
+                cell.classList.toggle('drawn', drawnNumbers.has(num));
+            });
+
+            const drawnList = document.getElementById('drawnList');
+            drawnList.innerHTML = '';
+            // Показываем в порядке выпадения (не по возрастанию)
+            drawnOrder.forEach(num => {
+                const barrel = document.createElement('div');
+                barrel.className = 'drawn-barrel';
+                barrel.textContent = num;
+                const removeBtn = document.createElement('div');
+                removeBtn.className = 'remove';
+                removeBtn.textContent = '×';
+                removeBtn.onclick = (e) => { e.stopPropagation(); removeNumber(num); };
+                barrel.appendChild(removeBtn);
+                drawnList.appendChild(barrel);
+            });
+
+            document.getElementById('drawnCount').textContent = drawnOrder.length;
+            document.getElementById('remainingCount').textContent = 90 - drawnOrder.length;
+
+            if (drawnOrder.length > 0) showLastNumber(drawnOrder[drawnOrder.length - 1]);
+            else {
+                const el = document.getElementById('lastNumber');
+                el.textContent = '—';
+                el.classList.add('empty-last');
+            }
+        }
+
+        async function clearAll() {
+            if (!lobbyId || !userId) return;
+            if (!confirm('Удалить все выпавшие бочонки?')) return;
+            if (adminMutating) return;
+            adminMutating = true;
+            try {
+                const res = await fetch('/api/loto', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'reset_numbers', lobbyId, userId })
+                });
+                const data = await res.json();
+                drawnOrder = [];
+                drawnNumbers.clear();
+                updateDisplay();
+                if (data.version !== undefined) adminLastVersion = String(data.version);
+            } catch(e) {
+                await loadFromServer(true);
+            } finally {
+                adminMutating = false;
+            }
+        }
+
+        async function loadFromServer(force = false) {
+            if (!lobbyId) return;
+            if (!force && (adminMutating || adminPollBusy)) return;
+            adminPollBusy = true;
+            try {
+                const res = await fetch(`/api/loto?action=get_state&lobbyId=${encodeURIComponent(lobbyId)}&userId=${encodeURIComponent(userId)}&v=${encodeURIComponent(adminLastVersion)}`, { cache: 'no-store' });
+                const data = await res.json();
+                if (data.type === 'no_change') return;
+                if (data.version !== undefined) adminLastVersion = String(data.version);
+                
+                if (data.error) {
+                    console.error('Loto State Error:', data.error);
+                    return;
+                }
+
+                drawnOrder = (data.drawn || []).map(Number);
+                drawnNumbers = new Set(drawnOrder);
+                updateDisplay();
+                
+                if (data.lobby && data.lobby.players) {
+                    const pPanel = document.getElementById('playersPanel');
+                    if (pPanel) pPanel.style.display = 'block';
+                    renderPlayers(data.lobby.players);
+                }
+            } catch(e) {
+                console.error('Fetch error:', e);
+                document.getElementById('drawnList').innerHTML =
+                    '<div style="color:rgba(255,100,100,.8);font-size:14px;">⚠️ Сервер недоступен</div>';
+            } finally {
+                adminPollBusy = false;
+            }
+        }
+
+        // Enter в поле ввода
+        document.getElementById('numberInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addNumber();
+        });
+
+        // Инициализация
+        window.addEventListener('DOMContentLoaded', () => {
+            initGrid();
+            loadFromServer(true);
+            if (!adminPollTimer) adminPollTimer = setInterval(loadFromServer, 1000);
+        });
+
+        function renderPlayers(players) {
+            const list = document.getElementById('playersList');
+            list.innerHTML = '';
+            if (!players || !players.length) {
+                list.innerHTML = '<div style="color:rgba(255,215,0,.5);font-size:14px;text-align:center;">Нет игроков</div>';
+                return;
+            }
+            players.forEach(p => {
+                const marked = parseInt(p.progress || 0);
+                const total = 15;
+                const pct = Math.round(marked / total * 100);
+                const row = document.createElement('div');
+                row.className = 'player-progress-row';
+                row.style.cssText = 'background:rgba(255,215,0,0.05); padding:10px; border-radius:10px; margin-bottom:5px;';
+                row.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <span style="font-weight:bold; color:#FFD700;">${p.nickname || 'Игрок'}</span>
+                        <span style="font-size:12px; color:rgba(255,215,0,0.7);">${marked}/15</span>
+                    </div>
+                    <div style="width:100%; height:4px; background:rgba(255,215,0,0.1); border-radius:2px;">
+                        <div style="width:${pct}%; height:100%; background:#FFD700; border-radius:2px; box-shadow:0 0 10px #FFD700;"></div>
+                    </div>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        // Автообновление данных — умный, version-based (5 сек вместо 2 сек)
+        // Админ сам делает изменения, ему нужен поллинг только для списка игроков
+        // Инициализация Realtime для админки
+        async function initAdminRealtime() {
+            return;
+            if (!lobbyId) return;
+            // Используем тот же anon-ключ что и в loto-realtime.js
+            const sb = window.supabase.createClient(
+                'https://dlybapjwphbcynfkdxyk.supabase.co',
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWJhcGp3cGhiY3luZmtkeHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTEzMzQsImV4cCI6MjA5MjAyNzMzNH0.XVjs3XJVUR51NXjxgFKnCrW1f-Irv3AQRItonjeDDPk'
+            );
+            
+            // Подписка на изменения лобби (бочонки)
+            sb.channel('admin-lobby')
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'loto_lobbies', filter: `id=eq.${lobbyId}` }, 
+                payload => {
+                    drawnOrder = (payload.new.drawn_numbers || []).map(Number);
+                    drawnNumbers = new Set(drawnOrder);
+                    updateDisplay();
+                })
+                .subscribe();
+
+            // Подписка на игроков (прогресс)
+            sb.channel('admin-players')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'loto_players', filter: `lobby_id=eq.${lobbyId}` }, 
+                async () => {
+                    // При любом изменении игроков — перекачиваем список (проще чем частичное обновление)
+                    const { data: players } = await sb.from('loto_players').select('*').eq('lobby_id', lobbyId);
+                    if (players) {
+                        const pPanel = document.getElementById('playersPanel');
+                        if (pPanel) pPanel.style.display = 'block';
+                        renderPlayers(players.map(p => ({
+                            nickname: p.nickname,
+                            progress: Array.isArray(p.marked_cells) ? p.marked_cells.length : (Number(p.marked_cells) || 0)
+                        })));
+                    }
+                })
+                .subscribe();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initAdminRealtime();
+        });
+
+    </script>
+</body>
+</html>

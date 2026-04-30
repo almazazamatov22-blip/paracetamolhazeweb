@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Дашборд — FATE OVERLAYS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Martian+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080808;
+      --surface:   #111111;
+      --surface2:  #161616;
+      --border:    #1e1e1e;
+      --accent:    #7c3aed;
+      --accent2:   #a855f7;
+      --text:      #e8e8e8;
+      --muted:     #555;
+      --green:     #22c55e;
+      --red:       #ef4444;
+      --yellow:    #eab308;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Martian Mono', monospace;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 999;
+      opacity: .5;
+    }
+
+    /* LAYOUT */
+    .layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: 100vh;
+    }
+
+    /* SIDEBAR */
+    aside {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: sticky; top: 0; height: 100vh;
+    }
+
+    .sidebar-logo {
+      padding: 28px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo a {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      letter-spacing: .12em;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .sidebar-logo a span { color: var(--accent2); }
+
+    .sidebar-user {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .user-avatar {
+      width: 32px; height: 32px;
+      border-radius: 2px;
+      background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 16px;
+      color: #fff;
+      overflow: hidden;
+    }
+    .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .user-info {}
+    .user-name { font-size: 12px; color: var(--text); }
+    .user-status {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10px; color: var(--green);
+      margin-top: 3px; letter-spacing: .1em;
+    }
+    .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+    nav.sidebar-nav {
+      padding: 24px 0;
+      flex: 1;
+    }
+    .nav-section {
+      padding: 0 24px 8px;
+      font-size: 9px;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 24px;
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color .2s, background .2s;
+      border-left: 2px solid transparent;
+    }
+    .nav-link:hover { color: var(--text); background: rgba(255,255,255,.03); }
+    .nav-link.active { color: var(--accent2); border-left-color: var(--accent2); background: rgba(168,85,247,.06); }
+    .nav-link svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; flex-shrink: 0; }
+
+    .sidebar-bottom {
+      padding: 20px 24px;
+      border-top: 1px solid var(--border);
+    }
+    .logout-link {
+      font-size: 11px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color .2s;
+    }
+    .logout-link:hover { color: var(--red); }
+
+    /* MAIN */
+    main {
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .page-header {
+      padding: 24px 48px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .page-title-label {
+      font-size: 10px;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      margin-bottom: 8px;
+    }
+
+    .page-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 48px;
+      letter-spacing: .06em;
+      line-height: 1;
+    }
+
+    .page-header-actions { display: flex; gap: 12px; }
+
+    /* STATUS BADGE */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border: 1px solid var(--green);
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--green);
+    }
+    .status-badge .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+    /* CONTENT */
+    .content { 
+      padding: 24px 48px; 
+      display: grid; 
+      grid-template-columns: 1fr 1.3fr; 
+      gap: 24px; 
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .content-col {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      min-height: 0;
+    }
+
+    .card.full-height {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card.full-height .card-body {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    /* CARDS */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .card-head {
+      padding: 20px 28px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-head-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-icon {
+      width: 32px; height: 32px;
+      background: rgba(124,58,237,.15);
+      border: 1px solid rgba(124,58,237,.3);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .card-icon svg { width: 15px; height: 15px; fill: none; stroke: var(--accent2); stroke-width: 1.5; }
+
+    .card-title {
+      font-size: 11px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+    .card-subtitle {
+      font-size: 10px;
+      letter-spacing: .1em;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .card-body { padding: 28px; }
+
+    /* OBS BLOCK */
+    .obs-url-block {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .obs-url {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 12px 16px;
+      font-family: 'Martian Mono', monospace;
+      font-size: 11px;
+      color: var(--accent2);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      user-select: all;
+    }
+
+    .btn-copy {
+      background: var(--accent);
+      border: none;
+      padding: 0 20px;
+      font-family: 'Martian Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #fff;
+      cursor: pointer;
+      transition: background .2s;
+      white-space: nowrap;
+    }
+    .btn-copy:hover { background: var(--accent2); }
+
+    .btn-test {
+      background: transparent;
+      border: 1px solid var(--border);
+      padding: 0 20px;
+      font-family: 'Martian Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .2s;
+      white-space: nowrap;
+      text-decoration: none;
+      display: inline-flex; align-items: center;
+    }
+    .btn-test:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    .obs-hint {
+      margin-top: 12px;
+      font-size: 10px;
+      line-height: 1.7;
+      color: var(--muted);
+      letter-spacing: .06em;
+    }
+    .obs-hint strong { color: var(--text); font-weight: 400; }
+
+    /* SETTINGS FORM */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .form-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .form-grid.full { grid-template-columns: 1fr; }
+
+    .field { display: flex; flex-direction: column; gap: 8px; }
+
+    .field-label {
+      font-size: 10px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .field-hint {
+      font-size: 10px;
+      color: var(--muted);
+      opacity: .7;
+      letter-spacing: .04em;
+      line-height: 1.5;
+    }
+
+    .field input[type="text"],
+    .field input[type="number"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      font-family: 'Martian Mono', monospace;
+      font-size: 12px;
+      color: var(--text);
+      outline: none;
+      width: 100%;
+      transition: border-color .2s;
+    }
+    .field input:focus { border-color: var(--accent); }
+
+    .color-field {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .color-swatch {
+      width: 40px; height: 40px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .color-swatch input[type="color"] {
+      position: absolute; inset: 0;
+      opacity: 0;
+      width: 100%; height: 100%;
+      cursor: pointer;
+      border: none;
+    }
+    .color-preview {
+      width: 100%;
+      height: 100%;
+    }
+    .color-hex {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      font-family: 'Martian Mono', monospace;
+      font-size: 12px;
+      color: var(--text);
+      outline: none;
+      width: 110px;
+    }
+    .color-hex:focus { border-color: var(--accent); }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    .btn-save {
+      background: var(--accent);
+      border: none;
+      padding: 14px 32px;
+      font-family: 'Martian Mono', monospace;
+      font-size: 11px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #fff;
+      cursor: pointer;
+      transition: background .2s, transform .15s;
+      align-self: flex-start;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .btn-save:hover { background: var(--accent2); }
+    .btn-save svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+    /* ASSETS */
+    .assets-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      background: var(--border);
+    }
+
+    .asset-row {
+      display: grid;
+      grid-template-columns: 36px 1fr 160px 110px;
+      align-items: center;
+      gap: 0;
+      background: var(--surface);
+    }
+    .asset-row:hover { background: var(--surface2); }
+
+    .asset-type-icon {
+      padding: 0 0 0 16px;
+      font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      align-self: stretch;
+    }
+
+    .asset-info { padding: 18px 16px; }
+
+    .asset-name {
+      font-size: 11px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--text);
+      margin-bottom: 5px;
+    }
+
+    .asset-desc {
+      font-size: 10px;
+      line-height: 1.6;
+      color: var(--muted);
+      letter-spacing: .04em;
+    }
+
+    .asset-spec {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 3px 8px;
+      border: 1px solid var(--border);
+      font-size: 10px;
+      letter-spacing: .1em;
+      color: var(--accent2);
+      text-transform: uppercase;
+    }
+
+    .asset-upload {
+      padding: 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .file-input-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .file-input-label input[type="file"] { display: none; }
+
+    .file-btn {
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+      font-family: 'Martian Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--bg);
+      cursor: pointer;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+    .file-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    .file-name {
+      font-size: 10px;
+      color: var(--muted);
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .asset-action {
+      padding: 18px 16px;
+    }
+
+    .btn-upload {
+      width: 100%;
+      background: var(--accent);
+      border: none;
+      padding: 10px 0;
+      font-family: 'Martian Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #fff;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-upload:hover { background: var(--accent2); }
+    .btn-upload:disabled { background: var(--border); color: var(--muted); cursor: default; }
+
+    .asset-status {
+      font-size: 10px;
+      color: var(--green);
+      letter-spacing: .08em;
+      margin-top: 4px;
+    }
+    .asset-status.none { color: var(--muted); }
+
+    /* ASSETS SECTION DIVIDER */
+    .assets-section-head {
+      padding: 10px 16px;
+      background: var(--bg);
+      font-size: 9px;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* TOAST */
+    .toast {
+      position: fixed;
+      bottom: 32px; right: 32px;
+      background: var(--surface);
+      border: 1px solid var(--green);
+      padding: 14px 20px;
+      font-size: 11px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--green);
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all .3s;
+      z-index: 9999;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      aside { display: none; }
+      .page-header { padding: 24px; }
+      .content { padding: 24px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid.cols-3 { grid-template-columns: 1fr; }
+      .asset-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside>
+    <div class="sidebar-logo">
+      <a href="/">FATE<span>.</span>OVERLAYS</a>
+    </div>
+
+    <div class="sidebar-user">
+      <div class="user-avatar">
+        <!-- Если есть avatar: <img src="<%= user.avatar %>" alt=""> -->
+        <!-- Замените на шаблонный тег -->
+        R
+      </div>
+      <div class="user-info">
+        <div class="user-name">r1ch_crazy</div>
+        <div class="user-status">
+          <span class="dot"></span>
+          Доступ активен
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section">Оверлеи</div>
+      <a href="#" class="nav-link active">
+        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        Ролл
+      </a>
+      <div class="nav-section" style="margin-top:16px">Аккаунт</div>
+      <a href="/" class="nav-link">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        Главная
+      </a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <a href="/logout" class="logout-link">← Выйти</a>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main>
+
+    <div class="page-header">
+      <div>
+        <div class="page-title-label">Fate Roll Overlay</div>
+        <h1 class="page-title">ДАШБОРД</h1>
+      </div>
+      <div class="page-header-actions">
+        <div class="status-badge">
+          <span class="dot"></span>
+          Доступ активен
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- LEFT COLUMN: OBS + SETTINGS -->
+      <div class="content-col" style="overflow-y: auto; padding-right: 4px;">
+        <!-- OBS SOURCE -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="card-icon">
+                <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              </div>
+              <div>
+                <div class="card-title">OBS Browser Source</div>
+                <div class="card-subtitle">Добавь этот URL в OBS</div>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="obs-url-block">
+              <div class="obs-url" id="obs-url">https://paracetamolhaze.vercel.app/overlays/roll?id=119989080</div>
+              <button class="btn-copy" onclick="copyUrl()">Скопировать</button>
+              <a href="#" class="btn-test" target="_blank">Тест</a>
+            </div>
+            <div class="obs-hint">
+              <strong>1600×210</strong> &nbsp;·&nbsp; ✓ <strong>Прозрачный фон</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="card-icon">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+              </div>
+              <div>
+                <div class="card-title">Настройки</div>
+                <div class="card-subtitle">Параметры оверлея</div>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            <form action="/dashboard/save" method="POST">
+              <div style="display:flex; flex-direction:column; gap:20px;">
+                <div class="field">
+                  <label class="field-label">Название награды в Twitch</label>
+                  <input type="text" name="reward_name" value="РАНДОМ СКИН КС2" />
+                </div>
+                <div class="form-grid">
+                  <div class="field">
+                    <label class="field-label">Мин. число</label>
+                    <input type="number" name="min_val" value="1" />
+                  </div>
+                  <div class="field">
+                    <label class="field-label">Макс. число</label>
+                    <input type="number" name="max_val" value="100" />
+                  </div>
+                </div>
+                <div class="divider"></div>
+                <div class="form-grid cols-3">
+                  <div class="field">
+                    <label class="field-label">Фон</label>
+                    <div class="color-field">
+                      <div class="color-swatch">
+                        <div class="color-preview" id="prev-bg" style="background:#1a1a2e"></div>
+                        <input type="color" name="color_bg" value="#1a1a2e" oninput="syncColor(this,'prev-bg','hex-bg')" />
+                      </div>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label class="field-label">Имя</label>
+                    <div class="color-field">
+                      <div class="color-swatch">
+                        <div class="color-preview" id="prev-name" style="background:#ffffff"></div>
+                        <input type="color" name="color_name" value="#ffffff" oninput="syncColor(this,'prev-name','hex-name')" />
+                      </div>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label class="field-label">Цифры</label>
+                    <div class="color-field">
+                      <div class="color-swatch">
+                        <div class="color-preview" id="prev-num" style="background:#ffffff"></div>
+                        <input type="color" name="color_num" value="#ffffff" oninput="syncColor(this,'prev-num','hex-num')" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <button type="submit" class="btn-save">Сохранить</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: ASSETS -->
+      <div class="content-col">
+        <div class="card full-height">
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="card-icon">
+                <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+              </div>
+              <div>
+                <div class="card-title">Ассеты</div>
+                <div class="card-subtitle">Изображения и звуки</div>
+              </div>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="assets-grid">
+              <div class="assets-section-head">Изображения</div>
+              <div class="asset-row">
+                <div class="asset-type-icon">🖼️</div>
+                <div class="asset-info">
+                  <div class="asset-name">Фон панели</div>
+                  <span class="asset-spec">1600×210</span>
+                </div>
+                <div class="asset-upload">
+                  <label class="file-input-label">
+                    <span class="file-btn">Выбрать</span>
+                    <input type="file" accept="image/png,image/jpeg" onchange="updateFileName(this)">
+                  </label>
+                </div>
+                <div class="asset-action">
+                  <button class="btn-upload" onclick="uploadAsset('panel_bg', this)">Загрузить</button>
+                </div>
+              </div>
+              <div class="asset-row">
+                <div class="asset-type-icon">🏆</div>
+                <div class="asset-info">
+                  <div class="asset-name">Иконка награды</div>
+                  <span class="asset-spec">200×200</span>
+                </div>
+                <div class="asset-upload">
+                  <label class="file-input-label">
+                    <span class="file-btn">Выбрать</span>
+                    <input type="file" accept="image/png" onchange="updateFileName(this)">
+                  </label>
+                </div>
+                <div class="asset-action">
+                  <button class="btn-upload" onclick="uploadAsset('reward_img', this)">Загрузить</button>
+                </div>
+              </div>
+              <div class="assets-section-head">Звуки</div>
+              <div class="asset-row">
+                <div class="asset-type-icon">🔔</div>
+                <div class="asset-info"><div class="asset-name">Появление</div></div>
+                <div class="asset-upload">
+                  <label class="file-input-label">
+                    <span class="file-btn">Выбрать</span>
+                    <input type="file" accept="audio/mpeg" onchange="updateFileName(this)">
+                  </label>
+                </div>
+                <div class="asset-action">
+                  <button class="btn-upload" onclick="uploadAsset('s_in', this)">Загрузить</button>
+                </div>
+              </div>
+              <div class="asset-row">
+                <div class="asset-type-icon">🎲</div>
+                <div class="asset-info"><div class="asset-name">Рандом</div></div>
+                <div class="asset-upload">
+                  <label class="file-input-label">
+                    <span class="file-btn">Выбрать</span>
+                    <input type="file" accept="audio/mpeg" onchange="updateFileName(this)">
+                  </label>
+                </div>
+                <div class="asset-action">
+                  <button class="btn-upload" onclick="uploadAsset('s_roll', this)">Загрузить</button>
+                </div>
+              </div>
+              <div class="asset-row">
+                <div class="asset-type-icon">🏅</div>
+                <div class="asset-info"><div class="asset-name">Победа</div></div>
+                <div class="asset-upload">
+                  <label class="file-input-label">
+                    <span class="file-btn">Выбрать</span>
+                    <input type="file" accept="audio/mpeg" onchange="updateFileName(this)">
+                  </label>
+                </div>
+                <div class="asset-action">
+                  <button class="btn-upload" onclick="uploadAsset('s_win', this)">Загрузить</button>
+                </div>
+              </div>
+              <div class="asset-row">
+                <div class="asset-type-icon">💀</div>
+                <div class="asset-info"><div class="asset-name">Проигрыш</div></div>
+                <div class="asset-upload">
+                  <label class="file-input-label">
+                    <span class="file-btn">Выбрать</span>
+                    <input type="file" accept="audio/mpeg" onchange="updateFileName(this)">
+                  </label>
+                </div>
+                <div class="asset-action">
+                  <button class="btn-upload" onclick="uploadAsset('s_lose', this)">Загрузить</button>
+                </div>
+              </div>
+              <div class="asset-row">
+                <div class="asset-type-icon">🌫️</div>
+                <div class="asset-info"><div class="asset-name">Исчезновение</div></div>
+                <div class="asset-upload">
+                  <label class="file-input-label">
+                    <span class="file-btn">Выбрать</span>
+                    <input type="file" accept="audio/mpeg" onchange="updateFileName(this)">
+                  </label>
+                </div>
+                <div class="asset-action">
+                  <button class="btn-upload" onclick="uploadAsset('s_out', this)">Загрузить</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    </div><!-- /content -->
+  </main>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // Color sync
+  function syncColor(input, previewId, hexId) {
+    document.getElementById(previewId).style.background = input.value;
+    document.getElementById(hexId).value = input.value;
+  }
+  function syncHex(input, previewId, colorInput) {
+    const val = input.value;
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+      document.getElementById(previewId).style.background = val;
+      colorInput.value = val;
+    }
+  }
+
+  // File label update
+  function updateFileName(input) {
+    const label = input.closest('.file-input-label');
+    const nameEl = label.parentElement.nextElementSibling
+      || label.closest('.asset-upload').querySelector('.file-name');
+    const fileNameEl = input.closest('.asset-upload').querySelector('.file-name');
+    if (fileNameEl) {
+      fileNameEl.textContent = input.files[0] ? input.files[0].name : 'Файл не выбран';
+    }
+  }
+
+  // Upload asset
+  async function uploadAsset(key, btn) {
+    const row = btn.closest('.asset-row');
+    const fileInput = row.querySelector('input[type="file"]');
+    const statusEl = document.getElementById('status-' + key);
+
+    if (!fileInput.files[0]) {
+      showToast('Сначала выбери файл', true);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('asset', fileInput.files[0]);
+    formData.append('key', key);
+
+    btn.disabled = true;
+    btn.textContent = '...';
+
+    try {
+      const res = await fetch('/dashboard/upload', { method: 'POST', body: formData });
+      if (res.ok) {
+        statusEl.textContent = '✓ Загружено';
+        statusEl.className = 'asset-status';
+        showToast('Файл загружен');
+      } else {
+        throw new Error();
+      }
+    } catch {
+      statusEl.textContent = '✗ Ошибка';
+      statusEl.style.color = 'var(--red)';
+      showToast('Ошибка загрузки', true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Загрузить';
+    }
+  }
+
+  // Copy URL
+  function copyUrl() {
+    const url = document.getElementById('obs-url').textContent.trim();
+    navigator.clipboard.writeText(url).then(() => showToast('URL скопирован'));
+  }
+
+  // Toast
+  function showToast(msg, error = false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.borderColor = error ? 'var(--red)' : 'var(--green)';
+    t.style.color = error ? 'var(--red)' : 'var(--green)';
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
+  }
+</script>
+</body>
+</html>

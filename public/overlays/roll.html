@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Fate Overlay</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=Martian+Mono:wght@800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --panel-top: 40px;
+            --panel-radius: 18px;
+            --panel-bg-color: #101014;
+            --white: #ffffff;
+            --num-color: #ffffff;
+            --muted: rgba(255, 255, 255, 0.78);
+            --green: #28d17c;
+            --red: #ff4d4d;
+
+            --name-size: 50px;
+            --title-size: 30px;
+            --num-size: 100px;
+            --vs-size: 54px;
+            --label-bg: rgba(0, 0, 0, 0.45);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1620px;
+            height: 290px;
+            overflow: hidden;
+            background: transparent;
+            font-family: 'Inter', sans-serif;
+            color: white;
+        }
+
+        #wrap {
+            position: absolute;
+            left: 50%;
+            top: -310px; /* Start way above */
+            width: 1600px;
+            height: 210px;
+            transform: translateX(-50%);
+            opacity: 0;
+            border-radius: var(--panel-radius);
+            background-color: var(--panel-bg-color);
+            background-size: cover;
+            background-position: center;
+            box-shadow: 0 14px 45px rgba(0, 0, 0, .45);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+            transition: top 650ms cubic-bezier(0.19, 1, 0.22, 1), opacity 300ms ease;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            z-index: 9999;
+        }
+
+        #wrap.show {
+            top: var(--panel-top);
+            opacity: 1;
+        }
+
+        #wrap.hide {
+            top: -310px;
+            opacity: 0;
+        }
+
+        /* Nick and Avatar at way left */
+        #left-side {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex: 1;
+        }
+
+        #user {
+            font-size: var(--name-size);
+            font-weight: 900;
+            color: var(--white);
+            text-shadow: 0 6px 20px rgba(0, 0, 0, .6);
+            text-transform: uppercase;
+        }
+
+        #avatar {
+            width: 110px;
+            height: 110px;
+            border-radius: 12px;
+            background: #222;
+            object-fit: cover;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Center Section (Label + Numbers) */
+        #center-side {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            justify-content: center;
+            flex: 2;
+        }
+
+        .col {
+            text-align: center;
+        }
+
+        .labelWrap {
+            display: inline-block;
+            background: var(--label-bg);
+            border-radius: 8px;
+            padding: 4px 12px;
+            margin-bottom: 6px;
+        }
+
+        .label {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--muted);
+            text-transform: uppercase;
+            line-height: 1;
+        }
+
+        .num {
+            font-size: var(--num-size);
+            font-weight: 900;
+            font-family: 'Martian Mono', monospace;
+            color: var(--num-color);
+            line-height: 1;
+            min-width: 160px;
+            text-shadow: 0 8px 24px rgba(0, 0, 0, .7);
+        }
+
+        #vs {
+            font-size: var(--vs-size);
+            font-weight: 900;
+            color: var(--white);
+            opacity: 1;
+            /* Forced opaque */
+            text-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Right Section (Reward) */
+        #right-side {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            justify-content: flex-end;
+            flex: 1.5;
+        }
+
+        #rewardTitle {
+            font-size: var(--title-size);
+            font-weight: 900;
+            color: var(--white);
+            text-align: center;
+            /* Centered as requested */
+            text-transform: uppercase;
+            max-width: 300px;
+            line-height: 1.1;
+        }
+
+        #rewardImg {
+            width: 150px;
+            height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #rewardImg img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.4));
+        }
+
+        #badge {
+            position: absolute;
+            right: 150px;
+            bottom: -25px;
+            font-size: 32px;
+            font-weight: 900;
+            padding: 8px 30px;
+            border-radius: 99px;
+            opacity: 0;
+            transform: scale(.8);
+            transition: all 0.3s;
+            z-index: 50;
+        }
+
+        #badge.show {
+            opacity: 1;
+            transform: scale(1) translateY(-15px);
+        }
+
+        #badge.win {
+            background: var(--green);
+            color: white;
+            box-shadow: 0 8px 20px rgba(40, 209, 124, 0.4);
+        }
+
+        #badge.lose {
+            background: var(--red);
+            color: white;
+        }
+
+        .rollFlash {
+            animation: flash .1s linear infinite;
+        }
+
+        @keyframes flash {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .4
+            }
+        }
+
+        .shake {
+            animation: shake .4s ease-in-out;
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            25% {
+                transform: translate(-10px, 0);
+            }
+
+            75% {
+                transform: translate(10px, 0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="wrap">
+        <div id="left-side">
+            <div id="user">PLAYER</div>
+            <img src="" id="avatar">
+        </div>
+
+        <div id="center-side">
+            <div class="col">
+                <div class="labelWrap">
+                    <div class="label">Число зрителя</div>
+                </div>
+                <div class="num" id="pickNum">00</div>
+            </div>
+            <div id="vs">VS</div>
+            <div class="col">
+                <div class="labelWrap">
+                    <div class="label">Число рандома</div>
+                </div>
+                <div class="num" id="rollNum">00</div>
+            </div>
+        </div>
+
+        <div id="right-side">
+            <div id="rewardTitle">REWARD NAME</div>
+            <div id="rewardImg"></div>
+        </div>
+
+        <div id="badge"></div>
+    </div>
+
+    <audio id="sIn" src="/overlays/defaults/sounds/in.mp3" preload="auto"></audio>
+    <audio id="sRoll" src="/overlays/defaults/sounds/roll.mp3" preload="auto"></audio>
+    <audio id="sWin" src="/overlays/defaults/sounds/win.mp3" preload="auto"></audio>
+    <audio id="sLose" src="/overlays/defaults/sounds/lose.mp3" preload="auto"></audio>
+    <audio id="sOut" src="/overlays/defaults/sounds/out.mp3" preload="auto"></audio>
+
+    <script>
+        const T_IN = 650;
+        const T_STAND = 1000;
+        const T_ROLL = 3000;
+        const T_AFTER = 2000; // Updated to 2 seconds
+        const T_OUT = 650;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('id');
+        let isRunning = false;
+        let lastTriggerId = null;
+
+        async function loadAssets() {
+            if (!userId) return;
+            try {
+                const res = await fetch(`/api/ov_upload?userId=${userId}`);
+                const assets = await res.json();
+                if (assets.panel_bg) document.getElementById('wrap').style.backgroundImage = `url(${assets.panel_bg})`;
+                if (assets.reward_img) document.getElementById('rewardImg').innerHTML = `<img src="${assets.reward_img}">`;
+                ['s_in', 's_roll', 's_win', 's_lose', 's_out'].forEach(k => {
+                    if (assets[k]) document.getElementById(k.replace('_', '')).src = assets[k];
+                });
+            } catch (e) { }
+        }
+
+        async function loadSettings() {
+            if (!userId) return;
+            try {
+                const res = await fetch(`/api/ov_settings?userId=${userId}`);
+                const settings = await res.json();
+                if (settings.reward_name) document.getElementById('rewardTitle').textContent = settings.reward_name;
+            } catch (e) { }
+        }
+
+        async function checkTrigger(isInitial = false) {
+            if ((isRunning && !isInitial) || !userId) return;
+            try {
+                const res = await fetch(`/api/ov_trigger?userId=${userId}&t=${Date.now()}`);
+                const data = await res.json();
+                if (data && data.triggerId) {
+                    if (lastTriggerId === null) {
+                        lastTriggerId = data.triggerId;
+                        return;
+                    }
+                    if (data.triggerId !== lastTriggerId) {
+                        lastTriggerId = data.triggerId;
+                        animate(data);
+                    }
+                }
+            } catch (e) { }
+        }
+
+        function play(id) {
+            const a = document.getElementById(id);
+            if (a && a.src) { a.currentTime = 0; a.play().catch(e => { }); }
+        }
+
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        async function animate(data) {
+            isRunning = true;
+            const wrap = document.getElementById('wrap');
+            const userEl = document.getElementById('user');
+            const avatarEl = document.getElementById('avatar');
+            const pickEl = document.getElementById('pickNum');
+            const rollEl = document.getElementById('rollNum');
+            const badge = document.getElementById('badge');
+            const centerSide = document.getElementById('center-side');
+
+            badge.className = "";
+            badge.textContent = "";
+            centerSide.classList.remove('shake');
+            rollEl.classList.remove('rollFlash');
+            rollEl.style.color = "var(--white)";
+
+            userEl.textContent = data.userName;
+            if (data.userAvatar) avatarEl.src = data.userAvatar;
+            pickEl.textContent = data.userChoice.toString().padStart(2, '0');
+            rollEl.textContent = "00";
+
+            wrap.classList.remove('hide');
+            wrap.classList.add('show');
+            play('sIn');
+            await sleep(T_IN);
+
+            await sleep(T_STAND);
+
+            play('sRoll');
+            rollEl.classList.add('rollFlash');
+            const startRoll = Date.now();
+            while (Date.now() - startRoll < T_ROLL) {
+                rollEl.textContent = Math.floor(Math.random() * 99 + 1).toString().padStart(2, '0');
+                await sleep(60);
+            }
+            rollEl.classList.remove('rollFlash');
+
+            let resultNum = data.isTest ? (Math.random() > 0.5 ? data.userChoice : Math.floor(Math.random() * 99 + 1)) : Math.floor(Math.random() * 99 + 1);
+            rollEl.textContent = resultNum.toString().padStart(2, '0');
+
+            const isWin = parseInt(rollEl.textContent) === parseInt(pickEl.textContent);
+            badge.textContent = isWin ? "ПОБЕДА!" : "ПРОИГРЫШ";
+            badge.classList.add('show', isWin ? 'win' : 'lose');
+            rollEl.style.color = isWin ? "var(--green)" : "var(--red)";
+            if (isWin) play('sWin'); else { play('sLose'); centerSide.classList.add('shake'); }
+
+            await sleep(T_AFTER);
+
+            play('sOut');
+            wrap.classList.remove('show');
+            wrap.classList.add('hide');
+            await sleep(T_OUT);
+
+            isRunning = false;
+        }
+
+        if (userId) {
+            loadAssets();
+            loadSettings();
+
+            // Check if we are in instant test mode from URL params
+            const isTestMode = urlParams.get('test') === '1';
+            if (isTestMode) {
+                const data = {
+                    userName: urlParams.get('userName') || 'PLAYER',
+                    userChoice: parseInt(urlParams.get('userChoice')) || 0,
+                    userAvatar: urlParams.get('userAvatar') || '',
+                    isTest: true
+                };
+                // Small delay to ensure styles/assets are ready
+                setTimeout(() => animate(data), 500);
+            } else {
+                setInterval(() => checkTrigger(false), 1500);
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0">
+    <title>Poker Pro Table</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="root">
+        <!-- TOP LEFT INFO -->
+        <div class="top-left-info">
+            <div class="info-title">NL Hold'em</div>
+            <div class="info-blinds">$0.05 / $0.10</div>
+        </div>
+
+        <!-- TOP RIGHT BUTTONS -->
+        <div class="top-right-buttons">
+            <div class="icon-btn"><span>⚙</span>Настройки</div>
+            <div class="icon-btn"><span>👥</span>Лобби</div>
+            <div class="icon-btn"><span>🚪</span>Выйти</div>
+        </div>
+
+        <!-- POKER TABLE -->
+        <div class="poker-table">
+            <!-- POT TEXT -->
+            <div class="pot-text">Банк: $0.35</div>
+            
+            <!-- COMMUNITY CARDS SLOTS -->
+            <div class="community-cards">
+                <div class="card-slot" style="left: 340px; top: 240px;"></div>
+                <div class="card-slot" style="left: 410px; top: 240px;"></div>
+                <div class="card-slot" style="left: 480px; top: 240px;"></div>
+                <div class="card-slot" style="left: 550px; top: 240px;"></div>
+                <div class="card-slot" style="left: 620px; top: 240px;"></div>
+            </div>
+        </div>
+
+        <!-- PLAYER SEATS -->
+        <div class="seat" id="seat-1" style="left: 890px; top: 180px;">
+            <div class="video-box"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Daria" alt=""></div>
+            <div class="player-name">Daria</div>
+            <div class="stack-amount">$8.32</div>
+        </div>
+
+        <div class="seat" id="seat-2" style="left: 1200px; top: 260px;">
+            <div class="video-box"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Maks" alt=""></div>
+            <div class="player-name">Maks</div>
+            <div class="stack-amount">$15.20</div>
+        </div>
+
+        <div class="seat" id="seat-3" style="left: 1320px; top: 420px;">
+            <div class="video-box"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Vika" alt=""></div>
+            <div class="player-name">Vika</div>
+            <div class="stack-amount">$7.18</div>
+        </div>
+
+        <div class="seat" id="seat-4" style="left: 1200px; top: 650px;">
+            <div class="video-box"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Igor" alt=""></div>
+            <div class="player-name">Igor</div>
+            <div class="stack-amount">$9.75</div>
+        </div>
+
+        <div class="seat is-you" id="seat-5" style="left: 890px; top: 760px;">
+            <div class="video-box"><video id="localVideo" autoplay playsinline muted></video></div>
+            <div class="player-name">Вы (YOU)</div>
+            <div class="stack-amount">$10.00</div>
+        </div>
+
+        <div class="seat" id="seat-6" style="left: 580px; top: 650px;">
+            <div class="video-box"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Artem" alt=""></div>
+            <div class="player-name">Artem</div>
+            <div class="stack-amount">$11.30</div>
+        </div>
+
+        <div class="seat" id="seat-7" style="left: 450px; top: 420px;">
+            <div class="video-box"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Liza" alt=""></div>
+            <div class="player-name">Liza</div>
+            <div class="stack-amount">$6.80</div>
+        </div>
+
+        <div class="seat" id="seat-8" style="left: 580px; top: 260px;">
+            <div class="video-box"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex" alt=""></div>
+            <div class="player-name">Alex</div>
+            <div class="stack-amount">$12.45</div>
+        </div>
+
+        <!-- BETTING PANEL -->
+        <div class="betting-panel">
+            <div class="action-buttons">
+                <button class="btn btn-fold">ФОЛД</button>
+                <button class="btn btn-call">КОЛЛ<br><small>$0.10</small></button>
+                <button class="btn btn-raise">РЕЙЗ ДО<br><small>$0.30</small></button>
+            </div>
+            <div class="slider-container">
+                <div class="slider-row">
+                    <button class="adjust-btn">-</button>
+                    <input type="range" class="bet-slider" min="0" max="100" value="30">
+                    <button class="adjust-btn">+</button>
+                    <div class="amount-display">$0.30</div>
+                </div>
+            </div>
+            <div class="quick-bets">
+                <button class="q-btn">МИН</button>
+                <button class="q-btn">1/2</button>
+                <button class="q-btn">2/3</button>
+                <button class="q-btn">ПОТ</button>
+                <button class="q-btn">МАКС</button>
+            </div>
+        </div>
+
+        <!-- BOTTOM LEFT OPTIONS -->
+        <div class="bottom-left-options">
+            <label><input type="checkbox"> Фолд на любую ставку</label>
+            <label><input type="checkbox" checked> Пропускать раздачи</label>
+            <label><input type="checkbox"> Авто-докупка</label>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

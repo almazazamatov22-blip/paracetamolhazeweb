@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дашборд | Fate Overlays</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0d0d0f;
+            --sidebar: #131317;
+            --card: #1a1a1f;
+            --accent: #9333ea;
+            --text: #ffffff;
+            --text-dim: #9ca3af;
+            --border: rgba(255,255,255,0.1);
+            --radius: 12px;
+            --success: #22c55e;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
+
+        /* --- SIDEBAR --- */
+        .sidebar { width: 260px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 24px; }
+        .logo { font-size: 20px; font-weight: 800; color: var(--accent); letter-spacing: 1px; margin-bottom: 40px; }
+        .nav-section { margin-bottom: 32px; }
+        .nav-label { font-size: 10px; text-transform: uppercase; color: var(--text-dim); letter-spacing: 1.5px; margin-bottom: 16px; display: block; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; color: var(--text-dim); text-decoration: none; font-size: 14px; transition: 0.2s; margin-bottom: 4px; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; }
+        .nav-item:hover, .nav-item.active { background: rgba(147, 51, 234, 0.1); color: var(--text); }
+        .nav-item svg { width: 18px; opacity: 0.7; pointer-events: none; }
+        .user-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 16px; border-radius: 12px; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+        .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: #1c1c21; }
+        .user-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-status { font-size: 10px; color: var(--success); }
+        .logout { margin-top: auto; color: #ef4444; }
+
+        /* --- CONTENT --- */
+        .content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .header { padding: 24px 40px; border-bottom: 1px solid var(--border); }
+        .header h2 { font-size: 22px; font-weight: 700; }
+        .main-grid { display: grid; grid-template-columns: 420px 1fr; gap: 24px; padding: 40px; flex: 1; min-height: 0; }
+
+        /* --- CARDS & UI --- */
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; display: flex; flex-direction: column; }
+        .card-title { font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+        .section-scroll { flex: 1; overflow-y: auto; padding-right: 8px; }
+        .section-scroll::-webkit-scrollbar { width: 4px; }
+        .section-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+        .obs-box { background: #000; padding: 16px; border-radius: 8px; font-family: monospace; font-size: 12px; color: var(--accent); word-break: break-all; margin-bottom: 16px; border: 1px solid var(--border); }
+        select, input { width: 100%; background: #1c1c21; border: 1px solid var(--border); border-radius: 8px; padding: 12px; color: #fff; outline: none; margin-bottom: 12px; font-family: inherit; }
+        .label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; }
+
+        .btn { background: var(--accent); color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; font-size: 14px; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: #fff; }
+        .btn-outline:hover { background: var(--border); }
+
+        .asset-row { background: #1c1c21; padding: 16px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent; transition: 0.2s; }
+        .asset-row:hover { border-color: rgba(255,255,255,0.05); }
+        .asset-info { flex: 1; }
+        .asset-name { font-weight: 600; font-size: 14px; color: #fff; }
+        .asset-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+        
+        .status-badge { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 16px; color: var(--text-dim); }
+        .status-badge.loaded { color: var(--success); }
+        .status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #333; }
+        .status-badge.loaded .dot { background: var(--success); box-shadow: 0 0 10px var(--success); }
+        
+        .toast { position: fixed; bottom: 24px; right: 24px; background: var(--accent); color: #fff; padding: 12px 24px; border-radius: 8px; transform: translateY(100px); transition: 0.3s; z-index: 10000; }
+        .toast.show { transform: translateY(0); }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="logo">FATE.OVERLAYS</div>
+        <div class="user-card">
+            <img id="user-avatar" class="user-avatar">
+            <div class="user-info">
+                <div id="username" class="user-name">...</div>
+                <div class="user-status">● Доступ активен</div>
+            </div>
+        </div>
+        <div class="nav-section">
+            <span class="nav-label">Оверлеи</span>
+            <button class="nav-item active" onclick="location.reload()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                РОЛЛ
+            </button>
+        </div>
+        <div class="nav-section">
+            <span class="nav-label">Аккаунт</span>
+            <a href="/" class="nav-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                ГЛАВНАЯ
+            </a>
+        </div>
+        <a href="/api/auth/logout" class="nav-item logout">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            ВЫЙТИ
+        </a>
+    </div>
+
+    <div class="content">
+        <div class="header"><h2>ДАШБОРД — РОЛЛ</h2></div>
+        
+        <div id="roll-view">
+            <div class="main-grid">
+                <div style="display: flex; flex-direction: column; gap: 24px;">
+                    <div class="card">
+                        <div class="card-title">OBS Browser Source</div>
+                        <div class="obs-box" id="obs-url">...</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <button class="btn btn-outline" onclick="copyUrl()">КОПИРОВАТЬ</button>
+                            <button class="btn" style="background: #22c55e;" onclick="testOverlay()">ТЕСТ</button>
+                        </div>
+                    </div>
+                    <div class="card" style="flex: 1;">
+                        <div class="card-title">Настройки</div>
+                        <div class="section-scroll">
+                            <form id="settings-form" onsubmit="saveSettings(event)">
+                                <label class="label">Награда Twitch</label>
+                                <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+                                    <select id="reward-select" name="reward_id" style="margin-bottom: 0;"></select>
+                                    <button type="button" class="btn btn-outline" onclick="fetchRewards()" style="padding: 10px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                                    </button>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                                    <div><label class="label">Мин Число</label><input type="number" name="min_val" value="1"></div>
+                                    <div><label class="label">Макс Число</label><input type="number" name="max_val" value="100"></div>
+                                </div>
+                                <button type="submit" id="save-btn" class="btn" style="width: 100%;">СОХРАНИТЬ ВЫБОР</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Ассеты</div>
+                    <div class="section-scroll" id="asset-list">
+                        <!-- Dynamic Assets -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        let currentUser = null;
+        const assetTemplates = [
+            { id: 'panel_bg', name: 'Фон панели', meta: 'Рекомендуемо: 1600x210' },
+            { id: 'reward_icon', name: 'Иконка награды', meta: 'Рекомендуемо: 200x200' },
+            { id: 'sound_in', name: 'Звук появления', meta: 'Длительность: 1 сек' },
+            { id: 'sound_loop', name: 'Звук рандома', meta: 'Длительность: 3 сек (под цикл)' },
+            { id: 'sound_win', name: 'Звук победы', meta: 'Длительность: 2 сек' },
+            { id: 'sound_lose', name: 'Звук проигрыша', meta: 'Длительность: 2 сек' },
+            { id: 'sound_out', name: 'Звук исчезновения', meta: 'Длительность: 1 сек' }
+        ];
+
+        async function init() {
+            try {
+                const res = await fetch('/api/auth/me');
+                const data = await res.json();
+                if (!data.id) { window.location.href = '/auth/twitch?source=overlays'; return; }
+                currentUser = data;
+                
+                document.getElementById('username').textContent = data.display_name;
+                document.getElementById('user-avatar').src = data.profile_image_url;
+                document.getElementById('obs-url').textContent = `${window.location.origin}/overlays/roll.html?id=${data.id}`;
+                
+                renderAssets();
+                loadSettings();
+                loadAssetStatuses();
+                fetchRewards();
+            } catch (e) { 
+                console.error('Init error:', e);
+            }
+        }
+
+        function renderAssets() {
+            const container = document.getElementById('asset-list');
+            if(!container) return;
+            container.innerHTML = assetTemplates.map(a => `
+                <div class="asset-row">
+                    <div class="asset-info">
+                        <div class="asset-name">${a.name}</div>
+                        <div class="asset-meta">${a.meta}</div>
+                    </div>
+                    <div id="status-${a.id}" class="status-badge">
+                        <div class="dot"></div>
+                        <span class="status-text">Ожидание</span>
+                    </div>
+                    <button class="btn btn-outline" onclick="document.getElementById('file-${a.id}').click()" style="padding: 10px 20px; font-size: 13px;">ВЫБРАТЬ</button>
+                    <input type="file" id="file-${a.id}" hidden onchange="uploadFile(this, '${a.id}')">
+                </div>
+            `).join('');
+        }
+
+        async function loadSettings() {
+            if(!currentUser) return;
+            try {
+                const res = await fetch(`/api/ov_settings?userId=${currentUser.id}`);
+                const s = await res.json();
+                const f = document.getElementById('settings-form');
+                if (s.reward_id) {
+                    const sel = document.getElementById('reward-select');
+                    sel.innerHTML = `<option value="${s.reward_id}">${s.reward_name || 'Привязанная награда'}</option>`;
+                }
+                if(f) {
+                    f.min_val.value = s.min_val || 1;
+                    f.max_val.value = s.max_val || 100;
+                }
+            } catch (e) {}
+        }
+
+        async function fetchRewards() {
+            try {
+                const res = await fetch('/api/ov_rewards');
+                const rewards = await res.json();
+                const sel = document.getElementById('reward-select');
+                if(!sel) return;
+                
+                const cur = sel.value;
+                sel.innerHTML = '<option value="">Выберите награду...</option>' + 
+                    rewards.map(r => `<option value="${r.id}" ${r.id === cur ? 'selected' : ''}>${r.title}</option>`).join('');
+            } catch (e) {}
+        }
+
+        async function saveSettings(e) {
+            e.preventDefault();
+            const btn = document.getElementById('save-btn');
+            btn.style.opacity = '0.5'; btn.textContent = '...';
+            const f = e.target;
+            const sel = document.getElementById('reward-select');
+            const opt = sel.options[sel.selectedIndex];
+            try {
+                await fetch('/api/ov_settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        reward_id: sel.value,
+                        reward_name: opt ? opt.textContent : '',
+                        min_val: f.min_val.value, max_val: f.max_val.value
+                    })
+                });
+                await fetch('/api/ov_subscribe', { method: 'POST' });
+                showToast('Настройки обновлены');
+            } catch (e) { showToast('Ошибка!', true); }
+            finally { btn.style.opacity = '1'; btn.textContent = 'СОХРАНИТЬ ВЫБОР'; }
+        }
+
+        async function uploadFile(input, key) {
+            const file = input.files[0]; if (!file) return;
+            const badge = document.getElementById(`status-${key}`);
+            const text = badge.querySelector('.status-text');
+            text.textContent = 'Загрузка...';
+
+            const reader = new FileReader();
+            reader.onload = async () => {
+                try {
+                    const res = await fetch('/api/ov_upload', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: file.name, type: file.type, data: reader.result.split(',')[1], key })
+                    });
+                    const d = await res.json();
+                    if (d.url) { 
+                        badge.classList.add('loaded');
+                        text.textContent = 'Загружено';
+                        showToast('Файл готов');
+                    }
+                } catch (e) { text.textContent = 'Ошибка'; }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function loadAssetStatuses() {
+            if(!currentUser) return;
+            try {
+                const res = await fetch(`/api/ov_upload?userId=${currentUser.id}`);
+                const assets = await res.json();
+                Object.keys(assets).forEach(key => {
+                    const badge = document.getElementById(`status-${key}`);
+                    if (badge && assets[key]) {
+                        badge.classList.add('loaded');
+                        badge.querySelector('.status-text').textContent = 'Загружено';
+                    }
+                });
+            } catch (e) {}
+        }
+
+        function copyUrl() {
+            const url = document.getElementById('obs-url').textContent;
+            navigator.clipboard.writeText(url);
+            showToast('Скопировано');
+        }
+
+        async function testOverlay() {
+            try { 
+                await fetch('/api/ov_test', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ type: 'fate' }) 
+                }); 
+                showToast('Тест запущен'); 
+            }
+            catch (e) {}
+        }
+
+        function showToast(msg, isError = false) {
+            const t = document.getElementById('toast');
+            if(!t) return;
+            t.textContent = msg; t.style.background = isError ? '#ef4444' : 'var(--accent)';
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        init();
+    </script>
+</body>
+</html>

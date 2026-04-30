@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Slots Overlay</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@900&display=swap');
+        
+        body { margin: 0; overflow: hidden; background: transparent; font-family: 'Outfit', sans-serif; }
+        
+        #machine-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 800px;
+            height: 600px;
+            perspective: 1000px; /* Essential for 3D */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #machine-frame {
+            position: absolute;
+            width: 650px;
+            height: 500px;
+            /* Using the high quality gold frame */
+            background: url('gold_machine.png') no-repeat center;
+            background-size: contain;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .reels-container {
+            display: flex;
+            gap: 25px;
+            z-index: 10;
+            transform: translateY(20px);
+        }
+
+        .reel-viewport {
+            width: 130px;
+            height: 160px;
+            position: relative;
+            overflow: hidden;
+            background: #fff;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+            border-radius: 4px;
+        }
+
+        .reel-drum {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 160px;
+            margin-top: -80px;
+            transform-style: preserve-3d;
+            transition: transform 3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .face {
+            position: absolute;
+            width: 100%;
+            height: 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backface-visibility: hidden;
+            background: #fff;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .face img {
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+        }
+
+        /* 5-sided prism math: 360/5 = 72deg. translateZ = height / (2 * tan(PI/5)) */
+        /* height 160 / (2 * 0.726) = ~110px */
+        .face:nth-child(1) { transform: rotateX(0deg) translateZ(110px); }
+        .face:nth-child(2) { transform: rotateX(72deg) translateZ(110px); }
+        .face:nth-child(3) { transform: rotateX(144deg) translateZ(110px); }
+        .face:nth-child(4) { transform: rotateX(216deg) translateZ(110px); }
+        .face:nth-child(5) { transform: rotateX(288deg) translateZ(110px); }
+
+        #lever-stick {
+            position: absolute;
+            right: 40px;
+            top: 150px;
+            width: 12px;
+            height: 140px;
+            background: linear-gradient(to right, #444, #ccc, #444);
+            border-radius: 6px;
+            transform-origin: bottom center;
+            z-index: 21;
+            transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        #lever-ball {
+            position: absolute;
+            top: -24px;
+            left: -14px;
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle at 30% 30%, #ff4b2b, #8b0000);
+            border-radius: 50%;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        #win-banner {
+            position: absolute;
+            top: 50px;
+            width: 100%;
+            text-align: center;
+            color: #ffd700;
+            font-size: 70px;
+            font-weight: 900;
+            text-transform: uppercase;
+            text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000;
+            z-index: 30;
+            opacity: 0;
+            transition: 0.5s;
+            transform: scale(0.2);
+            pointer-events: none;
+        }
+
+        .show-win { opacity: 1 !important; transform: scale(1) !important; }
+    </style>
+</head>
+<body>
+    <div id="machine-container">
+        <div id="win-banner">WINNER!</div>
+        <div id="machine-frame"></div>
+        
+        <div class="reels-container">
+            <div class="reel-viewport"><div class="reel-drum" id="drum-0"></div></div>
+            <div class="reel-viewport"><div class="reel-drum" id="drum-1"></div></div>
+            <div class="reel-viewport"><div class="reel-drum" id="drum-2"></div></div>
+        </div>
+
+        <div id="lever-stick"><div id="lever-ball"></div></div>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const streamerId = params.get('id');
+        let config = { symbols: [], assets: {} };
+        let isSpinning = false;
+
+        const defaultIcons = [
+            'https://img.icons8.com/color/96/apple.png',
+            'https://img.icons8.com/color/96/lemon.png',
+            'https://img.icons8.com/color/96/cherry.png',
+            'https://img.icons8.com/color/96/jingle-bell.png',
+            'https://img.icons8.com/color/96/7-ball.png'
+        ];
+
+        const sounds = {
+            lever: new Audio(),
+            spin: new Audio(),
+            win: new Audio(),
+            jackpot: new Audio(),
+            lose: new Audio()
+        };
+
+        async function init() {
+            if (!streamerId) return;
+            try {
+                const res = await fetch(`/api/ov_settings?userId=${streamerId}&type=slots`);
+                config = await res.json();
+
+                const assets = config.assets || {};
+                sounds.lever.src = assets.s_lever || 'https://assets.mixkit.co/active_storage/sfx/2042/2042-preview.mp3';
+                sounds.spin.src = assets.s_spin || 'https://assets.mixkit.co/active_storage/sfx/2012/2012-preview.mp3';
+                sounds.win.src = assets.s_win || 'https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3';
+                sounds.jackpot.src = assets.s_jackpot || 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3';
+                sounds.lose.src = assets.s_lose || 'https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3';
+
+                setupDrums();
+                setInterval(checkTrigger, 2000);
+            } catch(e) {}
+        }
+
+        function setupDrums(results = null) {
+            const symbols = (config.symbols && config.symbols.length >= 5) ? config.symbols : defaultIcons.map(url => ({url}));
+            
+            for (let i = 0; i < 3; i++) {
+                const drum = document.getElementById(`drum-${i}`);
+                drum.innerHTML = '';
+                
+                // If results are provided, rotation should end on the correct face
+                // Face indices 0..4 match the symbols
+                for (let j = 0; j < 5; j++) {
+                    const face = document.createElement('div');
+                    face.className = 'face';
+                    face.innerHTML = `<img src="${symbols[j].url}">`;
+                    drum.appendChild(face);
+                }
+            }
+        }
+
+        function pullLever() {
+            sounds.lever.play();
+            const stick = document.getElementById('lever-stick');
+            stick.style.transform = 'rotateX(70deg)';
+            setTimeout(() => { stick.style.transform = 'rotateX(0deg)'; }, 600);
+        }
+
+        async function startSpin(payload) {
+            if (isSpinning) return;
+            isSpinning = true;
+            document.getElementById('win-banner').classList.remove('show-win');
+
+            sounds.spin.currentTime = 0;
+            sounds.spin.play();
+
+            const symbols = config.symbols || [];
+            
+            for (let i = 0; i < 3; i++) {
+                const drum = document.getElementById(`drum-${i}`);
+                
+                // Find index of result symbol in current symbols config
+                const resultUrl = payload.result[i];
+                let targetIndex = symbols.findIndex(s => s.url === resultUrl);
+                if (targetIndex === -1) targetIndex = 0;
+
+                // 5 faces = 72deg each
+                // Multiplier 5 or more for "many full rotations"
+                const rotations = 10 + (i * 3);
+                // The angle to show face X is = - (X * 72)
+                const targetAngle = - (rotations * 360 + targetIndex * 72);
+                
+                drum.style.transition = `transform ${2 + i * 0.5}s cubic-bezier(0.45, 0.05, 0.55, 0.95)`;
+                drum.style.transform = `rotateX(${targetAngle}deg)`;
+            }
+
+            setTimeout(() => finalize(payload), 4000);
+        }
+
+        function finalize(payload) {
+            isSpinning = false;
+            sounds.spin.pause();
+            
+            const banner = document.getElementById('win-banner');
+            if (payload.isWin) {
+                if (payload.isJackpot) {
+                    sounds.jackpot.play();
+                    banner.innerText = "JACKPOT!";
+                } else {
+                    sounds.win.play();
+                    banner.innerText = "BIG WIN!";
+                }
+                banner.classList.add('show-win');
+            } else {
+                sounds.lose.play();
+            }
+            
+            setTimeout(() => banner.classList.remove('show-win'), 6000);
+        }
+
+        let lastTriggerId = null;
+        async function checkTrigger() {
+            if (!streamerId || isSpinning) return;
+            try {
+                const res = await fetch(`/api/ov_trigger?userId=${streamerId}&type=slots`);
+                const data = await res.json();
+                if (data.triggerId && data.triggerId !== lastTriggerId) {
+                    lastTriggerId = data.triggerId;
+                    pullLever();
+                    setTimeout(() => startSpin(data), 600);
+                }
+            } catch (e) {}
+        }
+
+        init();
+    </script>
+</body>
+</html>

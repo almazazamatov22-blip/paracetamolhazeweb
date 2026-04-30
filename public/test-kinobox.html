@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Kinobox Test</title>
+</head>
+<body style="background:#000; margin:0">
+  <div class="kinobox_player" style="width:100vw; height:100vh;"></div>
+  
+  <script src="https://kinobox.tv/kinobox.min.js"></script>
+  <script>
+    kbox('.kinobox_player', {
+      search: { kinopoisk: '409424' }
+    });
+  </script>
+</body>
+</html>

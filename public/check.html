@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check - Проверка подписок Twitch</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 30px 20px; }
+        header { text-align: center; margin-bottom: 40px; }
+        .back-link {
+            display: inline-block;
+            color: #00d9ff;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .subtitle { color: #888; }
+        
+        .search-panel {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        .search-box {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        input {
+            flex: 1;
+            min-width: 250px;
+            padding: 15px 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 1rem;
+        }
+        input:focus { outline: none; border-color: #00d9ff; }
+        input::placeholder { color: #666; }
+        
+        button {
+            padding: 15px 40px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            cursor: pointer;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            color: #000;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,217,255,0.3); }
+        
+        .stats-row {
+            display: flex;
+            justify-content: center;
+            gap: 60px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        .stat-box {
+            text-align: center;
+        }
+        .stat-value { font-size: 2rem; font-weight: bold; color: #00d9ff; }
+        .stat-label { color: #888; font-size: 0.9rem; }
+        
+        .subs-list {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+        }
+        .subs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .sort-btns {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .sort-btn {
+            padding: 8px 15px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .sort-btn:hover, .sort-btn.active {
+            background: rgba(0,217,255,0.2);
+            border-color: #00d9ff;
+        }
+        
+        .subs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .sub-item {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+        .sub-name { font-weight: 600; margin-bottom: 5px; }
+        .sub-date { color: #888; font-size: 0.8rem; }
+        .sub-tier { 
+            display: inline-block;
+            padding: 3px 10px;
+            background: #9146ff;
+            border-radius: 5px;
+            font-size: 0.7rem;
+            margin-top: 8px;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 30px;
+        }
+        .page-btn {
+            padding: 10px 15px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+        }
+        .page-btn:hover, .page-btn.active {
+            background: rgba(0,217,255,0.2);
+            border-color: #00d9ff;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .empty-icon { font-size: 3rem; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← На главную</a>
+        
+        <header>
+            <h1>Check</h1>
+            <p class="subtitle">Просмотр подписок пользователей</p>
+        </header>
+        
+        <div class="search-panel">
+            <div class="search-box">
+                <input type="text" id="username" placeholder="Введите никнейм Twitch">
+                <button onclick="searchSubs()">Получить Подписки</button>
+            </div>
+        </div>
+        
+        <div class="stats-row" id="stats" style="display: none;">
+            <div class="stat-box">
+                <div class="stat-value" id="totalSubs">0</div>
+                <div class="stat-label">Всего подписок</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="liveSubs">0</div>
+                <div class="stat-label">Сейчас в эфире</div>
+            </div>
+        </div>
+        
+        <div class="subs-list" id="subsList" style="display: none;">
+            <div class="subs-header">
+                <h3>📋 Подписки</h3>
+                <div class="sort-btns">
+                    <button class="sort-btn active" onclick="sortSubs('date_desc', this)">По дате (новые)</button>
+                    <button class="sort-btn" onclick="sortSubs('date_asc', this)">По дате (старые)</button>
+                    <button class="sort-btn" onclick="sortSubs('name_asc', this)">По имени (А-Я)</button>
+                    <button class="sort-btn" onclick="sortSubs('name_desc', this)">По имени (Я-А)</button>
+                    <button class="sort-btn" onclick="sortSubs('live', this)">Сначала в эфире</button>
+                </div>
+            </div>
+            <div class="subs-grid" id="subsGrid"></div>
+            <div class="pagination">
+                <button class="page-btn" onclick="changePage(-1)">← Назад</button>
+                <span style="display:flex;align-items:center;color:#888">Страница <span id="currentPage">1</span> из <span id="totalPages">1</span></span>
+                <button class="page-btn" onclick="changePage(1)">Вперед →</button>
+            </div>
+        </div>
+        
+        <div class="empty-state" id="emptyState">
+            <div class="empty-icon">👀</div>
+            <p>Введите никнейм и нажмите "Получить Подписки"</p>
+        </div>
+    </div>
+    
+    <script>
+        const mockSubs = [
+            { name: 'pupsylive', date: '2026-04-10', tier: 1, live: true },
+            { name: 'catviewer', date: '2026-04-08', tier: 2, live: false },
+            { name: 'doggo_ru', date: '2026-04-05', tier: 1, live: true },
+            { name: 'streamfan', date: '2026-03-28', tier: 3, live: false },
+            { name: 'gamerpro', date: '2026-03-20', tier: 1, live: false },
+            { name: ' Viewer2026', date: '2026-03-15', tier: 2, live: true },
+            { name: 'twitch_fan99', date: '2026-03-10', tier: 1, live: false },
+            { name: 'paracetamollow', date: '2026-02-28', tier: 1, live: false },
+            { name: 'haze lover', date: '2026-02-20', tier: 2, live: true },
+            { name: 'subcheck', date: '2026-02-15', tier: 1, live: false },
+        ];
+        
+        let currentSort = 'date_desc';
+        let currentPage = 1;
+        const perPage = 10;
+        
+        function searchSubs() {
+            const username = document.getElementById('username').value.trim();
+            if (!username) {
+                alert('Введите никнейм');
+                return;
+            }
+            
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('stats').style.display = 'flex';
+            document.getElementById('subsList').style.display = 'block';
+            
+            document.getElementById('totalSubs').textContent = mockSubs.length;
+            document.getElementById('liveSubs').textContent = mockSubs.filter(s => s.live).length;
+            
+            renderSubs();
+        }
+        
+        function sortSubs(type, btn) {
+            currentSort = type;
+            currentPage = 1;
+            document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderSubs();
+        }
+        
+        function renderSubs() {
+            let sorted = [...mockSubs];
+            
+            switch(currentSort) {
+                case 'date_desc':
+                    sorted.sort((a,b) => new Date(b.date) - new Date(a.date));
+                    break;
+                case 'date_asc':
+                    sorted.sort((a,b) => new Date(a.date) - new Date(b.date));
+                    break;
+                case 'name_asc':
+                    sorted.sort((a,b) => a.name.localeCompare(b.name));
+                    break;
+                case 'name_desc':
+                    sorted.sort((a,b) => b.name.localeCompare(a.name));
+                    break;
+                case 'live':
+                    sorted.sort((a,b) => (b.live?1:0) - (a.live?1:0));
+                    break;
+            }
+            
+            const totalPages = Math.ceil(sorted.length / perPage);
+            document.getElementById('totalPages').textContent = totalPages;
+            document.getElementById('currentPage').textContent = currentPage;
+            
+            const start = (currentPage - 1) * perPage;
+            const pageSubs = sorted.slice(start, start + perPage);
+            
+            const grid = document.getElementById('subsGrid');
+            grid.innerHTML = pageSubs.map(s => `
+                <div class="sub-item">
+                    <div class="sub-name">${s.name}</div>
+                    <div class="sub-date">${s.date}</div>
+                    <span class="sub-tier">Tier ${s.tier}${s.tier === 1 ? '' : '★'}</span>
+                    ${s.live ? '<span style="display:block;margin-top:5px;color:#00ff88">🔴 В эфире</span>' : ''}
+                </div>
+            `).join('');
+        }
+        
+        function changePage(delta) {
+            currentPage += delta;
+            renderSubs();
+        }
+    </script>
+</body>
+</html>
