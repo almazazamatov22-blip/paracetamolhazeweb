@@ -1,19 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
+import { getSupabasePublicKey, getSupabaseServerKey, getSupabaseUrl, hasSupabasePublicConfig } from './supabase-env';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '';
+const supabaseUrl = getSupabaseUrl();
+const anonKey = getSupabasePublicKey();
+const serviceRoleKey = getSupabaseServerKey();
 
-if (!supabaseUrl || !anonKey) {
+if (!hasSupabasePublicConfig) {
   console.error('[kinoquiz] Missing public Supabase env vars.');
 }
 
-export const kinoquizPublic = createClient(supabaseUrl, anonKey, {
+const safeUrl = supabaseUrl || 'https://example.supabase.co';
+const safePublicKey = anonKey || 'public-anon-key-placeholder';
+const safeServerKey = serviceRoleKey || safePublicKey;
+
+export const kinoquizPublic = createClient(safeUrl, safePublicKey, {
   db: { schema: 'kinoquiz' },
   auth: { persistSession: false }
 });
 
-export const kinoquizAdmin = createClient(supabaseUrl, serviceRoleKey || anonKey, {
+export const kinoquizAdmin = createClient(safeUrl, safeServerKey, {
   db: { schema: 'kinoquiz' },
   auth: { persistSession: false }
 });

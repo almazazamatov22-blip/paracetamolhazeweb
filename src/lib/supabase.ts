@@ -1,10 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
+import { getSupabasePublicKey, getSupabaseUrl, hasSupabasePublicConfig } from './supabase-env';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+const supabaseUrl = getSupabaseUrl();
+const supabaseAnonKey = getSupabasePublicKey();
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!hasSupabasePublicConfig) {
   console.error('CRITICAL: Supabase credentials missing from environment!');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Use a safe placeholder during build if env vars are missing.
+const safeUrl = supabaseUrl || 'https://example.supabase.co';
+const safeKey = supabaseAnonKey || 'public-anon-key-placeholder';
+
+export const supabase = createClient(safeUrl, safeKey);

@@ -260,9 +260,9 @@
 
 .paracetamol-projects-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 25px;
-  justify-items: center;
+  align-items: stretch;
 }
 
 @keyframes cardShine {
@@ -272,7 +272,7 @@
 
 .paracetamol-project-card {
   width: 100%;
-  max-width: 280px;
+  max-width: none;
   background: rgba(30, 30, 30, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
@@ -287,6 +287,24 @@
   text-decoration: none;
   color: inherit;
   display: block;
+}
+
+@media (max-width: 1440px) {
+  .paracetamol-projects-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1120px) {
+  .paracetamol-projects-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .paracetamol-projects-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .paracetamol-project-card::before {

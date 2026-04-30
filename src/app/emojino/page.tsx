@@ -135,6 +135,7 @@ function EmojinoContent() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [userStats, setUserStats] = useState({ all: 0, film: 0, serial: 0 });
   const [userHistory, setUserHistory] = useState<any[]>([]);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -193,19 +194,26 @@ function EmojinoContent() {
   }, [isProfileOpen]);
 
   const startNewGame = async (mode: string) => {
+    setLoadError('');
     try {
       let query = supabase.from('emojino_movies').select('*');
       if (mode === 'film') query = query.eq('type', 'film');
       else if (mode === 'serial') query = query.eq('type', 'serial');
-      const { data } = await query;
+      const { data, error } = await query;
+      if (error) throw error;
       if (data && data.length > 0) {
-        setGameMovies(data.sort(() => Math.random() - 0.5).slice(0, 10));
+        const rounds = data.length >= 10 ? 10 : data.length;
+        setGameMovies(data.sort(() => Math.random() - 0.5).slice(0, rounds));
         setScreen('game');
         setCurrentIndex(0);
         setState({ hintsUsed: 0, guessed: false, correct: false, score: 0, totalScore: 0, round: 1, mode });
         setGuessInput('');
+        return;
       }
-    } catch (e) {}
+      setLoadError('Emojino dataset is empty for this mode.');
+    } catch (e: any) {
+      setLoadError(e?.message || 'Failed to load Emojino dataset.');
+    }
   };
 
   const normalizeAnswer = (answer: string): string => {
@@ -216,6 +224,7 @@ function EmojinoContent() {
     const input = (inputOverride || guessInput).trim();
     if (state.guessed || !input) return;
     const current = gameMovies[currentIndex];
+    if (!current) return;
     const normalizedIn = normalizeAnswer(input);
     const possible = [normalizeAnswer(current.title_ru)];
     const isCorrect = possible.some(p => p === normalizedIn || (normalizedIn.length >= 4 && p.includes(normalizedIn)));
@@ -229,8 +238,16 @@ function EmojinoContent() {
     setState(prev => ({ ...prev, guessed: true, correct: false, score: 0 }));
   };
 
+  const useHint = () => {
+    if (state.guessed) return;
+    if (state.hintsUsed < 2) {
+      setState(prev => ({ ...prev, hintsUsed: prev.hintsUsed + 1 }));
+    }
+  };
+
   const nextMovie = () => {
-    if (state.round < 10 && currentIndex < gameMovies.length - 1) {
+    const totalRounds = gameMovies.length || 10;
+    if (state.round < totalRounds && currentIndex < gameMovies.length - 1) {
       setCurrentIndex(prev => prev + 1);
       setState(prev => ({ ...prev, hintsUsed: 0, guessed: false, correct: false, score: 0, round: prev.round + 1 }));
       setGuessInput('');
@@ -247,6 +264,8 @@ function EmojinoContent() {
       }
     }
   };
+
+  const totalRounds = gameMovies.length || 10;
 
   return (
     <div className="h-screen flex flex-col relative overflow-hidden bg-[#050505] text-white font-sans selection:bg-amber-500/30">
@@ -266,7 +285,7 @@ function EmojinoContent() {
                <div className="flex items-center gap-4 h-10 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08]">
                   <div className="flex items-center gap-2">
                      <span className="text-[10px] font-black uppercase text-white/30 tracking-widest leading-none">Раунд</span>
-                     <span className="text-sm font-black text-amber-400">{state.round} / 10</span>
+                     <span className="text-sm font-black text-amber-400">{state.round} / {totalRounds}</span>
                   </div>
                   <div className="w-px h-4 bg-white/10" />
                   <div className="flex items-center gap-2">
@@ -337,6 +356,11 @@ function EmojinoContent() {
                     </button>
                   ))}
                 </div>
+                {loadError && (
+                  <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+                    {loadError}
+                  </div>
+                )}
               </div>
 
               {/* Right Column: Leaderboard */}

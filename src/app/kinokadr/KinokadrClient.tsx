@@ -46,6 +46,69 @@ function AnimatedBg() {
 
 const BLUR_LEVELS = ['blur-2xl brightness-[0.8]', 'blur-xl brightness-[0.9]', 'blur-sm brightness-100', 'blur-0 brightness-100'];
 const SCORE_FOR_HINTS = [5, 3, 2, 1];
+const DEMO_FALLBACK_POOL: KinokadrMovie[] = [
+  {
+    id: 'demo-1',
+    title: 'Inception',
+    title_ru: 'Inception',
+    image_url: 'https://image.tmdb.org/t/p/w1280/8IB2e4r4oVhHnANbnm7O3Tj6tF8.jpg',
+    type: 'movie',
+    category: 'Sci-Fi',
+    year: 2010
+  },
+  {
+    id: 'demo-2',
+    title: 'Interstellar',
+    title_ru: 'Interstellar',
+    image_url: 'https://image.tmdb.org/t/p/w1280/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
+    type: 'movie',
+    category: 'Sci-Fi',
+    year: 2014
+  },
+  {
+    id: 'demo-3',
+    title: 'The Dark Knight',
+    title_ru: 'The Dark Knight',
+    image_url: 'https://image.tmdb.org/t/p/w1280/qJ2tW6WMUDux911r6m7haRef0WH.jpg',
+    type: 'movie',
+    category: 'Action',
+    year: 2008
+  },
+  {
+    id: 'demo-4',
+    title: 'Breaking Bad',
+    title_ru: 'Breaking Bad',
+    image_url: 'https://image.tmdb.org/t/p/w1280/ztkUQFLlC19CCMYHW9o1zWhJRNq.jpg',
+    type: 'series',
+    category: 'Drama',
+    year: 2008
+  },
+  {
+    id: 'demo-5',
+    title: 'Stranger Things',
+    title_ru: 'Stranger Things',
+    image_url: 'https://image.tmdb.org/t/p/w1280/uOOtwVbSr4QDjAGIifLDwpb2Pdl.jpg',
+    type: 'series',
+    category: 'Sci-Fi',
+    year: 2016
+  }
+];
+
+function buildFallbackMovies(mode: string): KinokadrMovie[] {
+  const source = mode === 'movie'
+    ? DEMO_FALLBACK_POOL.filter(item => item.type === 'movie')
+    : mode === 'series'
+      ? DEMO_FALLBACK_POOL.filter(item => item.type === 'series')
+      : DEMO_FALLBACK_POOL;
+
+  const pool = source.length ? source : DEMO_FALLBACK_POOL;
+  const items: KinokadrMovie[] = [];
+  for (let i = 0; i < 30; i++) {
+    const base = pool[i % pool.length];
+    items.push({ ...base, id: `${base.id}-${i}` });
+  }
+  return items;
+}
 
 function ProfileModal({ isOpen, onClose, user, stats }: { isOpen: boolean, onClose: () => void, user: any, stats: any }) {
   if (!isOpen) return null;
@@ -138,6 +201,7 @@ function KinokadrContent() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [userStats, setUserStats] = useState({ combo: 0, movie: 0, series: 0 });
+  const [loadError, setLoadError] = useState('');
   const searchTimeout = useRef<any>(null);
 
   // Auto-complete fetch
@@ -227,35 +291,34 @@ function KinokadrContent() {
   };
 
   const fetchMovies = async (mode: string) => {
+    setLoadError('');
     setIsLoading(true);
     try {
       const seenIds = getSeenIds();
       let query = supabase.from('kinokadr_movies').select('*').eq('is_textless', true);
-      
+
       if (mode === 'movie') query = query.eq('type', 'movie');
       else if (mode === 'series') query = query.eq('type', 'series');
-      
-      const { data } = await query.order('id', { ascending: Math.random() > 0.5 }).limit(200);
-      
+
+      const { data, error } = await query.order('id', { ascending: Math.random() > 0.5 }).limit(200);
+      if (error) throw error;
+
       if (data && data.length > 0) {
-        let pool = data.filter(m => !seenIds.includes(m.id));
-        if (pool.length < 35) pool = data; 
-        
-        const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 30);
+        let pool = data.filter(m => !seenIds.includes(String(m.id)));
+        if (pool.length < 10) pool = data;
+
+        const targetRounds = Math.min(30, Math.max(1, pool.length));
+        const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, targetRounds);
         setMovies(shuffled);
-        saveSeenIds(shuffled.map(m => m.id));
+        saveSeenIds(shuffled.map(m => String(m.id)));
       } else {
-        setMovies([{
-          id: 'demo-1',
-          title: 'Inception',
-          title_ru: 'Начало',
-          image_url: 'https://media.themoviedb.org/t/p/w1280/w85Z9pG9qMtw6m9QuE6PvKygEh1.jpg',
-          type: 'movie',
-          category: 'Sci-Fi',
-          year: 2010
-        }]);
+        setMovies(buildFallbackMovies(mode));
+        setLoadError('Kinokadr dataset is empty, demo mode enabled.');
       }
-    } catch (e) {}
+    } catch (e: any) {
+      setMovies(buildFallbackMovies(mode));
+      setLoadError(e?.message || 'Failed to load Kinokadr dataset, demo mode enabled.');
+    }
     setIsLoading(false);
   };
 
@@ -308,7 +371,8 @@ function KinokadrContent() {
   };
 
   const nextMovie = () => {
-    if (state.round < 30 && currentIndex < movies.length - 1) {
+    const totalRounds = Math.max(1, Math.min(30, movies.length || 0));
+    if (state.round < totalRounds && currentIndex < movies.length - 1) {
       setIsImageLoading(true);
       setCurrentIndex(prev => prev + 1);
       setState(prev => ({ ...prev, hintsUsed: 0, guessed: false, correct: false, score: 0, round: prev.round + 1 }));
@@ -349,6 +413,8 @@ function KinokadrContent() {
     handleGuess(title);
   };
 
+  const totalRounds = Math.max(1, Math.min(30, movies.length || 0));
+
   return (
     <div className="h-screen flex flex-col relative overflow-hidden bg-[#050505] text-white font-sans selection:bg-cyan-500/30">
       <AnimatedBg />
@@ -367,7 +433,7 @@ function KinokadrContent() {
                <div className="flex items-center gap-4 h-10 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08]">
                   <div className="flex items-center gap-2">
                      <span className="text-[10px] font-black uppercase text-white/30 tracking-widest leading-none">Раунд</span>
-                     <span className="text-sm font-black text-cyan-400">{state.round} / 30</span>
+                     <span className="text-sm font-black text-cyan-400">{state.round} / {totalRounds}</span>
                   </div>
                   <div className="w-px h-4 bg-white/10" />
                   <div className="flex items-center gap-2">
@@ -442,6 +508,11 @@ function KinokadrContent() {
                     </button>
                   ))}
                 </div>
+                {loadError && (
+                  <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+                    {loadError}
+                  </div>
+                )}
               </div>
 
               {/* Right Column: Embedded Leaderboard */}
@@ -617,7 +688,7 @@ function KinokadrContent() {
               
               <div className="space-y-1">
                 <h2 className="text-4xl font-black italic tracking-tighter uppercase">Конец игры!</h2>
-                <p className="text-neutral-500 font-bold uppercase tracking-widest text-[10px]">Все 30 раундов завершены</p>
+                <p className="text-neutral-500 font-bold uppercase tracking-widest text-[10px]">Все {totalRounds} раундов завершены</p>
               </div>
 
               <div className="p-10 rounded-[2.5rem] bg-white/[0.03] border border-white/10 shadow-2xl relative overflow-hidden">
@@ -663,3 +734,4 @@ export default function KinokadrPage() {
     </AuthProvider>
   );
 }
+
