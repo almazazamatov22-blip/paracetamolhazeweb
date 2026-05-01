@@ -74,6 +74,7 @@ export default {
 
     if (
       pathname === "/api/loto" ||
+      pathname === "/api/stats" ||
       pathname.startsWith("/api/users/") ||
       pathname.startsWith("/api/drawn")
     ) {
