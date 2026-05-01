@@ -240,7 +240,9 @@ function EmojinoContent() {
 
   const useHint = () => {
     if (state.guessed) return;
-    if (state.hintsUsed < 2) {
+    const hintsCount = gameMovies[currentIndex]?.hints?.length ?? 0;
+    const hintCap = Math.min(3, hintsCount);
+    if (state.hintsUsed < hintCap) {
       setState(prev => ({ ...prev, hintsUsed: prev.hintsUsed + 1 }));
     }
   };
@@ -266,6 +268,9 @@ function EmojinoContent() {
   };
 
   const totalRounds = gameMovies.length || 10;
+  const currentMovie = gameMovies[currentIndex];
+  const hintPool = currentMovie?.hints ?? [];
+  const maxHints = Math.min(3, hintPool.length);
 
   return (
     <div className="h-screen flex flex-col relative overflow-hidden bg-[#050505] text-white font-sans selection:bg-amber-500/30">
@@ -398,18 +403,18 @@ function EmojinoContent() {
             </motion.div>
           )}
 
-          {screen === 'game' && gameMovies[currentIndex] && (
+          {screen === 'game' && currentMovie && (
             <motion.div key="game" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-2xl flex flex-col gap-6">
-              <div className="relative aspect-[21/9] rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl bg-[#0c0c0e] flex items-center justify-center p-10">
-                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-purple-500/5 opacity-40" />
+              <div className="relative aspect-[21/9] rounded-[3rem] overflow-hidden border border-white/20 shadow-2xl bg-[#121219] flex items-center justify-center p-10">
+                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/12 via-white/[0.04] to-purple-500/12 opacity-70" />
                  <div className="relative z-10 text-5xl sm:text-6xl md:text-7xl flex items-center justify-center gap-4 flex-nowrap whitespace-nowrap overflow-hidden" style={{ fontFamily: '"Twemoji Mozilla", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif' }}>
-                    {Array.from(gameMovies[currentIndex].emoji).map((char, i) => (
+                    {Array.from(currentMovie.emoji).map((char, i) => (
                       <motion.span key={i} initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}>{char}</motion.span>
                     ))}
                  </div>
                  <div className="absolute top-6 left-6 z-20">
-                    <span className="px-4 py-2 rounded-2xl bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-black uppercase tracking-widest">
-                      {gameMovies[currentIndex].type === 'film' ? 'Фильм' : 'Сериал'} • {gameMovies[currentIndex].year}
+                    <span className="px-4 py-2 rounded-2xl bg-black/70 backdrop-blur-md border border-white/20 text-[10px] font-black uppercase tracking-widest">
+                      {currentMovie.type === 'film' ? 'Фильм' : 'Сериал'}
                     </span>
                  </div>
                  {!state.guessed && (
@@ -421,8 +426,8 @@ function EmojinoContent() {
 
               <AnimatePresence>
                 {state.hintsUsed > 0 && !state.guessed && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 text-amber-500 text-xs font-black text-center uppercase tracking-widest italic">
-                    💡 {gameMovies[currentIndex].hints.slice(1, state.hintsUsed + 1).join(' • ')}
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 rounded-2xl bg-amber-500/14 border border-amber-400/35 text-amber-200 text-xs font-black text-center uppercase tracking-widest italic">
+                    💡 {hintPool.slice(0, state.hintsUsed).join(' • ')}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -434,7 +439,7 @@ function EmojinoContent() {
                         <Search className="w-5 h-5 text-white/20 group-focus-within:text-amber-400 transition-colors" />
                       </div>
                       <input 
-                        className="w-full h-16 pl-14 pr-8 bg-white/[0.03] border border-white/10 rounded-2xl focus:outline-none focus:border-white/20 text-lg font-bold transition-all placeholder:text-white/10"
+                        className="w-full h-16 pl-14 pr-8 bg-white/[0.08] border border-white/20 rounded-2xl focus:outline-none focus:border-white/35 text-lg font-bold transition-all placeholder:text-white/30"
                         placeholder="Назови проект..."
                         value={guessInput}
                         onChange={(e) => setGuessInput(e.target.value)}
@@ -444,8 +449,8 @@ function EmojinoContent() {
                       />
                    </div>
                    <div className="grid grid-cols-4 gap-3">
-                      <button onClick={useHint} disabled={state.hintsUsed >= 2} className="h-16 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center gap-2 text-neutral-500 hover:text-white transition-all disabled:opacity-20"><Lightbulb className="w-4 h-4" /><span className="text-[9px] uppercase font-black">ПОДСКАЗКА</span></button>
-                      <button onClick={handleSkip} className="h-16 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center gap-2 text-neutral-500 hover:text-white transition-all"><SkipForward className="w-4 h-4" /><span className="text-[9px] uppercase font-black">СКИП</span></button>
+                      <button onClick={useHint} disabled={state.hintsUsed >= maxHints} className="h-16 rounded-2xl bg-white/[0.09] border border-white/20 flex items-center justify-center gap-2 text-white/80 hover:text-white transition-all disabled:opacity-30"><Lightbulb className="w-4 h-4" /><span className="text-[9px] uppercase font-black">ПОДСКАЗКА</span></button>
+                      <button onClick={handleSkip} className="h-16 rounded-2xl bg-white/[0.09] border border-white/20 flex items-center justify-center gap-2 text-white/80 hover:text-white transition-all"><SkipForward className="w-4 h-4" /><span className="text-[9px] uppercase font-black">СКИП</span></button>
                       <button onClick={() => handleGuess()} className="col-span-2 h-16 rounded-2xl bg-white text-black flex items-center justify-center gap-2 font-black text-sm uppercase tracking-widest hover:bg-neutral-200 transition-all active:scale-95">УГАДАТЬ</button>
                    </div>
                 </div>
