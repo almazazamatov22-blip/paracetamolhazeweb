@@ -173,6 +173,15 @@ function flattenCardNumbers(card: any): number[] {
   return result;
 }
 
+function fnv1a32(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
 function buildStateVersion(lobby: any, players: any[], markedCells: number[], drawn: number[]): string {
   const playersSig = (players || [])
     .map((p) => {
@@ -189,7 +198,7 @@ function buildStateVersion(lobby: any, players: any[], markedCells: number[], dr
     .sort()
     .join('|');
   const eventSig = lobby?.event ? JSON.stringify(lobby.event) : '';
-  return [
+  const rawVersion = [
     String(lobby?.status || ''),
     drawn.join(','),
     String(players.length || 0),
@@ -197,6 +206,8 @@ function buildStateVersion(lobby: any, players: any[], markedCells: number[], dr
     eventSig,
     String(markedCells.length),
   ].join('::');
+  // Short hashed version cuts response size for frequent no_change polling
+  return fnv1a32(rawVersion);
 }
 
 function mapPlayers(players: any[]) {

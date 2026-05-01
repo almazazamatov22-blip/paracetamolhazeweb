@@ -12,6 +12,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../client')));
 // также раздаём файлы из папки server (game.html, admin.html, overlay.html, sounds.json)
 app.use(express.static(__dirname));
+app.use('/lotomal', express.static(__dirname));
 
 // Инициализация базы данных
 const DB_PATH = process.env.RAILWAY_VOLUME_MOUNT_PATH
@@ -194,6 +195,579 @@ function sendToUser(userId, message) {
   }
 }
 
+function safeJsonParse(value, fallback) {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (Array.isArray(value)) return value;
+  try {
+    return JSON.parse(value);
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function asString(value) {
+  return value === null || value === undefined ? '' : String(value).trim();
+}
+
+function cleanNickname(value, fallbackId = '') {
+  const nick = asString(value).slice(0, 40);
+  return nick || `Player${String(fallbackId || Date.now()).slice(-4)}`;
+}
+
+function cleanAvatar(value) {
+  return asString(value).slice(0, 256) || '\u{1F464}';
+}
+
+function uniqueLobbyCode() {
+  for (let i = 0; i < 30; i++) {
+    const code = generateLobbyCode();
+    const exists = db.prepare('SELECT id FROM lobbies WHERE code = ?').get(code);
+    if (!exists) return code;
+  }
+  return `L${Date.now().toString(36).toUpperCase().slice(-5)}`;
+}
+
+function ensureUser(userId, nickname, avatar) {
+  const id = asString(userId);
+  if (!id) throw new Error('Missing userId');
+  const nextNickname = cleanNickname(nickname, id);
+  const nextAvatar = cleanAvatar(avatar);
+  const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  if (existing) {
+    db.prepare(`
+      UPDATE users
+      SET nickname = ?, avatar = ?, last_seen = strftime('%s', 'now')
+      WHERE id = ?
+    `).run(nextNickname, nextAvatar, id);
+  } else {
+    db.prepare(`
+      INSERT INTO users (id, nickname, avatar, last_seen)
+      VALUES (?, ?, ?, strftime('%s', 'now'))
+    `).run(id, nextNickname, nextAvatar);
+  }
+  return db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+}
+
+function getDrawnNumbers(lobbyId) {
+  return db.prepare(`
+    SELECT number FROM drawn_numbers
+    WHERE lobby_id = ?
+    ORDER BY drawn_at ASC, rowid ASC
+  `).all(lobbyId).map(row => Number(row.number));
+}
+
+function setDrawnNumbers(lobbyId, numbers) {
+  const clean = [...new Set((numbers || []).map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= 90))];
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM drawn_numbers WHERE lobby_id = ?').run(lobbyId);
+    const insert = db.prepare('INSERT OR IGNORE INTO drawn_numbers (lobby_id, number) VALUES (?, ?)');
+    clean.forEach(n => insert.run(lobbyId, n));
+  });
+  tx();
+  return clean;
+}
+
+function mapLobbyPlayers(lobby) {
+  const rows = db.prepare(`
+    SELECT
+      u.id,
+      u.nickname,
+      u.avatar,
+      u.games_played,
+      u.games_won,
+      lp.status,
+      lp.card,
+      lp.marked_cells
+    FROM lobby_players lp
+    JOIN users u ON u.id = lp.user_id
+    WHERE lp.lobby_id = ?
+    ORDER BY lp.joined_at ASC
+  `).all(lobby.id);
+
+  return rows.map(row => {
+    const marked = safeJsonParse(row.marked_cells, []).map(Number).filter(Number.isFinite);
+    return {
+      id: row.id,
+      nickname: row.nickname,
+      avatar: row.avatar,
+      games_played: Number(row.games_played || 0),
+      games_won: Number(row.games_won || 0),
+      status: row.status,
+      isAdmin: String(row.id) === String(lobby.admin_id),
+      progress: marked.length,
+      marked_cells: marked,
+      card: safeJsonParse(row.card, null),
+    };
+  });
+}
+
+function readChat(lobbyId) {
+  return db.prepare(`
+    SELECT
+      cm.id,
+      cm.user_id,
+      cm.message,
+      cm.timestamp,
+      u.nickname,
+      u.avatar
+    FROM chat_messages cm
+    LEFT JOIN users u ON u.id = cm.user_id
+    WHERE cm.lobby_id = ?
+    ORDER BY cm.timestamp ASC, cm.id ASC
+    LIMIT 50
+  `).all(lobbyId).map(row => ({
+    id: row.id,
+    lobbyId,
+    userId: row.user_id,
+    nickname: row.nickname || 'Player',
+    avatar: row.avatar || '\u{1F464}',
+    text: row.message,
+    timestamp: Number(row.timestamp || 0) * 1000,
+  }));
+}
+
+function buildStateVersion(lobby, players, drawn, chat) {
+  return JSON.stringify({
+    s: lobby.status,
+    d: drawn,
+    p: players.map(p => [p.id, p.status, p.progress, p.games_played, p.games_won]),
+    c: chat.map(m => m.id),
+  });
+}
+
+function getLobbyState(lobbyId, userId, clientVersion = '') {
+  const lobby = db.prepare('SELECT * FROM lobbies WHERE id = ?').get(lobbyId);
+  if (!lobby) return { type: 'error', message: 'Lobby not found' };
+
+  const players = mapLobbyPlayers(lobby);
+  const drawn = getDrawnNumbers(lobbyId);
+  const chat = readChat(lobbyId);
+  const me = players.find(p => String(p.id) === String(userId));
+  const markedCells = me?.marked_cells || [];
+  const version = buildStateVersion(lobby, players, drawn, chat);
+
+  if (clientVersion && clientVersion === version) {
+    return { type: 'no_change', version };
+  }
+
+  return {
+    type: 'state_update',
+    version,
+    drawn,
+    all: drawn,
+    isAdmin: String(lobby.admin_id) === String(userId),
+    card: me?.card || null,
+    markedCells,
+    chat,
+    lobby: {
+      id: lobby.id,
+      code: lobby.code,
+      name: lobby.name,
+      status: lobby.status,
+      admin_id: lobby.admin_id,
+      max_players: lobby.max_players,
+      players,
+    },
+  };
+}
+
+function broadcastState(lobbyId) {
+  const users = lobbyClients.get(lobbyId);
+  if (!users) return;
+  users.forEach(userId => {
+    try {
+      sendToUser(userId, getLobbyState(lobbyId, userId));
+    } catch (error) {
+      console.error('broadcastState error:', error);
+    }
+  });
+}
+
+function filterMarksToDrawn(lobbyId, drawn) {
+  const allowed = new Set(drawn.map(Number));
+  const players = db.prepare('SELECT user_id, marked_cells FROM lobby_players WHERE lobby_id = ?').all(lobbyId);
+  const update = db.prepare('UPDATE lobby_players SET marked_cells = ? WHERE lobby_id = ? AND user_id = ?');
+  players.forEach(player => {
+    const current = safeJsonParse(player.marked_cells, []).map(Number).filter(Number.isFinite);
+    const next = current.filter(n => allowed.has(n));
+    if (JSON.stringify(current) !== JSON.stringify(next)) {
+      update.run(JSON.stringify(next), lobbyId, player.user_id);
+    }
+  });
+}
+
+function shuffleApi(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+}
+
+function generateLotoCardApi() {
+  const ranges = [[1,9],[10,19],[20,29],[30,39],[40,49],[50,59],[60,69],[70,79],[80,90]];
+
+  for (let attempt = 0; attempt < 2000; attempt++) {
+    const colCount = Array(9).fill(0);
+    const mask = Array(3).fill(null).map(() => Array(9).fill(false));
+    let ok = true;
+
+    const cols = [0,1,2,3,4,5,6,7,8];
+    shuffleApi(cols);
+    for (let i = 0; i < 9; i++) {
+      const row = Math.floor(i / 3);
+      const col = cols[i];
+      mask[row][col] = true;
+      colCount[col]++;
+    }
+
+    for (let row = 0; row < 3; row++) {
+      const need = 5 - mask[row].filter(Boolean).length;
+      const available = [];
+      for (let c = 0; c < 9; c++) {
+        if (!mask[row][c] && colCount[c] < 2) available.push(c);
+      }
+      if (available.length < need) { ok = false; break; }
+      shuffleApi(available);
+      for (const c of available.slice(0, need)) {
+        mask[row][c] = true;
+        colCount[c]++;
+      }
+    }
+    if (!ok) continue;
+
+    const validRows = mask.every(row => row.filter(Boolean).length === 5);
+    const validCols = colCount.every(count => count >= 1 && count <= 2);
+    if (!validRows || !validCols) continue;
+
+    const card = Array(3).fill(null).map(() => Array(9).fill(null));
+    for (let col = 0; col < 9; col++) {
+      const [min, max] = ranges[col];
+      const rows = [0,1,2].filter(row => mask[row][col]);
+      const pool = [];
+      for (let n = min; n <= max; n++) pool.push(n);
+      shuffleApi(pool);
+      const chosen = pool.slice(0, rows.length).sort((a, b) => a - b);
+      rows.sort((a, b) => a - b).forEach((row, i) => {
+        card[row][col] = chosen[i];
+      });
+    }
+    return card;
+  }
+
+  return Array(3).fill(null).map(() => Array(9).fill(null));
+}
+
+function flattenCard(card) {
+  if (!Array.isArray(card)) return [];
+  return card.flat().map(Number).filter(Number.isFinite);
+}
+
+function handleApiAction(payload, context = {}) {
+  const action = asString(payload?.action || payload?.type);
+  const userId = asString(payload?.userId);
+  const lobbyId = asString(payload?.lobbyId);
+  const nickname = payload?.nickname;
+  const avatar = payload?.avatar;
+
+  switch (action) {
+    case 'auth': {
+      const user = ensureUser(userId, nickname, avatar);
+      if (context.bindUser) context.bindUser(user.id);
+      return {
+        type: 'auth_success',
+        user: {
+          id: user.id,
+          nickname: user.nickname,
+          avatar: user.avatar,
+          games_played: user.games_played,
+          games_won: user.games_won,
+        },
+      };
+    }
+
+    case 'get_state':
+      return getLobbyState(lobbyId, userId, asString(payload?.v || payload?.version));
+
+    case 'list_lobbies': {
+      const lobbies = db.prepare(`
+        SELECT
+          l.id,
+          l.code,
+          l.name,
+          l.admin_id,
+          l.max_players,
+          l.status,
+          l.password,
+          COUNT(lp.user_id) as players_count
+        FROM lobbies l
+        LEFT JOIN lobby_players lp ON lp.lobby_id = l.id
+        WHERE l.status IN ('waiting', 'playing')
+        GROUP BY l.id
+        ORDER BY l.created_at DESC
+        LIMIT 50
+      `).all();
+      return lobbies.map(lobby => ({
+        id: lobby.id,
+        code: lobby.code,
+        name: lobby.name,
+        admin_id: lobby.admin_id,
+        max_players: lobby.max_players,
+        status: lobby.status,
+        players_count: Number(lobby.players_count || 0),
+        has_password: lobby.password ? 1 : 0,
+      }));
+    }
+
+    case 'create_lobby': {
+      const user = ensureUser(userId, nickname, avatar);
+      if (context.bindUser) context.bindUser(user.id);
+      const id = uuidv4();
+      const code = uniqueLobbyCode();
+      const maxPlayers = Math.max(2, Math.min(Number(payload?.maxPlayers || 10), 1000));
+      const name = asString(payload?.name) || 'Loto';
+      db.prepare(`
+        INSERT INTO lobbies (id, code, name, password, admin_id, max_players, status, mode, total_rounds)
+        VALUES (?, ?, ?, ?, ?, ?, 'waiting', ?, ?)
+      `).run(
+        id,
+        code,
+        name,
+        asString(payload?.password) || null,
+        user.id,
+        maxPlayers,
+        asString(payload?.mode) || 'classic',
+        Number(payload?.rounds || 1)
+      );
+      db.prepare(`
+        INSERT OR REPLACE INTO lobby_players (lobby_id, user_id, status, marked_cells)
+        VALUES (?, ?, 'ready', '[]')
+      `).run(id, user.id);
+      if (context.bindLobby) context.bindLobby(id);
+      return {
+        type: 'lobby_created',
+        lobby: {
+          id,
+          code,
+          name,
+          adminId: user.id,
+          admin_id: user.id,
+          maxPlayers,
+          max_players: maxPlayers,
+          status: 'waiting',
+          players: [{
+            id: user.id,
+            nickname: user.nickname,
+            avatar: user.avatar,
+            games_played: user.games_played,
+            games_won: user.games_won,
+            isAdmin: true,
+          }],
+        },
+      };
+    }
+
+    case 'join_lobby': {
+      const user = ensureUser(userId, nickname, avatar);
+      if (context.bindUser) context.bindUser(user.id);
+      const code = asString(payload?.code).toUpperCase();
+      const lobby = db.prepare('SELECT * FROM lobbies WHERE code = ?').get(code);
+      if (!lobby) return { type: 'error', message: 'Lobby not found' };
+      if (lobby.status !== 'waiting') return { type: 'error', message: 'Game already started' };
+      if (lobby.password && lobby.password !== asString(payload?.password)) {
+        return { type: 'error', message: 'Wrong password' };
+      }
+      const count = db.prepare('SELECT COUNT(*) as count FROM lobby_players WHERE lobby_id = ?').get(lobby.id).count;
+      if (count >= lobby.max_players) return { type: 'error', message: 'Lobby is full' };
+
+      db.prepare(`
+        INSERT OR IGNORE INTO lobby_players (lobby_id, user_id, status, marked_cells)
+        VALUES (?, ?, 'waiting', '[]')
+      `).run(lobby.id, user.id);
+      if (context.bindLobby) context.bindLobby(lobby.id);
+
+      broadcast(lobby.id, {
+        type: 'player_joined',
+        player: {
+          id: user.id,
+          nickname: user.nickname,
+          avatar: user.avatar,
+        },
+      }, user.id);
+      broadcastState(lobby.id);
+
+      return {
+        type: 'lobby_joined',
+        lobbyId: lobby.id,
+        isAdmin: String(lobby.admin_id) === String(user.id),
+      };
+    }
+
+    case 'leave_lobby': {
+      if (lobbyId && userId) {
+        db.prepare('DELETE FROM lobby_players WHERE lobby_id = ? AND user_id = ?').run(lobbyId, userId);
+        const users = lobbyClients.get(lobbyId);
+        if (users) users.delete(userId);
+        broadcast(lobbyId, { type: 'player_left', userId });
+        broadcastState(lobbyId);
+      }
+      if (context.clearLobby) context.clearLobby();
+      return { type: 'left_lobby' };
+    }
+
+    case 'start_game': {
+      const lobby = db.prepare('SELECT * FROM lobbies WHERE id = ?').get(lobbyId);
+      if (!lobby) return { type: 'error', message: 'Lobby not found' };
+      if (String(lobby.admin_id) !== String(userId)) return { type: 'error', message: 'Only host can start game' };
+
+      const players = db.prepare('SELECT user_id FROM lobby_players WHERE lobby_id = ?').all(lobbyId);
+      const tx = db.transaction(() => {
+        db.prepare('DELETE FROM drawn_numbers WHERE lobby_id = ?').run(lobbyId);
+        db.prepare(`
+          UPDATE lobbies SET status = 'playing', started_at = strftime('%s', 'now')
+          WHERE id = ?
+        `).run(lobbyId);
+        const updatePlayer = db.prepare(`
+          UPDATE lobby_players SET card = ?, status = 'playing', marked_cells = '[]'
+          WHERE lobby_id = ? AND user_id = ?
+        `);
+        const updateUser = db.prepare('UPDATE users SET games_played = games_played + 1 WHERE id = ?');
+        players.forEach(player => {
+          updatePlayer.run(JSON.stringify(generateLotoCardApi()), lobbyId, player.user_id);
+          updateUser.run(player.user_id);
+        });
+      });
+      tx();
+      broadcast(lobbyId, { type: 'game_started' });
+      broadcastState(lobbyId);
+      return getLobbyState(lobbyId, userId);
+    }
+
+    case 'draw_number': {
+      const number = Number(payload?.number);
+      if (!Number.isInteger(number) || number < 1 || number > 90) {
+        return { type: 'error', message: 'Number must be between 1 and 90' };
+      }
+      const lobby = db.prepare('SELECT * FROM lobbies WHERE id = ?').get(lobbyId);
+      if (!lobby) return { type: 'error', message: 'Lobby not found' };
+      if (String(lobby.admin_id) !== String(userId)) return { type: 'error', message: 'Only host can draw numbers' };
+      const drawn = getDrawnNumbers(lobbyId);
+      if (!drawn.includes(number)) drawn.push(number);
+      const next = setDrawnNumbers(lobbyId, drawn);
+      broadcast(lobbyId, { type: 'number_drawn', number, all: next });
+      return { type: 'state_update', drawn: next, all: next };
+    }
+
+    case 'undo_number': {
+      const number = Number(payload?.number);
+      const drawn = getDrawnNumbers(lobbyId);
+      const next = Number.isInteger(number) && number > 0
+        ? drawn.filter(n => n !== number)
+        : drawn.slice(0, -1);
+      const saved = setDrawnNumbers(lobbyId, next);
+      filterMarksToDrawn(lobbyId, saved);
+      broadcast(lobbyId, { type: 'numbers_updated', all: saved });
+      broadcastState(lobbyId);
+      return { type: 'state_update', drawn: saved, all: saved };
+    }
+
+    case 'reset_numbers': {
+      const saved = setDrawnNumbers(lobbyId, []);
+      filterMarksToDrawn(lobbyId, saved);
+      broadcast(lobbyId, { type: 'numbers_updated', all: saved });
+      broadcastState(lobbyId);
+      return { type: 'state_update', drawn: saved, all: saved };
+    }
+
+    case 'chat_message': {
+      if (!lobbyId || !userId) return { type: 'success' };
+      const user = ensureUser(userId, nickname, avatar);
+      const text = asString(payload?.text).slice(0, 500);
+      const id = uuidv4();
+      db.prepare(`
+        INSERT INTO chat_messages (id, lobby_id, user_id, message)
+        VALUES (?, ?, ?, ?)
+      `).run(id, lobbyId, user.id, text);
+      const message = {
+        id,
+        lobbyId,
+        userId: user.id,
+        nickname: user.nickname,
+        avatar: user.avatar,
+        text,
+        timestamp: Date.now(),
+      };
+      broadcast(lobbyId, { type: 'chat_message', message });
+      return { type: 'chat_message', message };
+    }
+
+    case 'clear_chat': {
+      const lobby = db.prepare('SELECT * FROM lobbies WHERE id = ?').get(lobbyId);
+      if (!lobby) return { type: 'error', message: 'Lobby not found' };
+      if (String(lobby.admin_id) !== String(userId)) return { type: 'error', message: 'Only host can clear chat' };
+      db.prepare('DELETE FROM chat_messages WHERE lobby_id = ?').run(lobbyId);
+      broadcast(lobbyId, { type: 'chat_cleared', lobbyId });
+      return { type: 'chat_cleared', lobbyId };
+    }
+
+    case 'update_profile': {
+      const user = ensureUser(userId, payload?.nickname || nickname, payload?.avatar || avatar);
+      return {
+        type: 'profile_updated',
+        profile: {
+          id: user.id,
+          nickname: user.nickname,
+          avatar: user.avatar,
+          games_played: user.games_played,
+          games_won: user.games_won,
+        },
+      };
+    }
+
+    case 'mark_cell': {
+      if (!lobbyId || !userId) return { type: 'success' };
+      const player = db.prepare(`
+        SELECT lp.*, u.nickname, u.avatar, u.games_played, u.games_won
+        FROM lobby_players lp
+        JOIN users u ON u.id = lp.user_id
+        WHERE lp.lobby_id = ? AND lp.user_id = ?
+      `).get(lobbyId, userId);
+      if (!player) return { type: 'error', message: 'Player not found in lobby' };
+
+      const allowed = new Set(getDrawnNumbers(lobbyId));
+      let cells = Array.isArray(payload?.cells)
+        ? payload.cells.map(Number).filter(Number.isFinite)
+        : safeJsonParse(player.marked_cells, []).map(Number).filter(Number.isFinite);
+      if (payload?.number !== undefined) {
+        const number = Number(payload.number);
+        if (allowed.has(number) && !cells.includes(number)) cells.push(number);
+      }
+      cells = [...new Set(cells)].filter(n => allowed.has(n));
+      db.prepare(`
+        UPDATE lobby_players SET marked_cells = ?
+        WHERE lobby_id = ? AND user_id = ?
+      `).run(JSON.stringify(cells), lobbyId, userId);
+
+      const cardNumbers = flattenCard(safeJsonParse(player.card, []));
+      const cardSet = new Set(cardNumbers);
+      const markedCardCount = cells.filter(n => cardSet.has(n)).length;
+      const lobby = db.prepare('SELECT * FROM lobbies WHERE id = ?').get(lobbyId);
+      if (cardNumbers.length > 0 && markedCardCount >= cardNumbers.length && lobby?.status !== 'finished') {
+        db.prepare('UPDATE users SET games_won = games_won + 1, total_score = total_score + 100 WHERE id = ?').run(userId);
+        db.prepare('UPDATE lobbies SET status = ? WHERE id = ?').run('finished', lobbyId);
+        const win = { type: 'game_won', winnerId: userId, winnerName: player.nickname };
+        broadcast(lobbyId, win);
+        return win;
+      }
+
+      broadcastState(lobbyId);
+      return { type: 'success' };
+    }
+
+    default:
+      return { type: 'error', message: 'Unknown action' };
+  }
+}
+
 // Обработка WebSocket соединений
 wss.on('connection', (ws) => {
   let currentUserId = null;
@@ -204,6 +778,9 @@ wss.on('connection', (ws) => {
       const message = JSON.parse(data);
       
       switch (message.type) {
+        case 'api':
+          handleApiWs(ws, message);
+          break;
         case 'auth':
           handleAuth(ws, message);
           break;
@@ -249,6 +826,36 @@ wss.on('connection', (ws) => {
       ws.send(JSON.stringify({ type: 'error', message: error.message }));
     }
   });
+
+  function bindClient(userId, lobbyId = null) {
+    if (currentUserId && currentUserId !== userId) {
+      clients.delete(currentUserId);
+    }
+    currentUserId = userId;
+    clients.set(userId, ws);
+
+    if (lobbyId) {
+      if (currentLobbyId && currentLobbyId !== lobbyId) {
+        const oldUsers = lobbyClients.get(currentLobbyId);
+        if (oldUsers) oldUsers.delete(userId);
+      }
+      currentLobbyId = lobbyId;
+      if (!lobbyClients.has(lobbyId)) {
+        lobbyClients.set(lobbyId, new Set());
+      }
+      lobbyClients.get(lobbyId).add(userId);
+    }
+  }
+
+  function handleApiWs(ws, message) {
+    const payload = message.payload || {};
+    const result = handleApiAction(payload, {
+      bindUser: (userId) => bindClient(userId),
+      bindLobby: (lobbyId) => bindClient(asString(payload.userId), lobbyId),
+      clearLobby: () => { currentLobbyId = null; },
+    });
+    ws.send(JSON.stringify({ ...result, requestId: message.requestId }));
+  }
 
   ws.on('close', () => {
     if (currentUserId) {
@@ -750,6 +1357,29 @@ wss.on('connection', (ws) => {
 });
 
 // REST API endpoints
+app.get('/api/loto', (req, res) => {
+  try {
+    const result = handleApiAction({
+      ...req.query,
+      action: req.query.action || 'get_state',
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('API GET /api/loto error:', error);
+    res.status(500).json({ type: 'error', message: error.message });
+  }
+});
+
+app.post('/api/loto', (req, res) => {
+  try {
+    const result = handleApiAction(req.body || {});
+    res.json(result);
+  } catch (error) {
+    console.error('API POST /api/loto error:', error);
+    res.status(500).json({ type: 'error', message: error.message });
+  }
+});
+
 app.get('/api/status', (req, res) => {
   res.json({ status: 'online', version: '1.0.0' });
 });

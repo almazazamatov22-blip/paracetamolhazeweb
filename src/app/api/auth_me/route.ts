@@ -6,7 +6,7 @@ const redis = process.env.KV_REST_API_URL ? new Redis({
   token: process.env.KV_REST_API_TOKEN,
 }) : null;
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
   const token = req.cookies.get('twitch_token')?.value;

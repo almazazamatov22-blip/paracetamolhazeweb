@@ -1169,9 +1169,16 @@
     }
 
     // ====== POLLING & API ======
-    let pollInterval = null;
+    let pollTimer = null;
     let lastKnownVersion = -1; // Версия состояния, известная клиенту
-    let wsReady = false; const chatMessagesList = []; const chatMessagesIds = new Set(); let chatLobbyId = null;
+    let wsReady = false;
+    let ws = null;
+    let wsConnected = false;
+    let wsConnecting = false;
+    let wsRequestSeq = 1;
+    let wsReconnectDelay = 1500;
+    const pendingApiRequests = new Map();
+    const chatMessagesList = []; const chatMessagesIds = new Set(); let chatLobbyId = null;
     let creatingLobby = false;
     let startingGame = false;
     let markSyncInFlight = false;
@@ -1179,8 +1186,93 @@
     let lastLocalMarkEditAt = 0;
     let lastMarkSyncFinishedAt = 0;
 
-    window.initWS = function() {
+    function connectNativeWS() {
+      if (!('WebSocket' in window)) return Promise.resolve(false);
+      if (wsConnected) return Promise.resolve(true);
+      if (wsConnecting) {
+        return new Promise(resolve => setTimeout(() => resolve(wsConnected), 300));
+      }
+      wsConnecting = true;
+      setConnStatus('connecting', 'Подключение...');
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(protocol + '//' + location.host);
+
+      return new Promise(resolve => {
+        let settled = false;
+        const finish = (ok) => {
+          if (settled) return;
+          settled = true;
+          resolve(ok);
+        };
+
+        ws.onopen = () => {
+          wsConnected = true;
+          wsReady = true;
+          wsConnecting = false;
+          wsReconnectDelay = 1500;
+          finish(true);
+        };
+
+        ws.onmessage = (event) => {
+          let msg = null;
+          try { msg = JSON.parse(event.data); } catch (_) { return; }
+          if (msg.requestId && pendingApiRequests.has(msg.requestId)) {
+            const pending = pendingApiRequests.get(msg.requestId);
+            pendingApiRequests.delete(msg.requestId);
+            pending.resolve(msg);
+            return;
+          }
+          handleWsMessage(msg);
+        };
+
+        ws.onerror = () => {
+          wsConnected = false;
+          wsReady = true;
+          wsConnecting = false;
+          finish(false);
+        };
+
+        ws.onclose = () => {
+          const delay = wsReconnectDelay;
+          wsConnected = false;
+          wsConnecting = false;
+          for (const pending of pendingApiRequests.values()) {
+            pending.resolve({ type: 'error', message: 'WebSocket disconnected' });
+          }
+          pendingApiRequests.clear();
+          wsReconnectDelay = Math.min(wsReconnectDelay * 2, 30000);
+          setTimeout(() => connectNativeWS().catch(() => {}), delay);
+        };
+
+        setTimeout(() => {
+          wsConnecting = false;
+          finish(wsConnected);
+        }, 2500);
+      });
+    }
+
+    function sendApiOverWS(data) {
+      if (!wsConnected || !ws || ws.readyState !== WebSocket.OPEN) return null;
+      const requestId = 'r' + (wsRequestSeq++);
+      const payload = { ...data };
+      return new Promise(resolve => {
+        const timer = setTimeout(() => {
+          pendingApiRequests.delete(requestId);
+          resolve({ type: 'error', message: 'WebSocket timeout' });
+        }, 8000);
+        pendingApiRequests.set(requestId, {
+          resolve: (msg) => {
+            clearTimeout(timer);
+            resolve(msg);
+          }
+        });
+        ws.send(JSON.stringify({ type: 'api', requestId, payload }));
+      });
+    }
+
+    window.initWS = async function() {
       wsReady = true;
+      await connectNativeWS().catch(() => false);
       // Восстановление сессии — localStorage переживает закрытие вкладки
       const _sid   = normalizeLobbyId(localStorage.getItem('currentLobbyId'));
       const _adm   = localStorage.getItem('isAdmin') === 'true';
@@ -1215,29 +1307,54 @@
           setTimeout(() => { const el = document.getElementById('connStatus'); if(el) el.style.opacity='0'; }, 2000);
         })
         .catch(() => setConnStatus('error', 'Ошибка'));
-      // Поллинг — умный, version-based
-      if (!pollInterval) {
-        pollInterval = setInterval(async () => {
-          if (!currentLobbyId) return;
+      // Поллинг — version-based, с адаптивной частотой для снижения нагрузки
+      if (!pollTimer) {
+        const schedulePoll = () => {
+          const isGame = currentScreen === 'gameScreen';
+          const delay = wsConnected ? 15000 : (document.hidden ? 15000 : (isGame ? 1800 : 3500));
+          pollTimer = setTimeout(runPoll, delay);
+        };
+        const runPoll = async () => {
+          if (!currentLobbyId) {
+            schedulePoll();
+            return;
+          }
+          if (wsConnected) {
+            schedulePoll();
+            return;
+          }
           const requestedLobbyId = currentLobbyId;
           try {
-            // Передаём клиентскую версию — сервер вернёт no_change если ничего не изменилось (1 Redis-команда)
+            // В скрытой вкладке запросы не делаем — это экономит origin transfer
+            if (document.hidden) {
+              schedulePoll();
+              return;
+            }
             const res = await fetch(`/api/loto?action=get_state&lobbyId=${encodeURIComponent(requestedLobbyId)}&userId=${encodeURIComponent(userId)}&v=${encodeURIComponent(lastKnownVersion)}`);
-            if (res.status === 404 || res.status === 410) { clearGameSession(); showScreen('mainMenu'); return; }
+            if (res.status === 404 || res.status === 410) { clearGameSession(); showScreen('mainMenu'); schedulePoll(); return; }
             if (res.ok) {
               const msg = await res.json();
-              if (requestedLobbyId !== currentLobbyId) return;
-              if (msg.type === 'no_change') return; // Ничего не изменилось — пропускаем
-              if (msg.version !== undefined) lastKnownVersion = String(msg.version);
-              handleWsMessage(msg);
+              if (requestedLobbyId !== currentLobbyId) { schedulePoll(); return; }
+              if (msg.type !== 'no_change') {
+                if (msg.version !== undefined) lastKnownVersion = String(msg.version);
+                handleWsMessage(msg);
+              }
             }
           } catch(e) {}
-        }, 1000); // 1 сек вместо 2.5 сек — безопасно т.к. большинство запросов = 1 Redis-команда
+          schedulePoll();
+        };
+        runPoll();
       }
     }
 
     window.sendAPI = async function(data) {
       try {
+        const wsResponse = sendApiOverWS(data);
+        if (wsResponse) {
+          const resp = await wsResponse;
+          if (resp && resp.type) handleWsMessage(resp);
+          return resp;
+        }
         const res = await fetch('/api/loto', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -1,6 +1,9 @@
 ﻿# Git ignore
 node_modules
 .next
+.open-next
+.wrangler
+.dev.vars
 .env*
 фейссвап/
 program.zip

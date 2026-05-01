@@ -11,6 +11,8 @@ const DEFAULT_NICKS = [
   'evelone2004', 'kurokoken', 'egypop13', 'GolDi_21', 'STRYPOFF13', 'limonnub'
 ];
 
+const LOTTOMAL_URL = process.env.NEXT_PUBLIC_LOTOMAL_URL || 'https://lotomal.almazazamatov2.workers.dev/lotomal/'
+
 const PROJECTS = [
   {
     title: 'РОЗ',
@@ -30,7 +32,7 @@ const PROJECTS = [
   {
     title: 'ЛОТОМАЛЬ',
     desc: 'Многопользовательская игра в Лото',
-    href: '/lotomal',
+    href: LOTTOMAL_URL,
   },
   {
     title: 'ФейтОверлей',

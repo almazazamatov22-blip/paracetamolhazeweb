@@ -457,7 +457,7 @@
         }
 
         const query = new URLSearchParams(window.location.search);
-        const lobbyId = normalizeId(query.get('lobbyId')) || normalizeId(localStorage.getItem('currentLobbyId'));
+        let lobbyId = normalizeId(query.get('lobbyId')) || normalizeId(localStorage.getItem('currentLobbyId'));
         const userId = normalizeId(query.get('userId')) || normalizeId(localStorage.getItem('browserUserId')) || getBrowserUserId();
         let adminPollTimer = null;
         let adminPollBusy = false;
@@ -465,6 +465,22 @@
         let adminLastVersion = '';
         if (lobbyId) localStorage.setItem('currentLobbyId', lobbyId);
         if (userId) localStorage.setItem('browserUserId', userId);
+
+        async function resolveLobbyBinding() {
+            if (lobbyId || !userId) return;
+            try {
+                const res = await fetch('/api/loto?action=list_lobbies', { cache: 'no-store' });
+                if (!res.ok) return;
+                const lobbies = await res.json();
+                const owned = Array.isArray(lobbies)
+                    ? lobbies.find(l => String(l.admin_id || '') === String(userId))
+                    : null;
+                if (owned?.id) {
+                    lobbyId = normalizeId(owned.id);
+                    localStorage.setItem('currentLobbyId', lobbyId);
+                }
+            } catch (_) {}
+        }
 
         async function addNumberToDrawn(num) {
             if (!lobbyId || !userId) {
@@ -639,7 +655,8 @@
         });
 
         // Инициализация
-        window.addEventListener('DOMContentLoaded', () => {
+        window.addEventListener('DOMContentLoaded', async () => {
+            await resolveLobbyBinding();
             initGrid();
             loadFromServer(true);
             if (!adminPollTimer) adminPollTimer = setInterval(loadFromServer, 1000);
