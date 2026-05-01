@@ -139,7 +139,7 @@ export function Landing() {
           </div>
 
           {/* Right: Leaderboard */}
-          <div className="lg:col-span-7 bg-[#0c0c0e]/50 backdrop-blur-xl border border-white/[0.06] rounded-[3rem] p-8 flex flex-col h-[650px] shadow-2xl">
+          <div className="lg:col-span-7 bg-[#121219]/82 backdrop-blur-xl border border-white/[0.16] rounded-[3rem] p-8 flex flex-col h-[650px] shadow-2xl">
              <div className="flex flex-col gap-6 mb-8">
                 <div className="flex items-center justify-between">
                    <div className="flex items-center gap-4">
@@ -151,7 +151,7 @@ export function Landing() {
                    <CountdownTimer period={period} />
                 </div>
 
-                <div className="flex gap-1 bg-white/[0.03] p-1.5 rounded-2xl border border-white/[0.06]">
+                <div className="flex gap-1 bg-white/[0.08] p-1.5 rounded-2xl border border-white/[0.16]">
                    {[
                      { id: 'day', label: 'ЗА ДЕНЬ' },
                      { id: 'week', label: 'ЗА НЕДЕЛЮ' },
@@ -160,7 +160,7 @@ export function Landing() {
                       <button 
                         key={t.id} 
                         onClick={() => setPeriod(t.id)} 
-                        className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${period === t.id ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20' : 'text-neutral-500 hover:text-neutral-300'}`}
+                        className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${period === t.id ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20' : 'text-neutral-300 hover:text-white'}`}
                       >
                         {t.label}
                       </button>
@@ -173,22 +173,22 @@ export function Landing() {
                   {isLoading ? (
                     <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center h-full gap-4">
                        <RefreshCw className="w-10 h-10 text-cyan-500 animate-spin" />
-                       <span className="text-[10px] font-black uppercase text-neutral-500">Загрузка...</span>
+                       <span className="text-[10px] font-black uppercase text-neutral-300">Загрузка...</span>
                     </motion.div>
                   ) : lbEntries.length > 0 ? (
                     <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
                        {lbEntries.map((p, i) => (
-                          <div key={p.login} className="flex items-center gap-5 p-5 rounded-3xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.06] transition-all group">
-                             <div className={`w-10 text-2xl font-black italic ${i < 3 ? 'text-cyan-400' : 'text-neutral-700'}`}>#{i+1}</div>
+                          <div key={p.login} className="flex items-center gap-5 p-5 rounded-3xl bg-white/[0.08] border border-white/[0.16] hover:bg-white/[0.12] transition-all group">
+                             <div className={`w-10 text-2xl font-black italic ${i < 3 ? 'text-cyan-400' : 'text-neutral-300'}`}>#{i+1}</div>
                              <img src={p.image || ''} className="w-14 h-14 rounded-2xl border border-white/10 shadow-lg group-hover:scale-110 transition-transform" alt="" referrerPolicy="no-referrer" />
                              <div className="flex-1 min-w-0">
                                 <p className="text-lg font-black tracking-tight truncate">{p.username}</p>
-                                <p className="text-[10px] text-neutral-500 uppercase font-black leading-none mt-1">
+                                <p className="text-[10px] text-neutral-300 uppercase font-black leading-none mt-1">
                                    Рекорд: {p.bestScore} {p.maxCombo > 0 && `• Комбо x${p.maxCombo}`}
                                 </p>
                              </div>
                              <div className="text-right">
-                                <p className={`text-4xl font-black italic leading-none ${i < 3 ? 'text-cyan-400' : 'text-white/60'}`}>{p.bestScore}</p>
+                                <p className={`text-4xl font-black italic leading-none ${i < 3 ? 'text-cyan-400' : 'text-white/75'}`}>{p.bestScore}</p>
                              </div>
                           </div>
                        ))}

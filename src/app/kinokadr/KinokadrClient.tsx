@@ -525,9 +525,9 @@ function KinokadrContent() {
                        <h2 className="text-3xl font-black uppercase italic tracking-tighter">Рейтинг</h2>
                     </div>
 
-                    <div className="flex gap-1 bg-white/[0.03] p-1 rounded-2xl border border-white/[0.06]">
+                    <div className="flex gap-1 bg-white/[0.08] p-1 rounded-2xl border border-white/[0.16]">
                       {['combo', 'movie', 'series'].map(m => (
-                          <button key={m} onClick={() => setLbMode(m)} className={`px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${lbMode === m ? 'bg-white/10 text-white shadow-lg' : 'text-neutral-500 hover:text-neutral-300'}`}>
+                          <button key={m} onClick={() => setLbMode(m)} className={`px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${lbMode === m ? 'bg-white/16 text-white shadow-lg' : 'text-neutral-300 hover:text-white'}`}>
                             {m === 'combo' ? 'КОМБО' : m === 'movie' ? 'ФИЛЬМЫ' : 'СЕРИАЛЫ'}
                           </button>
                       ))}
@@ -536,15 +536,15 @@ function KinokadrContent() {
 
                  <div className="flex-1 space-y-3 overflow-y-auto pr-3 custom-scrollbar">
                     {leaderboard.length > 0 ? leaderboard.map((p, i) => (
-                        <div key={i} className="flex items-center gap-5 p-5 rounded-3xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.06] transition-all group">
-                          <div className={`w-10 text-2xl font-black italic ${i < 3 ? 'text-cyan-400' : 'text-neutral-700'}`}>#{i+1}</div>
+                        <div key={i} className="flex items-center gap-5 p-5 rounded-3xl bg-white/[0.08] border border-white/[0.16] hover:bg-white/[0.12] transition-all group">
+                          <div className={`w-10 text-2xl font-black italic ${i < 3 ? 'text-cyan-400' : 'text-neutral-300'}`}>#{i+1}</div>
                           <img src={p.avatar} className="w-14 h-14 rounded-2xl border border-white/10 shadow-lg group-hover:scale-110 transition-transform" alt="" />
                           <div className="flex-1 min-w-0">
                               <p className="text-lg font-black tracking-tight truncate">{p.username}</p>
-                              <p className="text-[10px] text-neutral-500 uppercase font-black leading-none mt-1">{p.mode === 'combo' ? 'Комбо' : p.mode === 'movie' ? 'Фильмы' : p.mode === 'series' ? 'Сериалы' : ''}</p>
+                              <p className="text-[10px] text-neutral-300 uppercase font-black leading-none mt-1">{p.mode === 'combo' ? 'Комбо' : p.mode === 'movie' ? 'Фильмы' : p.mode === 'series' ? 'Сериалы' : ''}</p>
                           </div>
                           <div className="text-right">
-                              <p className={`text-4xl font-black italic leading-none ${i < 3 ? 'text-cyan-400' : 'text-white/60'}`}>{p.score}</p>
+                              <p className={`text-4xl font-black italic leading-none ${i < 3 ? 'text-cyan-400' : 'text-white/75'}`}>{p.score}</p>
                           </div>
                         </div>
                     )) : (
@@ -562,7 +562,7 @@ function KinokadrContent() {
               key="game" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
               className="w-full max-w-sm flex flex-col gap-5"
             >
-              <div className="relative aspect-[2/3] rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl bg-white/[0.02] backdrop-blur-xl group">
+              <div className="relative aspect-[2/3] rounded-[2.5rem] overflow-hidden border border-white/20 shadow-2xl bg-white/[0.06] backdrop-blur-xl group">
                  {isImageLoading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-md z-30">
                        <Loader2 className="w-10 h-10 text-cyan-400 animate-spin" />
@@ -588,7 +588,7 @@ function KinokadrContent() {
                  )}
                  
                  <div className="absolute top-5 left-5 z-20">
-                    <span className="px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-black uppercase tracking-widest flex items-center h-7 shadow-lg">
+                    <span className="px-3 py-1.5 rounded-xl bg-black/70 backdrop-blur-md border border-white/20 text-[10px] font-black uppercase tracking-widest flex items-center h-7 shadow-lg">
                       {movies[currentIndex].type === 'movie' ? 'Фильм' : 'Сериал'}
                     </span>
                  </div>
@@ -609,7 +609,7 @@ function KinokadrContent() {
                         <Search className="w-5 h-5 text-white/20 group-focus-within:text-cyan-400 transition-colors" />
                       </div>
                       <input 
-                        className="w-full h-16 pl-14 pr-6 bg-white/[0.03] border border-white/10 rounded-2xl focus:outline-none focus:border-cyan-500/50 focus:ring-4 focus:ring-cyan-500/10 text-lg font-bold transition-all placeholder:text-white/10"
+                        className="w-full h-16 pl-14 pr-6 bg-white/[0.08] border border-white/20 rounded-2xl focus:outline-none focus:border-cyan-500/60 focus:ring-4 focus:ring-cyan-500/20 text-lg font-bold transition-all placeholder:text-white/35"
                         placeholder="Название..."
                         value={guessInput}
                         onChange={(e) => setGuessInput(e.target.value)}
@@ -623,7 +623,7 @@ function KinokadrContent() {
                      {showSuggestions && suggestions.length > 0 && (
                        <motion.div 
                          initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-                         className="absolute bottom-full mb-3 left-0 right-0 bg-[#0c0c0e] border border-white/10 rounded-3xl overflow-hidden shadow-2xl z-50 p-1.5"
+                        className="absolute bottom-full mb-3 left-0 right-0 bg-[#14141c] border border-white/20 rounded-3xl overflow-hidden shadow-2xl z-50 p-1.5"
                        >
                          {suggestions.map((s, idx) => (
                            <button key={idx} onClick={() => selectSuggestion(s)} className="w-full text-left p-4 hover:bg-white/[0.05] flex flex-col transition-colors rounded-2xl group">
@@ -636,11 +636,11 @@ function KinokadrContent() {
                    </AnimatePresence>
 
                    <div className="grid grid-cols-4 gap-2">
-                      <button onClick={useHint} disabled={state.hintsUsed >= 3} className="h-16 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col items-center justify-center text-neutral-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-20 group">
+                      <button onClick={useHint} disabled={state.hintsUsed >= 3} className="h-16 rounded-2xl bg-white/[0.08] border border-white/20 flex flex-col items-center justify-center text-neutral-200 hover:text-white hover:bg-white/[0.12] transition-all disabled:opacity-20 group">
                          <Lightbulb className="w-5 h-5 group-hover:text-yellow-400 transition-colors" />
                          <span className="text-[8px] uppercase font-black tracking-widest mt-1">ОТКРЫТЬ</span>
                       </button>
-                      <button onClick={handleSkip} className="h-16 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col items-center justify-center text-neutral-400 hover:text-white hover:bg-white/5 transition-all group">
+                      <button onClick={handleSkip} className="h-16 rounded-2xl bg-white/[0.08] border border-white/20 flex flex-col items-center justify-center text-neutral-200 hover:text-white hover:bg-white/[0.12] transition-all group">
                          <SkipForward className="w-5 h-5 group-hover:text-cyan-400 transition-colors" />
                          <span className="text-[8px] uppercase font-black tracking-widest mt-1">СКИП</span>
                       </button>

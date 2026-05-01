@@ -36,6 +36,59 @@ function AnimatedBg() {
 
 const SCORE_FOR_HINTS = [5, 3, 2, 1];
 
+const FLAG_EMOJI_REGEX = /^(?:[\u{1F1E6}-\u{1F1FF}]{2}|\u{1F3F4}(?:[\u{E0061}-\u{E007A}]{2,7})\u{E007F})$/u;
+const FLAG_CODE_LETTER_REGEX = /^[A-Za-z]$/;
+const GRAPHEME_SEGMENTER =
+  typeof Intl !== 'undefined' && 'Segmenter' in Intl
+    ? new Intl.Segmenter('en', { granularity: 'grapheme' })
+    : null;
+
+function splitGraphemes(value: string): string[] {
+  if (!value) return [];
+  if (GRAPHEME_SEGMENTER) {
+    return Array.from(GRAPHEME_SEGMENTER.segment(value), (segment) => segment.segment);
+  }
+  return Array.from(value);
+}
+
+function toTwemojiSvgUrl(symbol: string): string {
+  const codepoints = Array.from(symbol)
+    .map((char) => char.codePointAt(0)!.toString(16))
+    .filter((codepoint) => codepoint !== 'fe0f')
+    .join('-');
+  return `https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/${codepoints}.svg`;
+}
+
+function countryCodeToFlagEmoji(code: string): string {
+  return String.fromCodePoint(
+    ...code
+      .toUpperCase()
+      .split('')
+      .map((char) => 127397 + char.charCodeAt(0)),
+  );
+}
+
+function normalizeEmojiTokens(value: string): string[] {
+  const rawTokens = splitGraphemes(value);
+  const normalized: string[] = [];
+
+  for (let i = 0; i < rawTokens.length; i += 1) {
+    const current = rawTokens[i];
+    if (!current || /^\s+$/.test(current)) continue;
+
+    const next = rawTokens[i + 1];
+    if (FLAG_CODE_LETTER_REGEX.test(current) && next && FLAG_CODE_LETTER_REGEX.test(next)) {
+      normalized.push(countryCodeToFlagEmoji(`${current}${next}`));
+      i += 1;
+      continue;
+    }
+
+    normalized.push(current);
+  }
+
+  return normalized;
+}
+
 function ProfileModal({ isOpen, onClose, user, stats, history }: { isOpen: boolean, onClose: () => void, user: any, stats: any, history: any[] }) {
   const [tab, setTab] = useState<'records' | 'history'>('records');
   if (!isOpen) return null;
@@ -271,6 +324,14 @@ function EmojinoContent() {
   const currentMovie = gameMovies[currentIndex];
   const hintPool = currentMovie?.hints ?? [];
   const maxHints = Math.min(3, hintPool.length);
+  const emojiTokens = normalizeEmojiTokens(currentMovie?.emoji ?? '');
+  const emojiCount = emojiTokens.length;
+  const emojiSizeClass =
+    emojiCount >= 8
+      ? 'text-4xl sm:text-5xl md:text-6xl'
+      : emojiCount >= 6
+        ? 'text-5xl sm:text-6xl md:text-[4rem]'
+        : 'text-5xl sm:text-6xl md:text-7xl';
 
   return (
     <div className="h-screen flex flex-col relative overflow-hidden bg-[#050505] text-white font-sans selection:bg-amber-500/30">
@@ -369,7 +430,7 @@ function EmojinoContent() {
               </div>
 
               {/* Right Column: Leaderboard */}
-              <div className="lg:col-span-7 bg-[#0c0c0e]/50 backdrop-blur-xl border border-white/[0.06] rounded-[3rem] p-8 flex flex-col h-[600px] shadow-2xl">
+              <div className="lg:col-span-7 bg-[#121219]/82 backdrop-blur-xl border border-white/[0.16] rounded-[3rem] p-8 flex flex-col h-[600px] shadow-2xl">
                  <div className="flex items-center justify-between mb-8 px-2">
                     <div className="flex items-center gap-4">
                        <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center text-yellow-500 shadow-inner">
@@ -377,9 +438,9 @@ function EmojinoContent() {
                        </div>
                        <h2 className="text-3xl font-black uppercase italic tracking-tighter">РЕЙТИНГ</h2>
                     </div>
-                    <div className="flex gap-1 bg-white/[0.03] p-1 rounded-2xl border border-white/[0.06]">
+                    <div className="flex gap-1 bg-white/[0.08] p-1 rounded-2xl border border-white/[0.18]">
                       {['all', 'film', 'serial'].map(m => (
-                          <button key={m} onClick={() => setLbMode(m)} className={`px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${lbMode === m ? 'bg-white/10 text-white shadow-lg' : 'text-neutral-500 hover:text-neutral-300'}`}>
+                          <button key={m} onClick={() => setLbMode(m)} className={`px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${lbMode === m ? 'bg-white/20 text-white shadow-lg' : 'text-neutral-400 hover:text-white'}`}>
                             {m === 'all' ? 'КОМБО' : m === 'film' ? 'ФИЛЬМЫ' : 'СЕРИАЛЫ'}
                           </button>
                       ))}
@@ -388,12 +449,12 @@ function EmojinoContent() {
 
                  <div className="flex-1 space-y-3 overflow-y-auto pr-3 custom-scrollbar">
                     {leaderboard.map((p, i) => (
-                        <div key={i} className="flex items-center gap-5 p-5 rounded-3xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.06] transition-all group">
-                          <div className={`w-10 text-2xl font-black italic ${i < 3 ? 'text-amber-400' : 'text-neutral-700'}`}>#{i+1}</div>
+                        <div key={i} className="flex items-center gap-5 p-5 rounded-3xl bg-white/[0.08] border border-white/[0.16] hover:bg-white/[0.12] transition-all group">
+                          <div className={`w-10 text-2xl font-black italic ${i < 3 ? 'text-amber-400' : 'text-neutral-400'}`}>#{i+1}</div>
                           <img src={p.avatar} className="w-14 h-14 rounded-2xl border border-white/10 group-hover:scale-110 transition-transform" alt="" />
                           <div className="flex-1 min-w-0">
                               <p className="text-lg font-black tracking-tight truncate italic leading-none">{p.username}</p>
-                              <p className="text-[10px] text-neutral-500 uppercase font-black leading-none mt-1">{p.mode.replace('emojino_', '')}</p>
+                              <p className="text-[10px] text-neutral-400 uppercase font-black leading-none mt-1">{p.mode.replace('emojino_', '')}</p>
                           </div>
                           <div className="text-4xl font-black italic text-amber-400">{p.score}</div>
                         </div>
@@ -407,9 +468,21 @@ function EmojinoContent() {
             <motion.div key="game" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-2xl flex flex-col gap-6">
               <div className="relative aspect-[21/9] rounded-[3rem] overflow-hidden border border-white/20 shadow-2xl bg-[#121219] flex items-center justify-center p-10">
                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/12 via-white/[0.04] to-purple-500/12 opacity-70" />
-                 <div className="relative z-10 text-5xl sm:text-6xl md:text-7xl flex items-center justify-center gap-4 flex-nowrap whitespace-nowrap overflow-hidden" style={{ fontFamily: '"Twemoji Mozilla", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif' }}>
-                    {Array.from(currentMovie.emoji).map((char, i) => (
-                      <motion.span key={i} initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}>{char}</motion.span>
+                 <div className={`relative z-10 ${emojiSizeClass} w-full px-6 sm:px-8 flex items-center justify-center gap-1.5 sm:gap-2.5 md:gap-3 flex-nowrap`} style={{ fontFamily: '"Twemoji Mozilla", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif' }}>
+                    {emojiTokens.map((token, i) => (
+                      <motion.span key={`${token}-${i}`} className="inline-flex items-center justify-center shrink-0 leading-none px-[0.08em]" initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}>
+                        {FLAG_EMOJI_REGEX.test(token) ? (
+                          <img
+                            src={toTwemojiSvgUrl(token)}
+                            alt={token}
+                            className="h-[0.95em] w-[1.28em] object-contain align-middle"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <span className="leading-none">{token}</span>
+                        )}
+                      </motion.span>
                     ))}
                  </div>
                  <div className="absolute top-6 left-6 z-20">
