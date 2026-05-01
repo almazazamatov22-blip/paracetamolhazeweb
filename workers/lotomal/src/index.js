@@ -76,7 +76,8 @@ export default {
       pathname === "/api/loto" ||
       pathname === "/api/stats" ||
       pathname.startsWith("/api/users/") ||
-      pathname.startsWith("/api/drawn")
+      pathname.startsWith("/api/drawn") ||
+      pathname.startsWith("/api/admin")
     ) {
       return getGameStub(env).fetch(request);
     }
@@ -334,6 +335,119 @@ export class LotomalGame extends DurableObject {
           .slice(0, 20)
           .map(u => ({ id: u.id, nickname: u.nickname, games_played: u.games_played, games_won: u.games_won, last_seen: u.last_seen })),
       });
+    }
+
+    if (url.pathname.startsWith("/api/admin")) {
+      // Basic password check via query param or header
+      const adminToken = url.searchParams.get("token") || request.headers.get("x-admin-token") || "";
+      const ADMIN_PASSWORD = "lotomal2025admin"; // change this!
+      if (adminToken !== ADMIN_PASSWORD) {
+        return json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const adminPath = url.pathname.replace("/api/admin", "") || "/";
+
+      // GET /api/admin/db — full state dump
+      if (adminPath === "/db" || adminPath === "/") {
+        const lobbies = Object.values(this.state.lobbies);
+        const users = Object.values(this.state.users);
+        return json({
+          users: users.map(u => ({
+            id: u.id,
+            nickname: u.nickname,
+            hasAvatar: !!(u.avatar && u.avatar !== "\u{1F464}" && u.avatar.length > 4),
+            avatarPreview: u.avatar && u.avatar.startsWith("data:") ? u.avatar.slice(0, 100) + "..." : (u.avatar || null),
+            games_played: u.games_played || 0,
+            games_won: u.games_won || 0,
+            last_seen: u.last_seen,
+            created_at: u.created_at,
+          })),
+          lobbies: lobbies.map(l => ({
+            id: l.id,
+            code: l.code,
+            name: l.name,
+            status: l.status,
+            players: Object.values(l.players || {}).map(p => ({
+              id: p.id,
+              nickname: p.nickname,
+              status: p.status,
+              is_admin: p.is_admin,
+              marked_cells: (p.marked_cells || []).length,
+              last_seen: p.last_seen,
+            })),
+            max_players: l.max_players,
+            drawn_numbers: l.drawn_numbers || [],
+            created_at: l.created_at,
+            started_at: l.started_at,
+          })),
+        });
+      }
+
+      // DELETE /api/admin/lobby/:id
+      if (adminPath.startsWith("/lobby/") && request.method === "DELETE") {
+        const lobbyId = adminPath.slice("/lobby/".length);
+        if (!this.state.lobbies[lobbyId]) return json({ error: "Lobby not found" }, { status: 404 });
+        // kick all players via WS
+        for (const ws of this.getSocketsForLobby(lobbyId, "")) {
+          try { ws.send(JSON.stringify({ type: "kicked", reason: "Лобби удалено администратором" })); } catch (_) {}
+          try { ws.close(); } catch (_) {}
+        }
+        delete this.state.lobbies[lobbyId];
+        this.ctx.storage.delete(`lobby:${lobbyId}`).catch(() => {});
+        await this.persist();
+        return json({ ok: true, deleted: lobbyId });
+      }
+
+      // DELETE /api/admin/user/:id
+      if (adminPath.startsWith("/user/") && request.method === "DELETE") {
+        const uid = adminPath.slice("/user/".length);
+        if (!this.state.users[uid]) return json({ error: "User not found" }, { status: 404 });
+        delete this.state.users[uid];
+        this.ctx.storage.delete(`user:${uid}`).catch(() => {});
+        await this.persist();
+        return json({ ok: true, deleted: uid });
+      }
+
+      // POST /api/admin/user/:id/reset-stats
+      if (adminPath.startsWith("/user/") && adminPath.endsWith("/reset-stats") && request.method === "POST") {
+        const uid = adminPath.slice("/user/".length).replace("/reset-stats", "");
+        const user = this.state.users[uid];
+        if (!user) return json({ error: "User not found" }, { status: 404 });
+        user.games_played = 0;
+        user.games_won = 0;
+        user.total_score = 0;
+        await this.persist();
+        return json({ ok: true, user: { id: user.id, nickname: user.nickname } });
+      }
+
+      // POST /api/admin/lobby/:id/kick/:userId
+      if (adminPath.includes("/kick/") && request.method === "POST") {
+        const [, lobbyId, , kickUid] = adminPath.match(/\/lobby\/([^/]+)\/kick\/(.+)/) ? adminPath.split("/").filter(Boolean) : [];
+        const lid = adminPath.match(/\/lobby\/([^/]+)\/kick\//);
+        if (lid) {
+          const realLobbyId = lid[1];
+          const kickUserId = adminPath.slice(adminPath.lastIndexOf("/kick/") + 6);
+          const lobby = this.state.lobbies[realLobbyId];
+          if (!lobby) return json({ error: "Lobby not found" }, { status: 404 });
+          delete lobby.players[kickUserId];
+          await this.persist();
+          this.broadcastState(realLobbyId, "");
+          return json({ ok: true });
+        }
+      }
+
+      // POST /api/admin/reset-all  — сброс всего состояния
+      if (adminPath === "/reset-all" && request.method === "POST") {
+        const all = await this.ctx.storage.list();
+        const keys = [...all.keys()];
+        for (let i = 0; i < keys.length; i += 100) {
+          await this.ctx.storage.delete(keys.slice(i, i + 100));
+        }
+        this.state = createDefaultState();
+        return json({ ok: true, message: "State cleared" });
+      }
+
+      return json({ error: "Unknown admin endpoint" }, { status: 404 });
     }
 
     if (url.pathname.startsWith("/api/drawn")) {
