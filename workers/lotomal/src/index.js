@@ -295,8 +295,44 @@ export class LotomalGame extends DurableObject {
 
     const url = new URL(request.url);
     if (url.pathname.startsWith("/api/users/")) {
-      const userId = decodeURIComponent(url.pathname.split("/")[3] || "");
-      return json(this.getUserStats(userId));
+      const parts = url.pathname.split("/").filter(Boolean); // ['api','users',':id'] or [..., 'stats']
+      const userId = decodeURIComponent(parts[2] || "");
+      const user = this.state.users[userId];
+      if (!user) return json({ error: "User not found" }, { status: 404 });
+      return json({
+        id: user.id,
+        nickname: user.nickname,
+        avatar: user.avatar || null,
+        games_played: user.games_played || 0,
+        games_won: user.games_won || 0,
+        total_score: user.total_score || 0,
+        created_at: user.created_at,
+      });
+    }
+
+    if (url.pathname === "/api/stats") {
+      const lobbies = Object.values(this.state.lobbies);
+      const users = Object.values(this.state.users);
+      return json({
+        total_users: users.length,
+        total_lobbies: lobbies.length,
+        lobbies_waiting: lobbies.filter(l => l.status === "waiting").length,
+        lobbies_playing: lobbies.filter(l => l.status === "playing").length,
+        lobbies_finished: lobbies.filter(l => l.status === "finished").length,
+        active_lobbies: lobbies.filter(l => l.status === "waiting" || l.status === "playing").map(l => ({
+          id: l.id,
+          code: l.code,
+          name: l.name,
+          status: l.status,
+          players: Object.keys(l.players || {}).length,
+          max_players: l.max_players,
+          created_at: l.created_at,
+        })),
+        recent_users: users
+          .sort((a, b) => (b.last_seen || 0) - (a.last_seen || 0))
+          .slice(0, 20)
+          .map(u => ({ id: u.id, nickname: u.nickname, games_played: u.games_played, games_won: u.games_won, last_seen: u.last_seen })),
+      });
     }
 
     if (url.pathname.startsWith("/api/drawn")) {

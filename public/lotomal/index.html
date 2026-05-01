@@ -1300,7 +1300,7 @@
       }
       // Авторизация
       setConnStatus('connecting', 'Подключение...');
-      sendAPI({ action: 'auth', userId, nickname: userProfile.nickname })
+      sendAPI({ action: 'auth', userId, nickname: userProfile.nickname, avatar: userProfile.avatar || '👤' })
         .then(msg => {
           handleWsMessage(msg);
           setConnStatus('connected', 'Онлайн');
@@ -1745,7 +1745,8 @@
       }
       // Подтягиваем свежую статистику с сервера
       try {
-        const res = await fetch(`/api/users/${userId}/stats`, { cache: 'no-store' });
+        const statsUrl = `${location.origin}/api/users/${userId}`;
+        const res = await fetch(statsUrl, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           if (data.nickname && /^Игрок\d*$/.test(userProfile.nickname || '')) {
