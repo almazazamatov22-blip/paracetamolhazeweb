@@ -516,7 +516,7 @@ function KinokadrContent() {
               </div>
 
               {/* Right Column: Embedded Leaderboard */}
-              <div className="lg:col-span-7 bg-[#0c0c0e]/50 backdrop-blur-xl border border-white/[0.06] rounded-[3rem] p-8 flex flex-col h-[600px] shadow-2xl">
+              <div className="lg:col-span-7 bg-[#171a22]/92 backdrop-blur-xl border border-white/[0.20] rounded-[3rem] p-8 flex flex-col h-[600px] shadow-2xl">
                  <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-4">
                        <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center text-yellow-500 shadow-inner">
@@ -525,9 +525,9 @@ function KinokadrContent() {
                        <h2 className="text-3xl font-black uppercase italic tracking-tighter">Рейтинг</h2>
                     </div>
 
-                    <div className="flex gap-1 bg-white/[0.08] p-1 rounded-2xl border border-white/[0.16]">
+                    <div className="flex gap-1 bg-white/[0.12] p-1 rounded-2xl border border-white/[0.24]">
                       {['combo', 'movie', 'series'].map(m => (
-                          <button key={m} onClick={() => setLbMode(m)} className={`px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${lbMode === m ? 'bg-white/16 text-white shadow-lg' : 'text-neutral-300 hover:text-white'}`}>
+                          <button key={m} onClick={() => setLbMode(m)} className={`px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${lbMode === m ? 'bg-white/30 text-white shadow-lg' : 'text-neutral-200 hover:text-white'}`}>
                             {m === 'combo' ? 'КОМБО' : m === 'movie' ? 'ФИЛЬМЫ' : 'СЕРИАЛЫ'}
                           </button>
                       ))}
@@ -536,15 +536,15 @@ function KinokadrContent() {
 
                  <div className="flex-1 space-y-3 overflow-y-auto pr-3 custom-scrollbar">
                     {leaderboard.length > 0 ? leaderboard.map((p, i) => (
-                        <div key={i} className="flex items-center gap-5 p-5 rounded-3xl bg-white/[0.08] border border-white/[0.16] hover:bg-white/[0.12] transition-all group">
-                          <div className={`w-10 text-2xl font-black italic ${i < 3 ? 'text-cyan-400' : 'text-neutral-300'}`}>#{i+1}</div>
+                        <div key={i} className="flex items-center gap-5 p-5 rounded-3xl bg-white/[0.12] border border-white/[0.22] hover:bg-white/[0.18] transition-all group">
+                          <div className={`w-10 text-2xl font-black italic ${i < 3 ? 'text-cyan-400' : 'text-neutral-200'}`}>#{i+1}</div>
                           <img src={p.avatar} className="w-14 h-14 rounded-2xl border border-white/10 shadow-lg group-hover:scale-110 transition-transform" alt="" />
                           <div className="flex-1 min-w-0">
                               <p className="text-lg font-black tracking-tight truncate">{p.username}</p>
-                              <p className="text-[10px] text-neutral-300 uppercase font-black leading-none mt-1">{p.mode === 'combo' ? 'Комбо' : p.mode === 'movie' ? 'Фильмы' : p.mode === 'series' ? 'Сериалы' : ''}</p>
+                              <p className="text-[10px] text-neutral-200 uppercase font-black leading-none mt-1">{p.mode === 'combo' ? 'Комбо' : p.mode === 'movie' ? 'Фильмы' : p.mode === 'series' ? 'Сериалы' : ''}</p>
                           </div>
                           <div className="text-right">
-                              <p className={`text-4xl font-black italic leading-none ${i < 3 ? 'text-cyan-400' : 'text-white/75'}`}>{p.score}</p>
+                              <p className={`text-4xl font-black italic leading-none ${i < 3 ? 'text-cyan-400' : 'text-white/90'}`}>{p.score}</p>
                           </div>
                         </div>
                     )) : (
