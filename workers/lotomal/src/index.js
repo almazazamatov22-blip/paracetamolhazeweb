@@ -118,7 +118,7 @@ function cleanNickname(value, fallbackId = "") {
 }
 
 function cleanAvatar(value) {
-  return asString(value).slice(0, 128 * 1024) || "\u{1F464}";
+  return asString(value).slice(0, 120 * 1024) || "\u{1F464}";
 }
 
 function shuffle(items) {
@@ -240,15 +240,42 @@ export class LotomalGame extends DurableObject {
   }
 
   async loadState() {
-    const stored = await this.ctx.storage.get(STATE_KEY);
-    this.state = stored && typeof stored === "object" ? stored : createDefaultState();
-    this.state.meta ||= { last_cleanup_at: 0 };
-    this.state.users ||= {};
-    this.state.lobbies ||= {};
+    const all = await this.ctx.storage.list();
+    this.state = createDefaultState();
+
+    const oldState = all.get(STATE_KEY);
+    if (oldState) {
+      this.state = oldState && typeof oldState === "object" ? oldState : createDefaultState();
+      this.state.meta ||= { last_cleanup_at: 0 };
+      this.state.users ||= {};
+      this.state.lobbies ||= {};
+      await this.persist();
+      await this.ctx.storage.delete(STATE_KEY);
+      return;
+    }
+
+    for (const [key, value] of all.entries()) {
+      if (key === "meta") this.state.meta = value;
+      else if (key.startsWith("user:")) this.state.users[key.slice(5)] = value;
+      else if (key.startsWith("lobby:")) this.state.lobbies[key.slice(6)] = value;
+    }
   }
 
   async persist() {
-    await this.ctx.storage.put(STATE_KEY, this.state);
+    this.state.meta.updated_at = getTimestamp();
+    const puts = { meta: this.state.meta };
+    for (const [id, user] of Object.entries(this.state.users)) {
+      puts[`user:${id}`] = user;
+    }
+    for (const [id, lobby] of Object.entries(this.state.lobbies)) {
+      puts[`lobby:${id}`] = lobby;
+    }
+
+    const chunks = Object.entries(puts);
+    for (let i = 0; i < chunks.length; i += 100) {
+      const chunk = Object.fromEntries(chunks.slice(i, i + 100));
+      await this.ctx.storage.put(chunk);
+    }
   }
 
   async fetch(request) {
@@ -407,6 +434,7 @@ export class LotomalGame extends DurableObject {
 
       if (Object.keys(lobby.players).length === 0) {
         delete this.state.lobbies[lobbyId];
+        this.ctx.storage.delete(`lobby:${lobbyId}`).catch(() => {});
         continue;
       }
 
@@ -414,6 +442,7 @@ export class LotomalGame extends DurableObject {
         const finishedAt = Number(lobby.finished_at || lobby.updated_at || lobby.started_at || lobby.created_at || 0);
         if (finishedAt && now - finishedAt > FINISHED_LOBBY_TTL_MS) {
           delete this.state.lobbies[lobbyId];
+          this.ctx.storage.delete(`lobby:${lobbyId}`).catch(() => {});
         }
       }
     }
@@ -493,7 +522,7 @@ export class LotomalGame extends DurableObject {
 
   listLobbies() {
     return Object.values(this.state.lobbies)
-      .filter((lobby) => ["waiting", "playing"].includes(lobby.status))
+      .filter((lobby) => ["waiting"].includes(lobby.status))
       .sort((a, b) => b.created_at - a.created_at)
       .slice(0, 50)
       .map((lobby) => ({
@@ -671,6 +700,7 @@ export class LotomalGame extends DurableObject {
           this.broadcastState(lobby.id, userId);
           if (Object.keys(lobby.players).length === 0 && lobby.status !== "playing") {
             delete this.state.lobbies[lobby.id];
+            this.ctx.storage.delete(`lobby:${lobby.id}`).catch(() => {});
           }
           await this.persist();
         }
