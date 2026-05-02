@@ -11,8 +11,7 @@ const DEFAULT_NICKS = [
   'evelone2004', 'kurokoken', 'egypop13', 'GolDi_21', 'STRYPOFF13', 'limonnub'
 ];
 
-const LOTTOMAL_URL = process.env.NEXT_PUBLIC_LOTOMAL_URL || 'https://lotomal.almazazamatov2.workers.dev/lotomal/'
-
+const LOTTOMAL_URL = process.env.NEXT_PUBLIC_LOTOMAL_URL || 'https://lotomal.paracetamolhaze.ru'
 const PROJECTS = [
   {
     title: 'РОЗ',
@@ -70,6 +69,18 @@ const PROJECTS = [
 export default function Home() {
   const containerRef = useRef<HTMLDivElement>(null)
   const ticking = useRef(false)
+  const [lotomalUrl, setLotomalUrl] = useState(LOTTOMAL_URL)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      if (hostname.endsWith('paracetamolhaze.online')) {
+        setLotomalUrl('https://lotomal.paracetamolhaze.online');
+      } else if (hostname.endsWith('paracetamolhaze.ru')) {
+        setLotomalUrl('https://lotomal.paracetamolhaze.ru');
+      }
+    }
+  }, []);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!ticking.current) {
@@ -154,18 +165,21 @@ export default function Home() {
         <div className="paracetamol-projects-section">
           <div className="paracetamol-projects-title">ОНЛАЙН ПРОЕКТЫ</div>
           <div className="paracetamol-projects-grid">
-            {PROJECTS.map((project) => (
-              <a
-                key={project.title}
-                href={project.disabled ? undefined : project.href}
-                className={`paracetamol-project-card ${project.disabled ? 'is-disabled' : ''}`}
-                onMouseMove={handleCardMouseMove}
-                onMouseLeave={handleCardMouseLeave}
-              >
-                <div className="paracetamol-project-title">{project.title}</div>
-                {project.desc && <div className="paracetamol-project-desc">{project.desc}</div>}
-              </a>
-            ))}
+            {PROJECTS.map((project) => {
+              const href = project.title === 'ЛОТОМАЛЬ' ? lotomalUrl : project.href;
+              return (
+                <a
+                  key={project.title}
+                  href={project.disabled ? undefined : href}
+                  className={`paracetamol-project-card ${project.disabled ? 'is-disabled' : ''}`}
+                  onMouseMove={handleCardMouseMove}
+                  onMouseLeave={handleCardMouseLeave}
+                >
+                  <div className="paracetamol-project-title">{project.title}</div>
+                  {project.desc && <div className="paracetamol-project-desc">{project.desc}</div>}
+                </a>
+              )
+            })}
           </div>
         </div>
 
