@@ -64,6 +64,12 @@ const PROJECTS = [
     desc: 'Угадай фильм по эмоджи',
     href: '/emojino',
   },
+  {
+    title: 'ПРАВДА ИЛИ ЛОЖЬ',
+    desc: 'Блефуй и угадывай факты',
+    href: '/trueorfalse',
+    disabled: true,
+  },
 ]
 
 export default function Home() {
