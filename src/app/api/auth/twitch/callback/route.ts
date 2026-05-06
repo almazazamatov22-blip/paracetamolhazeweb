@@ -3,6 +3,15 @@ import { getRequestBaseUrl } from '@/lib/auth-origin';
 
 function targetUrl(baseUrl: string, source: string | null, error?: string) {
   let path = '/overlays/dashboard';
+  if (source?.startsWith('bred:')) {
+    const code = source.slice('bred:'.length).trim().toUpperCase();
+    const params = new URLSearchParams();
+    if (code) params.set('code', code);
+    if (error) params.set('error', error);
+    const query = params.toString();
+    return `${baseUrl}/bred${query ? `?${query}` : ''}`;
+  }
+
   if (source === '67') path = '/67';
   if (source === 'kinokadr') path = '/kinokadr';
   if (source === 'emojino') path = '/emojino';

@@ -447,6 +447,10 @@ export default function BredClient() {
     }
   };
 
+  const handleInviteTwitchSignIn = () => {
+    signIn(inviteCode ? `${BRED_SOURCE}:${inviteCode}` : BRED_SOURCE);
+  };
+
   const handleAnonymousGame = async () => {
     if (inviteCode) {
       await handleJoinInvite();
@@ -693,8 +697,17 @@ export default function BredClient() {
                 aria-label="Никнейм для входа в лобби"
                 value={nickname}
                 onChange={(event) => setNickname(event.target.value)}
-                placeholder=""
+                placeholder="никнейм"
               />
+              <button
+                className="bred-primary-button"
+                type="button"
+                onClick={handleInviteTwitchSignIn}
+                disabled={authStatus === 'loading'}
+              >
+                <LogIn size={26} aria-hidden="true" />
+                {authStatus === 'loading' ? 'проверка' : 'Twitch'}
+              </button>
               <button
                 className="bred-primary-button"
                 type="button"
@@ -978,9 +991,6 @@ export default function BredClient() {
           <button className="bred-secondary-button" type="button" onClick={copyInvite}>
             <LinkIcon size={27} aria-hidden="true" />
             пригласить
-          </button>
-          <button className="bred-square-button" type="button">
-            <span aria-hidden="true">▦</span>
           </button>
           <button
             className="bred-primary-button"

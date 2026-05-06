@@ -12,15 +12,21 @@ function sourcePath(source: string) {
   return '/overlays/dashboard';
 }
 
+function normalizeSource(source: string) {
+  if (source.startsWith('bred:')) return 'bred';
+  return source;
+}
+
 export async function GET(request: NextRequest) {
   const clientId = process.env.TWITCH_CLIENT_ID;
   const source = request.nextUrl.searchParams.get('source') || '67';
+  const normalizedSource = normalizeSource(source);
   const origin = getRequestBaseUrl(request);
   const redirectUri = `${origin}/callback`;
   const scope = 'user:read:email chat:read chat:edit channel:read:redemptions';
   
   if (!clientId) {
-    return NextResponse.redirect(`${origin}${sourcePath(source)}?error=twitch_client_id_missing`);
+    return NextResponse.redirect(`${origin}${sourcePath(normalizedSource)}?error=twitch_client_id_missing`);
   }
 
   const twitchAuthUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${source}`;
