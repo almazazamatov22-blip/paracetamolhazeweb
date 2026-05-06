@@ -21,7 +21,13 @@ const TABLES = [
   { schema: 'public', table: 'tof_players', onConflict: 'id,lobby_id' },
   { schema: 'public', table: 'bred_lobbies', onConflict: 'id', optional: true },
   { schema: 'public', table: 'bred_players', onConflict: 'id,lobby_id', optional: true },
-  { schema: 'kinoquiz', table: 'questions', onConflict: 'id' },
+  {
+    schema: 'kinoquiz',
+    table: 'questions',
+    targetSchema: 'public',
+    targetTable: 'kinoquiz_questions',
+    onConflict: 'id',
+  },
 ];
 
 function loadEnvFile(file) {
@@ -111,22 +117,26 @@ async function upsertRows(config, rows) {
     return;
   }
 
-  const destinationExists = await tableExists(newClient, config);
+  const targetConfig = {
+    schema: config.targetSchema || config.schema,
+    table: config.targetTable || config.table,
+  };
+  const destinationExists = await tableExists(newClient, targetConfig);
   if (!destinationExists) {
-    throw new Error(`Target table ${config.schema}.${config.table} is missing. Run db/supabase_frankfurt_schema.sql in the new project first.`);
+    throw new Error(`Target table ${targetConfig.schema}.${targetConfig.table} is missing. Run db/supabase_frankfurt_schema.sql in the new project first.`);
   }
 
   const rewritten = rows.map(rewriteProjectUrls);
   for (let index = 0; index < rewritten.length; index += DATA_CHUNK_SIZE) {
     const chunk = rewritten.slice(index, index + DATA_CHUNK_SIZE);
-    const { error } = await db(newClient, config.schema)
-      .from(config.table)
+    const { error } = await db(newClient, targetConfig.schema)
+      .from(targetConfig.table)
       .upsert(chunk, { onConflict: config.onConflict });
 
-    if (error) throw new Error(`write ${config.schema}.${config.table}: ${error.message}`);
+    if (error) throw new Error(`write ${targetConfig.schema}.${targetConfig.table}: ${error.message}`);
   }
 
-  console.log(`${config.schema}.${config.table}: ${rewritten.length} rows`);
+  console.log(`${targetConfig.schema}.${targetConfig.table}: ${rewritten.length} rows`);
 }
 
 async function copyStorageObject(bucket, path) {

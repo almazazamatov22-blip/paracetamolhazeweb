@@ -216,8 +216,30 @@ create index if not exists kinoquiz_questions_media_type_idx on kinoquiz.questio
 create index if not exists kinoquiz_questions_difficulty_idx on kinoquiz.questions(difficulty);
 create index if not exists kinoquiz_questions_media_difficulty_idx on kinoquiz.questions(media_type, difficulty);
 
-create or replace view public.kinoquiz_questions as
-select * from kinoquiz.questions;
+drop view if exists public.kinoquiz_questions;
+
+create table if not exists public.kinoquiz_questions (
+  id bigint primary key,
+  tmdb_id bigint not null,
+  media_type text not null check (media_type in ('movie', 'series', 'anime')),
+  difficulty text not null check (difficulty in ('easy', 'medium', 'hard')),
+  title text not null,
+  title_ru text not null,
+  original_title text not null,
+  year integer,
+  image_url text not null,
+  backdrop_path text,
+  poster_path text,
+  popularity numeric,
+  vote_average numeric,
+  vote_count integer,
+  created_at timestamptz not null default now(),
+  unique (media_type, tmdb_id)
+);
+
+create index if not exists public_kinoquiz_questions_media_type_idx on public.kinoquiz_questions(media_type);
+create index if not exists public_kinoquiz_questions_difficulty_idx on public.kinoquiz_questions(difficulty);
+create index if not exists public_kinoquiz_questions_media_difficulty_idx on public.kinoquiz_questions(media_type, difficulty);
 
 insert into storage.buckets (id, name, public)
 values ('overlays', 'overlays', true)
@@ -237,6 +259,7 @@ alter table public.tof_lobbies disable row level security;
 alter table public.tof_players disable row level security;
 alter table public.bred_lobbies disable row level security;
 alter table public.bred_players disable row level security;
+alter table public.kinoquiz_questions disable row level security;
 alter table kinoquiz.questions disable row level security;
 
 grant usage on schema public to anon, authenticated, service_role;
