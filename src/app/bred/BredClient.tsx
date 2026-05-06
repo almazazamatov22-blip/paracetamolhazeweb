@@ -19,6 +19,7 @@ import {
   Shuffle,
   Sparkles,
   Timer,
+  UserRound,
   Users,
   Volume2,
 } from 'lucide-react';
@@ -158,6 +159,29 @@ function makeGuestId() {
   return `user_${Math.random().toString(36).slice(2, 11)}`;
 }
 
+function hashFactOrder(input: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function getFactDisplayOrder(lobby: Lobby, targetPlayerId: string) {
+  const seed = `${lobby.id}:${lobby.current_fact_idx}:${targetPlayerId}`;
+  return hashFactOrder(seed) % 2 === 0 ? [0, 1] : [1, 0];
+}
+
+function getDisplayFacts(lobby: Lobby, targetPlayer: Player) {
+  const facts = [targetPlayer.fact_a, targetPlayer.fact_b];
+  return getFactDisplayOrder(lobby, targetPlayer.id).map((factIndex, displayIndex) => ({
+    factIndex,
+    fact: facts[factIndex],
+    label: displayIndex === 0 ? 'A' : 'Б',
+  }));
+}
+
 function PlayerAvatar({ player, faded = false }: { player?: Player; faded?: boolean }) {
   if (player?.avatar_url) {
     return (
@@ -176,6 +200,18 @@ function PlayerAvatar({ player, faded = false }: { player?: Player; faded?: bool
       <span className="bred-bird-beak" />
       <span className="bred-bird-wing left" />
       <span className="bred-bird-wing right" />
+    </div>
+  );
+}
+
+function LeaderboardAvatar({ player }: { player: Player }) {
+  if (player.avatar_url) {
+    return <img src={player.avatar_url} alt="" className="bred-avatar-img bred-leader-avatar-img" />;
+  }
+
+  return (
+    <div className="bred-leader-fallback-avatar" aria-hidden="true">
+      <UserRound size={34} strokeWidth={3.2} />
     </div>
   );
 }
@@ -1010,6 +1046,7 @@ export default function BredClient() {
     if (!lobby || !targetPlayer) return null;
 
     const isOwnRound = targetPlayer.id === myPlayerId;
+    const displayFacts = getDisplayFacts(lobby, targetPlayer);
 
     return (
       <motion.section
@@ -1029,16 +1066,16 @@ export default function BredClient() {
         <p className="bred-phase-sub">{isOwnRound ? 'Это ваши факты.' : 'Где здесь правда?'}</p>
 
         <div className="bred-vote-grid">
-          {[targetPlayer.fact_a, targetPlayer.fact_b].map((fact, index) => (
+          {displayFacts.map((item) => (
             <button
-              key={index}
-              className={`bred-vote-card ${myVote === index ? 'is-picked' : ''}`}
+              key={item.factIndex}
+              className={`bred-vote-card ${myVote === item.factIndex ? 'is-picked' : ''}`}
               type="button"
-              onClick={() => handleVote(index)}
+              onClick={() => handleVote(item.factIndex)}
               disabled={isOwnRound || myVote !== null}
             >
-              <span>{index === 0 ? 'A' : 'Б'}</span>
-              <strong>{fact}</strong>
+              <span>{item.label}</span>
+              <strong>{item.fact}</strong>
             </button>
           ))}
         </div>
@@ -1048,7 +1085,9 @@ export default function BredClient() {
 
   const renderRevealPhase = () => {
     const targetPlayer = players.find((player) => player.id === lobby?.facts[lobby.current_fact_idx]);
-    if (!targetPlayer) return null;
+    if (!lobby || !targetPlayer) return null;
+
+    const displayFacts = getDisplayFacts(lobby, targetPlayer);
 
     return (
       <motion.section
@@ -1061,13 +1100,13 @@ export default function BredClient() {
         <h1>Раскрытие</h1>
         <p className="bred-phase-sub">{targetPlayer.name}</p>
         <div className="bred-vote-grid">
-          {[targetPlayer.fact_a, targetPlayer.fact_b].map((fact, index) => (
+          {displayFacts.map((item) => (
             <div
-              key={index}
-              className={`bred-reveal-card ${targetPlayer.truth_index === index ? 'is-truth' : 'is-lie'}`}
+              key={item.factIndex}
+              className={`bred-reveal-card ${targetPlayer.truth_index === item.factIndex ? 'is-truth' : 'is-lie'}`}
             >
-              <span>{targetPlayer.truth_index === index ? 'правда' : 'ложь'}</span>
-              <strong>{fact}</strong>
+              <span>{targetPlayer.truth_index === item.factIndex ? 'правда' : 'ложь'}</span>
+              <strong>{item.fact}</strong>
             </div>
           ))}
         </div>
@@ -1088,7 +1127,7 @@ export default function BredClient() {
         {sortedPlayers.map((player, index) => (
           <div key={player.id} className="bred-leader-row">
             <span>{index + 1}</span>
-            <PlayerAvatar player={player} />
+            <LeaderboardAvatar player={player} />
             <strong>{player.name}</strong>
             <em>{player.score}</em>
           </div>
