@@ -609,6 +609,7 @@ async function handleAction(
         .from('loto_lobbies')
         .select('id, code, name, max_players, status, password')
         .in('status', ['waiting', 'playing'])
+        .or('mode.is.null,mode.neq.bred')
         .limit(50);
       if (lobbiesErr) throw lobbiesErr;
       if (!lobbies?.length) return json([]);
@@ -704,6 +705,7 @@ async function handleAction(
         .from('loto_lobbies')
         .select('*')
         .eq('code', code)
+        .or('mode.is.null,mode.neq.bred')
         .maybeSingle();
       if (lobbyErr) throw lobbyErr;
 

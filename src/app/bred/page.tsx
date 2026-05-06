@@ -4,7 +4,7 @@ import BredClient from './BredClient';
 
 export const metadata = {
   title: 'Бредовуха — Paracetamol Haze',
-  description: 'Лобби с режимами для вечеринок, включая Правда или ложь.',
+  description: 'Лобби для режима Правда или ложь.',
 };
 
 export default function BredPage() {

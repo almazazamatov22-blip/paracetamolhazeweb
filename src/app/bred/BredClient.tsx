@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Check,
@@ -82,6 +83,48 @@ const modeCards = [
     icon: Sparkles,
     active: false,
   },
+  {
+    id: 'blitz',
+    title: 'Блиц',
+    subtitle: 'скоро',
+    icon: Timer,
+    active: false,
+  },
+  {
+    id: 'team',
+    title: 'Команды',
+    subtitle: 'скоро',
+    icon: Users,
+    active: false,
+  },
+  {
+    id: 'questions',
+    title: 'Вопросы',
+    subtitle: 'скоро',
+    icon: MessageCircleQuestion,
+    active: false,
+  },
+  {
+    id: 'random',
+    title: 'Рандом',
+    subtitle: 'скоро',
+    icon: Shuffle,
+    active: false,
+  },
+  {
+    id: 'finale',
+    title: 'Финал',
+    subtitle: 'скоро',
+    icon: Crown,
+    active: false,
+  },
+  {
+    id: 'custom',
+    title: 'Свое',
+    subtitle: 'скоро',
+    icon: Settings,
+    active: false,
+  },
 ];
 
 const howSlides = [
@@ -139,14 +182,18 @@ function PlayerAvatar({ player, faded = false }: { player?: Player; faded?: bool
 
 export default function BredClient() {
   const { data: session, status: authStatus } = useSession();
+  const searchParams = useSearchParams();
 
   const [lobby, setLobby] = useState<Lobby | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [isJoining, setIsJoining] = useState(false);
+  const [isInviteLoading, setIsInviteLoading] = useState(false);
   const [view, setView] = useState<'menu' | 'game'>('menu');
   const [authTab, setAuthTab] = useState<'anonymous' | 'auth'>('anonymous');
   const [nickname, setNickname] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteLobby, setInviteLobby] = useState<Lobby | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [howStep, setHowStep] = useState(0);
   const [copiedInvite, setCopiedInvite] = useState(false);
@@ -167,6 +214,7 @@ export default function BredClient() {
   const me = players.find((player) => player.id === myPlayerId);
   const isHost = Boolean(me?.is_host);
   const submittedCount = players.filter((player) => player.submitted_fact).length;
+  const requestedInviteCode = searchParams.get('code')?.trim().toUpperCase() || '';
 
   const inviteUrl = useMemo(() => {
     if (!lobby?.code || typeof window === 'undefined') return '';
@@ -192,6 +240,44 @@ export default function BredClient() {
     setPlayers((data.players || []) as Player[]);
     return data as Lobby;
   }, []);
+
+  useEffect(() => {
+    const code = requestedInviteCode;
+    setInviteCode(code);
+
+    if (!code) {
+      setInviteLobby(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsInviteLoading(true);
+    setError(null);
+
+    fetch(`/api/bred?code=${encodeURIComponent(code)}`)
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Лобби по ссылке не найдено');
+        return data as Lobby & { players?: Player[] };
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setInviteLobby(data);
+        setPlayers((data.players || []) as Player[]);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setInviteLobby(null);
+        setError('Лобби по ссылке не найдено');
+      })
+      .finally(() => {
+        if (!cancelled) setIsInviteLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [requestedInviteCode]);
 
   const createLobby = async ({
     hostId,
@@ -270,7 +356,57 @@ export default function BredClient() {
     }
   };
 
+  const handleJoinInvite = async () => {
+    const cleanName = nickname.trim() || session?.user?.name?.trim() || '';
+
+    if (!inviteLobby?.id) {
+      setError(isInviteLoading ? 'Проверяем ссылку' : 'Лобби по ссылке не найдено');
+      return;
+    }
+
+    if (!cleanName) {
+      setError('Введите никнейм');
+      return;
+    }
+
+    setIsJoining(true);
+    setError(null);
+
+    try {
+      const playerId = myPlayerId || (session?.user?.id ? `user_${session.user.id}` : makeGuestId());
+      const res = await fetch('/api/bred/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lobbyId: inviteLobby.id,
+          playerId,
+          name: cleanName,
+          twitchId: session?.user?.id,
+          avatarUrl: session?.user?.image,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Не удалось войти в лобби');
+
+      setMyPlayerId(playerId);
+      setLobby(data.lobby as Lobby);
+      setInviteLobby(data.lobby as Lobby);
+      setPlayers((data.players || data.lobby?.players || []) as Player[]);
+      setView('game');
+    } catch (err: any) {
+      setError(err.message || 'Не удалось войти в лобби');
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
   const handleAnonymousGame = async () => {
+    if (inviteCode) {
+      await handleJoinInvite();
+      return;
+    }
+
     const cleanName = nickname.trim();
 
     if (!cleanName) {
@@ -484,6 +620,144 @@ export default function BredClient() {
 
   const activeHowSlide = howSlides[howStep];
 
+  const renderAuthPanel = () => {
+    if (inviteCode) {
+      return (
+        <div className="bred-auth-panel bred-auth-panel-invite">
+          <div className="bred-tabs bred-single-tab">
+            <button type="button" className="is-active">
+              приглашение
+            </button>
+          </div>
+          <div className="bred-auth-body">
+            <div className="bred-auth-controls">
+              <h2>{isInviteLoading ? 'Ищем лобби' : 'Войти в лобби'}</h2>
+              <div className="bred-name-field">код {inviteCode}</div>
+              <input
+                className="bred-name-input"
+                aria-label="Никнейм для входа в лобби"
+                value={nickname}
+                onChange={(event) => setNickname(event.target.value)}
+                placeholder=""
+              />
+              <button
+                className="bred-primary-button"
+                type="button"
+                onClick={handleJoinInvite}
+                disabled={isJoining || isInviteLoading || !inviteLobby}
+              >
+                <LogIn size={26} aria-hidden="true" />
+                {isJoining ? 'вход' : 'войти'}
+              </button>
+              <button
+                className="bred-link-button"
+                type="button"
+                onClick={() => {
+                  window.history.replaceState(null, '', '/bred');
+                  setInviteCode('');
+                  setInviteLobby(null);
+                  setError(null);
+                }}
+              >
+                <ChevronLeft size={18} aria-hidden="true" />
+                назад
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bred-auth-panel">
+        <div className="bred-tabs">
+          <button
+            type="button"
+            className={authTab === 'anonymous' ? 'is-active' : 'is-muted'}
+            onClick={() => setAuthTab('anonymous')}
+          >
+            анонимно
+          </button>
+          <button
+            type="button"
+            className={authTab === 'auth' ? 'is-active' : 'is-muted'}
+            onClick={() => setAuthTab('auth')}
+          >
+            с аутентификацией
+          </button>
+        </div>
+        <div className="bred-auth-body">
+          <div className="bred-auth-controls">
+            {authTab === 'anonymous' ? (
+              <>
+                <h2>Выбери псевдоним</h2>
+                <input
+                  className="bred-name-input"
+                  aria-label="Никнейм для анонимной игры"
+                  value={nickname}
+                  onChange={(event) => setNickname(event.target.value)}
+                  placeholder=""
+                />
+                <button
+                  className="bred-primary-button"
+                  type="button"
+                  onClick={handleAnonymousGame}
+                  disabled={isJoining}
+                >
+                  <Play size={26} aria-hidden="true" />
+                  {isJoining ? 'создание' : 'начать'}
+                </button>
+              </>
+            ) : authStatus === 'authenticated' ? (
+              <>
+                <h2>Создать лобби</h2>
+                <div className="bred-name-field">
+                  {session?.user?.name || 'Twitch игрок'}
+                </div>
+                <button
+                  className="bred-primary-button"
+                  type="button"
+                  onClick={handleHostGame}
+                  disabled={isJoining}
+                >
+                  <Play size={26} aria-hidden="true" />
+                  {isJoining ? 'создание' : 'создать лобби'}
+                </button>
+                <button
+                  className="bred-link-button"
+                  type="button"
+                  onClick={() => signOut(BRED_SOURCE)}
+                >
+                  <LogOut size={18} aria-hidden="true" />
+                  выйти
+                </button>
+              </>
+            ) : (
+              <>
+                <h2>Авторизуйся</h2>
+                <div className="bred-auth-provider-row">
+                  <button
+                    className="bred-primary-button"
+                    type="button"
+                    onClick={() => signIn(BRED_SOURCE)}
+                    disabled={authStatus === 'loading'}
+                  >
+                    <LogIn size={26} aria-hidden="true" />
+                    {authStatus === 'loading' ? 'проверка' : 'Twitch'}
+                  </button>
+                  <a className="bred-primary-button" href={TELEGRAM_URL} target="_blank" rel="noreferrer">
+                    <Send size={26} aria-hidden="true" />
+                    Telegram
+                  </a>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderMenu = () => (
     <div className="bred-root">
       <div className="bred-bg" />
@@ -505,92 +779,7 @@ export default function BredClient() {
         </section>
 
         <section className="bred-menu-grid">
-          <div className="bred-auth-panel">
-            <div className="bred-tabs">
-              <button
-                type="button"
-                className={authTab === 'anonymous' ? 'is-active' : 'is-muted'}
-                onClick={() => setAuthTab('anonymous')}
-              >
-                анонимно
-              </button>
-              <button
-                type="button"
-                className={authTab === 'auth' ? 'is-active' : 'is-muted'}
-                onClick={() => setAuthTab('auth')}
-              >
-                с аутентификацией
-              </button>
-            </div>
-            <div className="bred-auth-body">
-              <div className="bred-auth-controls">
-                {authTab === 'anonymous' ? (
-                  <>
-                    <h2>Выбери псевдоним</h2>
-                    <input
-                      className="bred-name-input"
-                      aria-label="Никнейм для анонимной игры"
-                      value={nickname}
-                      onChange={(event) => setNickname(event.target.value)}
-                      placeholder=""
-                    />
-                    <button
-                      className="bred-primary-button"
-                      type="button"
-                      onClick={handleAnonymousGame}
-                      disabled={isJoining}
-                    >
-                      <Play size={26} aria-hidden="true" />
-                      {isJoining ? 'создание' : 'начать'}
-                    </button>
-                  </>
-                ) : authStatus === 'authenticated' ? (
-                  <>
-                    <h2>Выбери комнату</h2>
-                    <div className="bred-name-field">
-                      {session?.user?.name || 'Twitch игрок'}
-                    </div>
-                    <button
-                      className="bred-primary-button"
-                      type="button"
-                      onClick={handleHostGame}
-                      disabled={isJoining}
-                    >
-                      <Play size={26} aria-hidden="true" />
-                      {isJoining ? 'создание' : 'создать лобби'}
-                    </button>
-                    <button
-                      className="bred-link-button"
-                      type="button"
-                      onClick={() => signOut(BRED_SOURCE)}
-                    >
-                      <LogOut size={18} aria-hidden="true" />
-                      выйти
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <h2>Авторизуйся</h2>
-                    <div className="bred-auth-provider-row">
-                      <button
-                        className="bred-primary-button"
-                        type="button"
-                        onClick={() => signIn(BRED_SOURCE)}
-                        disabled={authStatus === 'loading'}
-                      >
-                        <LogIn size={26} aria-hidden="true" />
-                        {authStatus === 'loading' ? 'проверка' : 'Twitch'}
-                      </button>
-                      <a className="bred-primary-button" href={TELEGRAM_URL} target="_blank" rel="noreferrer">
-                        <Send size={26} aria-hidden="true" />
-                        Telegram
-                      </a>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
+          {renderAuthPanel()}
 
           <aside className="bred-how-panel">
             <h2>как играть</h2>
