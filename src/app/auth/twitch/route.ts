@@ -8,6 +8,7 @@ function sourcePath(source: string) {
   if (source === 'poker') return '/poker';
   if (source === 'kinoquiz') return '/kinoquiz';
   if (source === 'overlays') return '/overlays/dashboard';
+  if (source === 'trueorfalse') return '/trueorfalse';
   return '/overlays/dashboard';
 }
 
