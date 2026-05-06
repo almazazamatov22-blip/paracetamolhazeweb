@@ -31,6 +31,8 @@ export interface BredLobby {
   current_fact_idx: number;
   facts: string[];
   vote_results: BredVoteRound[];
+  phase_started_at?: string | null;
+  phase_deadline_at?: string | null;
   created_at: string;
   updated_at: string;
   players: BredPlayer[];
@@ -45,6 +47,8 @@ interface BredLobbyRow {
   current_fact_idx: number;
   facts?: unknown;
   vote_results?: unknown;
+  phase_started_at?: string | null;
+  phase_deadline_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -119,7 +123,9 @@ function isMissingTableError(error: { code?: string; message?: string } | null) 
     text.includes('pgrst205') ||
     text.includes('schema cache') ||
     text.includes('bred_lobbies') ||
-    text.includes('bred_players')
+    text.includes('bred_players') ||
+    text.includes('phase_started_at') ||
+    text.includes('phase_deadline_at')
   );
 }
 
@@ -183,6 +189,8 @@ function mapDedicatedLobby(row: BredLobbyRow, players: BredPlayer[]): BredLobby 
     current_fact_idx: row.current_fact_idx ?? 0,
     facts: asJsonArray<string>(row.facts),
     vote_results: asJsonArray<BredVoteRound>(row.vote_results),
+    phase_started_at: row.phase_started_at || null,
+    phase_deadline_at: row.phase_deadline_at || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     players,
@@ -242,6 +250,8 @@ function legacyLobbyEvent(lobby: Omit<BredLobby, 'players'>) {
     current_fact_idx: lobby.current_fact_idx,
     facts: lobby.facts,
     vote_results: lobby.vote_results,
+    phase_started_at: lobby.phase_started_at || null,
+    phase_deadline_at: lobby.phase_deadline_at || null,
     created_at: lobby.created_at,
     updated_at: lobby.updated_at,
   };
@@ -349,6 +359,8 @@ async function readLegacyLobby(row: LotoLobbyRow | null): Promise<BredLobby | nu
     current_fact_idx: Number(event.current_fact_idx || 0),
     facts: asJsonArray<string>(event.facts),
     vote_results: asJsonArray<BredVoteRound>(event.vote_results),
+    phase_started_at: event.phase_started_at ? String(event.phase_started_at) : null,
+    phase_deadline_at: event.phase_deadline_at ? String(event.phase_deadline_at) : null,
     created_at: String(event.created_at || row.last_activity || now),
     updated_at: String(event.updated_at || row.last_activity || now),
     players: ((playerRows || []) as LotoPlayerRow[]).map(mapLegacyPlayer),
@@ -374,6 +386,8 @@ async function saveDedicatedLobby(lobby: BredLobby, syncPlayers: boolean): Promi
     current_fact_idx: nextLobby.current_fact_idx,
     facts: nextLobby.facts,
     vote_results: nextLobby.vote_results,
+    phase_started_at: nextLobby.phase_started_at || null,
+    phase_deadline_at: nextLobby.phase_deadline_at || null,
     created_at: nextLobby.created_at,
     updated_at: nextLobby.updated_at,
   });
@@ -535,6 +549,8 @@ export async function createBredLobby({
         current_fact_idx: 0,
         facts: [],
         vote_results: [],
+        phase_started_at: null,
+        phase_deadline_at: null,
       })
       .select('*')
       .single();
@@ -552,6 +568,8 @@ export async function createBredLobby({
         current_fact_idx: 0,
         facts: [],
         vote_results: [],
+        phase_started_at: row.phase_started_at || null,
+        phase_deadline_at: row.phase_deadline_at || null,
         created_at: row.created_at || now,
         updated_at: row.updated_at || now,
         players: [{ ...hostPlayer, lobby_id: lobbyId }],
@@ -579,6 +597,8 @@ export async function createBredLobby({
         current_fact_idx: 0,
         facts: [],
         vote_results: [],
+        phase_started_at: null,
+        phase_deadline_at: null,
         created_at: now,
         updated_at: now,
       },
@@ -598,6 +618,8 @@ export async function createBredLobby({
     current_fact_idx: 0,
     facts: [],
     vote_results: [],
+    phase_started_at: null,
+    phase_deadline_at: null,
     created_at: now,
     updated_at: now,
     players: [{ ...hostPlayer, lobby_id: lobbyId }],

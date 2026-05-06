@@ -11,10 +11,15 @@ create table if not exists public.bred_lobbies (
   current_fact_idx integer not null default 0 check (current_fact_idx >= 0),
   facts jsonb not null default '[]'::jsonb,
   vote_results jsonb not null default '[]'::jsonb,
+  phase_started_at timestamptz,
+  phase_deadline_at timestamptz,
   settings jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.bred_lobbies add column if not exists phase_started_at timestamptz;
+alter table public.bred_lobbies add column if not exists phase_deadline_at timestamptz;
 
 create index if not exists bred_lobbies_code_idx on public.bred_lobbies (code);
 create index if not exists bred_lobbies_status_idx on public.bred_lobbies (status);
@@ -61,6 +66,8 @@ insert into public.bred_lobbies (
   current_fact_idx,
   facts,
   vote_results,
+  phase_started_at,
+  phase_deadline_at,
   settings,
   created_at,
   updated_at
@@ -96,6 +103,16 @@ select
       then coalesce(l.event->'vote_results', '[]'::jsonb)
     else '[]'::jsonb
   end,
+  case
+    when coalesce(l.event->>'phase_started_at', '') <> ''
+      then (l.event->>'phase_started_at')::timestamptz
+    else null
+  end,
+  case
+    when coalesce(l.event->>'phase_deadline_at', '') <> ''
+      then (l.event->>'phase_deadline_at')::timestamptz
+    else null
+  end,
   jsonb_build_object('legacy_loto_id', l.id::text, 'max_players', coalesce(l.max_players, 14)),
   coalesce(l.started_at, l.last_activity, now()),
   coalesce(l.last_activity, now())
@@ -109,6 +126,8 @@ on conflict (id) do update set
   current_fact_idx = excluded.current_fact_idx,
   facts = excluded.facts,
   vote_results = excluded.vote_results,
+  phase_started_at = excluded.phase_started_at,
+  phase_deadline_at = excluded.phase_deadline_at,
   settings = public.bred_lobbies.settings || excluded.settings,
   updated_at = excluded.updated_at;
 
@@ -161,11 +180,27 @@ on conflict (id, lobby_id) do update set
   fact_b = excluded.fact_b,
   truth_index = excluded.truth_index;
 
-alter table public.bred_lobbies disable row level security;
-alter table public.bred_players disable row level security;
+alter table public.bred_lobbies enable row level security;
+alter table public.bred_players enable row level security;
 
-grant select, insert, update, delete on public.bred_lobbies to anon, authenticated, service_role;
-grant select, insert, update, delete on public.bred_players to anon, authenticated, service_role;
+drop policy if exists "public read bred lobbies" on public.bred_lobbies;
+create policy "public read bred lobbies"
+on public.bred_lobbies
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "public read bred players" on public.bred_players;
+create policy "public read bred players"
+on public.bred_players
+for select
+to anon, authenticated
+using (true);
+
+grant select on public.bred_lobbies to anon, authenticated;
+grant select on public.bred_players to anon, authenticated;
+grant select, insert, update, delete on public.bred_lobbies to service_role;
+grant select, insert, update, delete on public.bred_players to service_role;
 
 do $$
 begin

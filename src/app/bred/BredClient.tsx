@@ -56,6 +56,8 @@ interface Lobby {
   current_fact_idx: number;
   facts: string[];
   vote_results?: VoteRound[];
+  phase_started_at?: string | null;
+  phase_deadline_at?: string | null;
 }
 
 const VOTE_TIME = 15;
@@ -181,6 +183,46 @@ function getDisplayFacts(lobby: Lobby, targetPlayer: Player) {
     fact: facts[factIndex],
     label: displayIndex === 0 ? 'A' : 'Б',
   }));
+}
+
+function createPhaseTiming(seconds: number) {
+  const startedAt = new Date();
+  return {
+    phase_started_at: startedAt.toISOString(),
+    phase_deadline_at: new Date(startedAt.getTime() + seconds * 1000).toISOString(),
+  };
+}
+
+function getRemainingSeconds(deadline?: string | null) {
+  if (!deadline) return 0;
+  const deadlineMs = new Date(deadline).getTime();
+  if (!Number.isFinite(deadlineMs)) return 0;
+  return Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
+}
+
+function getScoreDeltas(players: Player[], targetPlayer: Player, results?: VoteRound) {
+  const deltas: Record<string, number> = {};
+  let correctCount = 0;
+  const votes = results?.votes || {};
+
+  Object.entries(votes).forEach(([voterId, choice]) => {
+    if (choice === targetPlayer.truth_index) {
+      correctCount += 1;
+      deltas[voterId] = (deltas[voterId] || 0) + 100;
+    } else {
+      deltas[targetPlayer.id] = (deltas[targetPlayer.id] || 0) + 50;
+    }
+  });
+
+  if (Object.keys(votes).length > 0 && correctCount === 0) {
+    deltas[targetPlayer.id] = (deltas[targetPlayer.id] || 0) + 200;
+  }
+
+  players.forEach((player) => {
+    deltas[player.id] = deltas[player.id] || 0;
+  });
+
+  return deltas;
 }
 
 function PlayerAvatar({ player, faded = false }: { player?: Player; faded?: boolean }) {
@@ -365,6 +407,8 @@ export default function BredClient() {
       current_fact_idx: 0,
       facts: [],
       vote_results: [],
+      phase_started_at: null,
+      phase_deadline_at: null,
     });
     setMyPlayerId(hostId);
     setPlayers((data.players || data.lobby?.players || []) as Player[]);
@@ -587,7 +631,14 @@ export default function BredClient() {
     if (!isHost || !lobby || players.length < 2) return;
 
     setError(null);
-    await patchLobby({ status: 'input', facts: [], current_fact_idx: 0, vote_results: [] });
+    await patchLobby({
+      status: 'input',
+      facts: [],
+      current_fact_idx: 0,
+      vote_results: [],
+      phase_started_at: null,
+      phase_deadline_at: null,
+    });
   };
 
   const submitFacts = async () => {
@@ -632,6 +683,7 @@ export default function BredClient() {
       facts: playerSequence,
       current_fact_idx: 0,
       vote_results: [],
+      ...createPhaseTiming(roundSeconds),
     }).catch((err) => setError(err.message || 'Не удалось начать голосование'));
   }, [isHost, lobby?.id, lobby?.status, players]);
 
@@ -640,26 +692,36 @@ export default function BredClient() {
 
     if (lobby?.status !== 'voting') return;
 
-    setTimer(roundSeconds);
-    setMyVote(null);
-    timerIntervalRef.current = setInterval(() => {
-      setTimer((current) => {
-        if (current <= 1) {
-          if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-          if (isHost && lobby.id) {
-            patchLobby({ status: 'reveal' }).catch((err) => setError(err.message || 'Не удалось раскрыть раунд'));
-          }
-          return 0;
-        }
+    if (!lobby.phase_deadline_at && isHost) {
+      patchLobby(createPhaseTiming(roundSeconds))
+        .catch((err) => setError(err.message || 'Не удалось синхронизировать таймер'));
+    }
 
-        return current - 1;
-      });
+    setMyVote(null);
+    const updateTimer = () => {
+      const remaining = getRemainingSeconds(lobby.phase_deadline_at);
+      setTimer(lobby.phase_deadline_at ? remaining : roundSeconds);
+
+      if (remaining <= 0 && lobby.phase_deadline_at) {
+        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        if (isHost && lobby.id) {
+          patchLobby({
+            status: 'reveal',
+            ...createPhaseTiming(REVEAL_TIME),
+          }).catch((err) => setError(err.message || 'Не удалось раскрыть раунд'));
+        }
+      }
+    };
+
+    updateTimer();
+    timerIntervalRef.current = setInterval(() => {
+      updateTimer();
     }, 1000);
 
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [isHost, lobby?.id, lobby?.status, roundSeconds]);
+  }, [isHost, lobby?.id, lobby?.phase_deadline_at, lobby?.status, roundSeconds]);
 
   useEffect(() => {
     if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current);
@@ -680,23 +742,9 @@ export default function BredClient() {
         const results = currentLobby.vote_results?.[currentLobby.current_fact_idx];
         if (!targetPlayer || !results) return;
 
-        const updates: Record<string, number> = {};
-        let correctCount = 0;
+        const updates = getScoreDeltas(currentPlayers, targetPlayer, results);
 
-        Object.entries(results.votes || {}).forEach(([voterId, choice]) => {
-          if (choice === targetPlayer.truth_index) {
-            correctCount += 1;
-            updates[voterId] = (updates[voterId] || 0) + 100;
-          } else {
-            updates[targetPlayerId] = (updates[targetPlayerId] || 0) + 50;
-          }
-        });
-
-        if (Object.keys(results.votes || {}).length > 0 && correctCount === 0) {
-          updates[targetPlayerId] = (updates[targetPlayerId] || 0) + 200;
-        }
-
-        if (Object.keys(updates).length > 0) {
+        if (Object.values(updates).some((delta) => delta > 0)) {
           await patchLobby({
             players: currentPlayers.map((player) => ({
               ...player,
@@ -716,18 +764,22 @@ export default function BredClient() {
 
       const nextIdx = currentLobby.current_fact_idx + 1;
       if (nextIdx < currentLobby.facts.length) {
-        patchLobby({ status: 'voting', current_fact_idx: nextIdx })
+        patchLobby({
+          status: 'voting',
+          current_fact_idx: nextIdx,
+          ...createPhaseTiming(roundSeconds),
+        })
           .catch((err) => setError(err.message || 'Не удалось перейти к следующему раунду'));
       } else {
-        patchLobby({ status: 'leaderboard' })
+        patchLobby({ status: 'leaderboard', phase_started_at: null, phase_deadline_at: null })
           .catch((err) => setError(err.message || 'Не удалось открыть финал'));
       }
-    }, REVEAL_TIME * 1000);
+    }, lobby.phase_deadline_at ? Math.max(0, new Date(lobby.phase_deadline_at).getTime() - Date.now()) : REVEAL_TIME * 1000);
 
     return () => {
       if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current);
     };
-  }, [isHost, lobby?.id, lobby?.status, lobby?.current_fact_idx]);
+  }, [isHost, lobby?.id, lobby?.status, lobby?.current_fact_idx, lobby?.phase_deadline_at, roundSeconds]);
 
   const handleVote = async (index: number) => {
     if (!lobby || !myPlayerId || lobby.status !== 'voting' || myVote !== null) return;
@@ -791,7 +843,7 @@ export default function BredClient() {
                 {authStatus === 'loading' ? 'проверка' : 'войти через Twitch'}
               </button>
               <button
-                className="bred-link-button"
+                className="bred-link-button bred-back-link-button"
                 type="button"
                 onClick={() => {
                   window.history.replaceState(null, '', '/bred');
@@ -960,7 +1012,7 @@ export default function BredClient() {
       <div className="bred-bg bred-bg-lobby" />
       <main className="bred-frame bred-frame-lobby">
         <header className="bred-lobby-header">
-          <button className="bred-small-button" type="button" onClick={() => setView('menu')}>
+          <button className="bred-small-button bred-back-button" type="button" onClick={() => setView('menu')}>
             <ChevronLeft size={22} aria-hidden="true" />
             назад
           </button>
@@ -1171,6 +1223,13 @@ export default function BredClient() {
     if (!lobby || !targetPlayer) return null;
 
     const displayFacts = getDisplayFacts(lobby, targetPlayer);
+    const results = lobby.vote_results?.[lobby.current_fact_idx];
+    const scoreDeltas = getScoreDeltas(players, targetPlayer, results);
+    const getChoiceLabel = (choice?: number) => {
+      if (choice === undefined) return 'не выбрал';
+      return displayFacts.find((item) => item.factIndex === choice)?.label || 'не выбрал';
+    };
+    const voters = players.filter((player) => player.id !== targetPlayer.id);
 
     return (
       <motion.section
@@ -1192,6 +1251,27 @@ export default function BredClient() {
               <strong>{item.fact}</strong>
             </div>
           ))}
+        </div>
+        <div className="bred-reveal-results">
+          <h3>Кто что выбрал</h3>
+          <div className="bred-reveal-result-list">
+            {voters.map((player) => {
+              const choice = results?.votes?.[player.id];
+              const isCorrect = choice === targetPlayer.truth_index;
+              return (
+                <div key={player.id} className="bred-reveal-result-row">
+                  <span>{player.name}</span>
+                  <strong>{getChoiceLabel(choice)}</strong>
+                  <em>{choice === undefined ? '+0' : isCorrect ? '+100' : '+0'}</em>
+                </div>
+              );
+            })}
+            <div className="bred-reveal-result-row is-target">
+              <span>{targetPlayer.name}</span>
+              <strong>за блеф</strong>
+              <em>+{scoreDeltas[targetPlayer.id] || 0}</em>
+            </div>
+          </div>
         </div>
       </motion.section>
     );
@@ -1230,7 +1310,7 @@ export default function BredClient() {
       <div className="bred-bg bred-bg-lobby" />
       <main className="bred-frame bred-frame-phase">
         <header className="bred-lobby-header">
-          <button className="bred-small-button" type="button" onClick={() => window.location.reload()}>
+          <button className="bred-small-button bred-back-button" type="button" onClick={() => window.location.reload()}>
             <ChevronLeft size={22} aria-hidden="true" />
             меню
           </button>
