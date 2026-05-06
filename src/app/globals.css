@@ -1174,19 +1174,31 @@
   text-shadow: 0 3px 0 #2a1557;
 }
 
-.bred-tabs span {
+.bred-tabs button {
   height: 100%;
   display: grid;
   place-items: center;
+  border: 0;
   border-bottom: 3px solid rgba(60, 17, 95, 0.74);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  text-shadow: inherit;
+  cursor: pointer;
 }
 
 .bred-tabs .is-muted {
-  color: #48f3c4;
+  color: rgba(255, 255, 255, 0.84);
 }
 
 .bred-tabs .is-active {
+  color: #48f3c4;
   background: rgba(98, 18, 127, 0.48);
+  box-shadow: inset 0 -4px 0 rgba(72, 16, 104, 0.25);
+}
+
+.bred-tabs button + button {
   border-left: 3px solid rgba(60, 17, 95, 0.74);
 }
 
@@ -1241,6 +1253,7 @@
 }
 
 .bred-name-field,
+.bred-name-input,
 .bred-join-strip input,
 .bred-select-row,
 .bred-setting-row,
@@ -1266,6 +1279,21 @@
   white-space: nowrap;
 }
 
+.bred-name-input {
+  width: min(360px, 100%);
+  min-height: 62px;
+  padding: 0 18px;
+  font: inherit;
+  font-size: clamp(24px, 3vw, 35px);
+  font-weight: 900;
+  text-align: center;
+  outline: none;
+}
+
+.bred-name-input::placeholder {
+  color: rgba(255, 255, 255, 0.64);
+}
+
 .bred-primary-button,
 .bred-secondary-button {
   min-height: 62px;
@@ -1281,6 +1309,7 @@
   background: linear-gradient(#fffaff, #e7ddff);
   box-shadow: inset 0 -6px 0 #beb0ed, 0 6px 0 #4b2874;
   text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8);
+  text-decoration: none;
 }
 
 .bred-primary-button svg,
@@ -1312,6 +1341,18 @@
   background: transparent;
   color: rgba(255, 255, 255, 0.72);
   font-size: 16px;
+}
+
+.bred-auth-provider-row {
+  width: min(500px, 100%);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.bred-auth-provider-row .bred-primary-button {
+  width: 100%;
+  padding: 0 18px;
 }
 
 .bred-join-strip {
@@ -1385,19 +1426,48 @@
   text-shadow: 0 3px 0 #42105d;
 }
 
+.bred-how-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.bred-how-arrow {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border: 3px solid #5d3b8b;
+  border-radius: 8px;
+  color: #d3b6ff;
+  background: rgba(227, 210, 255, 0.28);
+  box-shadow: 0 4px 0 rgba(69, 30, 111, 0.64);
+  cursor: pointer;
+  transition: transform 0.14s ease, filter 0.14s ease;
+}
+
+.bred-how-arrow:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
+
 .bred-how-dots {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-top: 16px;
 }
 
-.bred-how-dots span {
+.bred-how-dots button {
   width: 14px;
   height: 14px;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
   background: #bda2e9;
   box-shadow: 0 3px 0 #5b327e;
+  cursor: pointer;
 }
 
 .bred-how-dots .is-active {
@@ -1999,6 +2069,7 @@
 
   .bred-auth-body,
   .bred-join-strip,
+  .bred-auth-provider-row,
   .bred-fact-grid,
   .bred-vote-grid {
     grid-template-columns: 1fr;

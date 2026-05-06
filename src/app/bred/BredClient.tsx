@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   Check,
   ChevronLeft,
+  ChevronRight,
   Copy,
   Crown,
   HelpCircle,
@@ -13,6 +14,7 @@ import {
   LogOut,
   MessageCircleQuestion,
   Play,
+  Send,
   Settings,
   Shuffle,
   Sparkles,
@@ -59,6 +61,7 @@ interface Lobby {
 const VOTE_TIME = 15;
 const REVEAL_TIME = 7;
 const BRED_SOURCE = 'bred';
+const TELEGRAM_URL = process.env.NEXT_PUBLIC_TELEGRAM_URL || 'https://t.me/paracetamolhaze';
 
 const modeCards = [
   {
@@ -81,6 +84,25 @@ const modeCards = [
     subtitle: 'скоро',
     icon: Sparkles,
     active: false,
+  },
+];
+
+const howSlides = [
+  {
+    title: '1. Соберите лобби',
+    text: 'Создайте комнату, отправьте друзьям ссылку и выберите режим.',
+  },
+  {
+    title: '2. Напишите факты',
+    text: 'Каждый игрок пишет одну правду и одну ложь о себе.',
+  },
+  {
+    title: '3. Голосуйте',
+    text: 'Читайте варианты других игроков и угадывайте, где правда.',
+  },
+  {
+    title: '4. Смотрите финал',
+    text: 'Получайте очки за верные ответы и удачный блеф.',
   },
 ];
 
@@ -127,9 +149,11 @@ export default function BredClient() {
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [isJoining, setIsJoining] = useState(false);
   const [view, setView] = useState<'menu' | 'game'>('menu');
+  const [authTab, setAuthTab] = useState<'anonymous' | 'auth'>('anonymous');
   const [joinCode, setJoinCode] = useState(searchParams.get('code')?.toUpperCase() || '');
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [howStep, setHowStep] = useState(0);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState(14);
   const [roundSeconds, setRoundSeconds] = useState(VOTE_TIME);
@@ -173,6 +197,41 @@ export default function BredClient() {
 
     if (data) setPlayers(data as Player[]);
   }, []);
+
+  const createLobby = async ({
+    hostId,
+    hostName,
+    twitchId,
+    avatarUrl,
+  }: {
+    hostId: string;
+    hostName: string;
+    twitchId?: string;
+    avatarUrl?: string;
+  }) => {
+    const res = await fetch('/api/bred', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hostId, hostName, twitchId, avatarUrl }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Не удалось создать лобби');
+
+    setLobby({
+      id: data.lobbyId,
+      code: data.code,
+      host_id: hostId,
+      host_name: hostName,
+      status: 'waiting',
+      current_fact_idx: 0,
+      facts: [],
+      vote_results: [],
+    });
+    setMyPlayerId(hostId);
+    await fetchPlayers(data.lobbyId);
+    setView('game');
+  };
 
   useEffect(() => {
     const code = searchParams.get('code');
@@ -230,33 +289,35 @@ export default function BredClient() {
 
     try {
       const hostId = `host_${session?.user?.id}`;
-      const res = await fetch('/api/bred', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          hostId,
-          hostName: session?.user?.name || 'Стример',
-          twitchId: session?.user?.id,
-          avatarUrl: session?.user?.image,
-        }),
+      await createLobby({
+        hostId,
+        hostName: session?.user?.name || 'Стример',
+        twitchId: session?.user?.id,
+        avatarUrl: session?.user?.image,
       });
+    } catch (err: any) {
+      setError(err.message || 'Не удалось создать лобби');
+    } finally {
+      setIsJoining(false);
+    }
+  };
 
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || 'Не удалось создать лобби');
+  const handleAnonymousGame = async () => {
+    const cleanName = nickname.trim();
 
-      setLobby({
-        id: data.lobbyId,
-        code: data.code,
-        host_id: hostId,
-        host_name: session?.user?.name || 'Стример',
-        status: 'waiting',
-        current_fact_idx: 0,
-        facts: [],
-        vote_results: [],
+    if (!cleanName) {
+      setError('Введите никнейм');
+      return;
+    }
+
+    setIsJoining(true);
+    setError(null);
+
+    try {
+      await createLobby({
+        hostId: makeGuestId(),
+        hostName: cleanName,
       });
-      setMyPlayerId(hostId);
-      await fetchPlayers(data.lobbyId);
-      setView('game');
     } catch (err: any) {
       setError(err.message || 'Не удалось создать лобби');
     } finally {
@@ -490,6 +551,12 @@ export default function BredClient() {
     await supabase.from('tof_lobbies').update({ vote_results: results }).eq('id', lobby.id);
   };
 
+  const moveHowSlide = (direction: 1 | -1) => {
+    setHowStep((current) => (current + direction + howSlides.length) % howSlides.length);
+  };
+
+  const activeHowSlide = howSlides[howStep];
+
   const renderMenu = () => (
     <div className="bred-root">
       <div className="bred-bg" />
@@ -514,8 +581,20 @@ export default function BredClient() {
         <section className="bred-menu-grid">
           <div className="bred-auth-panel">
             <div className="bred-tabs">
-              <span className="is-muted">анонимно</span>
-              <span className="is-active">с аутентификацией</span>
+              <button
+                type="button"
+                className={authTab === 'anonymous' ? 'is-active' : 'is-muted'}
+                onClick={() => setAuthTab('anonymous')}
+              >
+                анонимно
+              </button>
+              <button
+                type="button"
+                className={authTab === 'auth' ? 'is-active' : 'is-muted'}
+                onClick={() => setAuthTab('auth')}
+              >
+                с аутентификацией
+              </button>
             </div>
             <div className="bred-auth-body">
               <div className="bred-character-wrap">
@@ -538,9 +617,29 @@ export default function BredClient() {
               </div>
 
               <div className="bred-auth-controls">
-                <h2>{authStatus === 'authenticated' ? 'Выбери комнату' : 'Войди и создай лобби'}</h2>
-                {authStatus === 'authenticated' ? (
+                {authTab === 'anonymous' ? (
                   <>
+                    <h2>Выбери персонаж и псевдоним</h2>
+                    <input
+                      className="bred-name-input"
+                      aria-label="Никнейм для анонимной игры"
+                      value={nickname}
+                      onChange={(event) => setNickname(event.target.value)}
+                      placeholder="КлёвоеИмя7819"
+                    />
+                    <button
+                      className="bred-primary-button"
+                      type="button"
+                      onClick={handleAnonymousGame}
+                      disabled={isJoining}
+                    >
+                      <Play size={26} aria-hidden="true" />
+                      {isJoining ? 'создание' : 'начать'}
+                    </button>
+                  </>
+                ) : authStatus === 'authenticated' ? (
+                  <>
+                    <h2>Выбери комнату</h2>
                     <div className="bred-name-field">
                       {session?.user?.name || 'Twitch игрок'}
                     </div>
@@ -563,15 +662,24 @@ export default function BredClient() {
                     </button>
                   </>
                 ) : (
-                  <button
-                    className="bred-primary-button"
-                    type="button"
-                    onClick={() => signIn(BRED_SOURCE)}
-                    disabled={authStatus === 'loading'}
-                  >
-                    <LogIn size={26} aria-hidden="true" />
-                    {authStatus === 'loading' ? 'проверка' : 'войти через Twitch'}
-                  </button>
+                  <>
+                    <h2>Выбери персонаж и авторизуйся</h2>
+                    <div className="bred-auth-provider-row">
+                      <button
+                        className="bred-primary-button"
+                        type="button"
+                        onClick={() => signIn(BRED_SOURCE)}
+                        disabled={authStatus === 'loading'}
+                      >
+                        <LogIn size={26} aria-hidden="true" />
+                        {authStatus === 'loading' ? 'проверка' : 'Twitch'}
+                      </button>
+                      <a className="bred-primary-button" href={TELEGRAM_URL} target="_blank" rel="noreferrer">
+                        <Send size={26} aria-hidden="true" />
+                        Telegram
+                      </a>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -603,14 +711,27 @@ export default function BredClient() {
               <PlayerAvatar />
             </div>
             <div className="bred-how-copy">
-              <strong>1. Соберите лобби</strong>
-              <span>Хост входит через Twitch, приглашает друзей ссылкой и выбирает режим.</span>
+              <strong>{activeHowSlide.title}</strong>
+              <span>{activeHowSlide.text}</span>
             </div>
-            <div className="bred-how-dots" aria-hidden="true">
-              <span className="is-active" />
-              <span />
-              <span />
-              <span />
+            <div className="bred-how-controls">
+              <button type="button" className="bred-how-arrow" onClick={() => moveHowSlide(-1)} aria-label="Предыдущий шаг">
+                <ChevronLeft size={36} aria-hidden="true" />
+              </button>
+              <div className="bred-how-dots" aria-label="Шаги инструкции">
+                {howSlides.map((slide, index) => (
+                  <button
+                    key={slide.title}
+                    type="button"
+                    className={index === howStep ? 'is-active' : ''}
+                    onClick={() => setHowStep(index)}
+                    aria-label={`Показать шаг ${index + 1}`}
+                  />
+                ))}
+              </div>
+              <button type="button" className="bred-how-arrow" onClick={() => moveHowSlide(1)} aria-label="Следующий шаг">
+                <ChevronRight size={36} aria-hidden="true" />
+              </button>
             </div>
           </aside>
         </section>
