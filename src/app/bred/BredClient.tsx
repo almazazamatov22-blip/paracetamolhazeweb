@@ -247,6 +247,7 @@ export default function BredClient() {
   const scoredRoundRef = useRef<string | null>(null);
   const lobbyRef = useRef<Lobby | null>(null);
   const playersRef = useRef<Player[]>([]);
+  const autoInviteJoinRef = useRef<string | null>(null);
 
   const lobbyStatus = normalizeStatus(lobby?.status);
   const me = players.find((player) => player.id === myPlayerId);
@@ -368,13 +369,15 @@ export default function BredClient() {
 
   useEffect(() => {
     if (!lobby?.id || view !== 'game') return;
+    const intervalMs = lobbyStatus === 'lobby' ? 8000 : lobby?.status === 'input' ? 5000 : 3000;
 
     const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       syncLobby(lobby.id);
-    }, 2000);
+    }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [lobby?.id, syncLobby, view]);
+  }, [lobby?.id, lobby?.status, lobbyStatus, syncLobby, view]);
 
   const handleHostGame = async () => {
     if (authStatus === 'loading') return;
@@ -448,8 +451,24 @@ export default function BredClient() {
   };
 
   const handleInviteTwitchSignIn = () => {
+    if (authStatus === 'authenticated' && inviteLobby?.id) {
+      handleJoinInvite();
+      return;
+    }
+
     signIn(inviteCode ? `${BRED_SOURCE}:${inviteCode}` : BRED_SOURCE);
   };
+
+  useEffect(() => {
+    if (!inviteCode || !inviteLobby?.id || view !== 'menu') return;
+    if (authStatus !== 'authenticated' || isJoining) return;
+
+    const key = `${inviteLobby.id}:${session?.user?.id || session?.user?.name || ''}`;
+    if (autoInviteJoinRef.current === key) return;
+
+    autoInviteJoinRef.current = key;
+    handleJoinInvite();
+  }, [authStatus, inviteCode, inviteLobby?.id, isJoining, session?.user?.id, session?.user?.name, view]);
 
   const handleAnonymousGame = async () => {
     if (inviteCode) {
@@ -702,20 +721,20 @@ export default function BredClient() {
               <button
                 className="bred-primary-button"
                 type="button"
-                onClick={handleInviteTwitchSignIn}
-                disabled={authStatus === 'loading'}
-              >
-                <LogIn size={26} aria-hidden="true" />
-                {authStatus === 'loading' ? 'проверка' : 'Twitch'}
-              </button>
-              <button
-                className="bred-primary-button"
-                type="button"
                 onClick={handleJoinInvite}
                 disabled={isJoining || isInviteLoading || !inviteLobby}
               >
                 <LogIn size={26} aria-hidden="true" />
                 {isJoining ? 'вход' : 'войти'}
+              </button>
+              <button
+                className="bred-primary-button"
+                type="button"
+                onClick={handleInviteTwitchSignIn}
+                disabled={authStatus === 'loading'}
+              >
+                <LogIn size={26} aria-hidden="true" />
+                {authStatus === 'loading' ? 'проверка' : 'войти через Twitch'}
               </button>
               <button
                 className="bred-link-button"
