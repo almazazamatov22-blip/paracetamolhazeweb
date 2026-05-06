@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
 
-  // Check lobby exists and is in waiting state
+  // Check lobby exists and is joinable.
   const { data: lobby, error: lobbyErr } = await supabase
     .from('tof_lobbies')
     .select('status')
@@ -24,7 +24,9 @@ export async function POST(request: NextRequest) {
 
   if (lobbyErr) return NextResponse.json({ error: lobbyErr.message }, { status: 500 });
   if (!lobby) return NextResponse.json({ error: 'Lobby not found' }, { status: 404 });
-  if (lobby.status !== 'waiting') return NextResponse.json({ error: 'Game already started' }, { status: 409 });
+  if (lobby.status !== 'waiting' && lobby.status !== 'lobby') {
+    return NextResponse.json({ error: 'Game already started' }, { status: 409 });
+  }
 
   // Upsert player
   const { error } = await supabase.from('tof_players').upsert({

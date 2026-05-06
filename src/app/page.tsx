@@ -65,10 +65,9 @@ const PROJECTS = [
     href: '/emojino',
   },
   {
-    title: 'ПРАВДА ИЛИ ЛОЖЬ',
-    desc: 'Блефуй и угадывай факты',
-    href: '/trueorfalse',
-    disabled: true,
+    title: 'Бредовуха',
+    desc: 'Лобби с режимами для вечеринки',
+    href: '/bred',
   },
 ]
 

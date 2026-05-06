@@ -9,7 +9,7 @@ function targetUrl(baseUrl: string, source: string | null, error?: string) {
   if (source === 'poker') path = '/poker';
   if (source === 'kinoquiz') path = '/kinoquiz';
   if (source === 'overlays') path = '/overlays/dashboard';
-  if (source === 'trueorfalse') path = '/trueorfalse';
+  if (source === 'bred' || source === 'trueorfalse' || source === 'trueorfasle') path = '/bred';
 
   return error ? `${baseUrl}${path}?error=${error}` : `${baseUrl}${path}`;
 }

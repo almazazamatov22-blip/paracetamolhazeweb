@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-export default async function TrueOrFalseRedirect({
+export default async function TrueOrFasleRedirect({
   searchParams,
 }: {
   searchParams: Promise<{ code?: string }>;
