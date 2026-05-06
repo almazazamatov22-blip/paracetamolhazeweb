@@ -68,6 +68,7 @@ const PROJECTS = [
     title: 'Бредовуха',
     desc: 'Лобби с режимами для вечеринки',
     href: '/bred',
+    disabled: true,
   },
 ]
 
