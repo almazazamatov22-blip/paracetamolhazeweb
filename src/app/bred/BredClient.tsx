@@ -209,12 +209,22 @@ export default function BredClient() {
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const revealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scoredRoundRef = useRef<string | null>(null);
+  const lobbyRef = useRef<Lobby | null>(null);
+  const playersRef = useRef<Player[]>([]);
 
   const lobbyStatus = normalizeStatus(lobby?.status);
   const me = players.find((player) => player.id === myPlayerId);
   const isHost = Boolean(me?.is_host);
   const submittedCount = players.filter((player) => player.submitted_fact).length;
   const requestedInviteCode = searchParams.get('code')?.trim().toUpperCase() || '';
+
+  useEffect(() => {
+    lobbyRef.current = lobby;
+  }, [lobby]);
+
+  useEffect(() => {
+    playersRef.current = players;
+  }, [players]);
 
   const inviteUrl = useMemo(() => {
     if (!lobby?.code || typeof window === 'undefined') return '';
@@ -547,9 +557,14 @@ export default function BredClient() {
       scoredRoundRef.current = roundKey;
 
       const scoreRound = async () => {
-        const targetPlayerId = lobby.facts[lobby.current_fact_idx];
-        const targetPlayer = players.find((player) => player.id === targetPlayerId);
-        const results = lobby.vote_results?.[lobby.current_fact_idx];
+        const currentLobby = lobbyRef.current;
+        const currentPlayers = playersRef.current;
+        if (!currentLobby || currentLobby.status !== 'reveal') return;
+        if (currentLobby.current_fact_idx !== lobby.current_fact_idx) return;
+
+        const targetPlayerId = currentLobby.facts[currentLobby.current_fact_idx];
+        const targetPlayer = currentPlayers.find((player) => player.id === targetPlayerId);
+        const results = currentLobby.vote_results?.[currentLobby.current_fact_idx];
         if (!targetPlayer || !results) return;
 
         const updates: Record<string, number> = {};
@@ -570,7 +585,7 @@ export default function BredClient() {
 
         if (Object.keys(updates).length > 0) {
           await patchLobby({
-            players: players.map((player) => ({
+            players: currentPlayers.map((player) => ({
               ...player,
               score: player.score + (updates[player.id] || 0),
             })),
@@ -582,8 +597,12 @@ export default function BredClient() {
     }
 
     revealTimeoutRef.current = setTimeout(() => {
-      const nextIdx = lobby.current_fact_idx + 1;
-      if (nextIdx < lobby.facts.length) {
+      const currentLobby = lobbyRef.current;
+      if (!currentLobby || currentLobby.status !== 'reveal') return;
+      if (currentLobby.current_fact_idx !== lobby.current_fact_idx) return;
+
+      const nextIdx = currentLobby.current_fact_idx + 1;
+      if (nextIdx < currentLobby.facts.length) {
         patchLobby({ status: 'voting', current_fact_idx: nextIdx })
           .catch((err) => setError(err.message || 'Не удалось перейти к следующему раунду'));
       } else {
@@ -595,7 +614,7 @@ export default function BredClient() {
     return () => {
       if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current);
     };
-  }, [isHost, lobby, players]);
+  }, [isHost, lobby?.id, lobby?.status, lobby?.current_fact_idx]);
 
   const handleVote = async (index: number) => {
     if (!lobby || !myPlayerId || lobby.status !== 'voting' || myVote !== null) return;
@@ -962,7 +981,7 @@ export default function BredClient() {
           {[0, 1].map((index) => (
             <div key={index} className={`bred-fact-card ${truthIndex === index ? 'is-truth' : 'is-lie'}`}>
               <button type="button" onClick={() => setTruthIndex(index)}>
-                {truthIndex === index ? 'правда' : 'сделать правдой'}
+                {truthIndex === index ? 'правда' : 'ложь'}
               </button>
               <textarea
                 value={index === 0 ? factA : factB}

@@ -2059,13 +2059,17 @@
 
 .bred-vote-card span,
 .bred-reveal-card span {
-  width: 45px;
-  height: 45px;
+  width: 64px;
+  height: 64px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   color: #fff;
   background: #6b3cb7;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
   text-transform: uppercase;
 }
 
