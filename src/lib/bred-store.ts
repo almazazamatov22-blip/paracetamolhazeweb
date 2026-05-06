@@ -36,6 +36,19 @@ export interface BredLobby {
   players: BredPlayer[];
 }
 
+interface BredLobbyRow {
+  id: string;
+  code: string;
+  host_id: string;
+  host_name: string;
+  status: BredPhase;
+  current_fact_idx: number;
+  facts?: unknown;
+  vote_results?: unknown;
+  created_at: string;
+  updated_at: string;
+}
+
 interface LotoLobbyRow {
   id: string;
   code: string;
@@ -55,10 +68,7 @@ interface LotoPlayerRow {
   lobby_id: string;
   nickname?: string | null;
   avatar?: string | null;
-  games_played?: number | null;
-  games_won?: number | null;
   card?: Record<string, unknown> | null;
-  marked_cells?: unknown;
   status?: string | null;
   joined_at?: string | null;
   is_admin?: boolean | null;
@@ -68,6 +78,10 @@ const BRED_MODE = 'bred';
 const DEFAULT_MAX_PLAYERS = 14;
 
 let supabaseClient: SupabaseClient | null | undefined;
+let hasDedicatedBredTables: boolean | null = null;
+let lastDedicatedTableCheckAt = 0;
+
+const DEDICATED_TABLE_RETRY_MS = 60_000;
 
 function getSupabase() {
   if (supabaseClient !== undefined) return supabaseClient;
@@ -94,10 +108,33 @@ function getSupabase() {
 
 function requireSupabase() {
   const supabase = getSupabase();
-  if (!supabase) {
-    throw new Error('Supabase is not configured for /bred');
-  }
+  if (!supabase) throw new Error('Supabase is not configured for /bred');
   return supabase;
+}
+
+function isMissingTableError(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+  const text = `${error.code || ''} ${error.message || ''}`.toLowerCase();
+  return (
+    text.includes('pgrst205') ||
+    text.includes('schema cache') ||
+    text.includes('bred_lobbies') ||
+    text.includes('bred_players')
+  );
+}
+
+function canTryDedicatedTables() {
+  return hasDedicatedBredTables !== false || Date.now() - lastDedicatedTableCheckAt > DEDICATED_TABLE_RETRY_MS;
+}
+
+function markDedicatedTablesMissing() {
+  hasDedicatedBredTables = false;
+  lastDedicatedTableCheckAt = Date.now();
+}
+
+function markDedicatedTablesAvailable() {
+  hasDedicatedBredTables = true;
+  lastDedicatedTableCheckAt = Date.now();
 }
 
 function assertSupabase(error: { message?: string } | null) {
@@ -136,21 +173,23 @@ function toLotoStatus(status: BredPhase) {
   return 'playing';
 }
 
-function buildLobbyEvent(lobby: Omit<BredLobby, 'players'>) {
+function mapDedicatedLobby(row: BredLobbyRow, players: BredPlayer[]): BredLobby {
   return {
-    type: 'bred_state',
-    mode: BRED_MODE,
-    host_name: lobby.host_name,
-    status: lobby.status,
-    current_fact_idx: lobby.current_fact_idx,
-    facts: lobby.facts,
-    vote_results: lobby.vote_results,
-    created_at: lobby.created_at,
-    updated_at: lobby.updated_at,
+    id: row.id,
+    code: row.code.toUpperCase(),
+    host_id: row.host_id,
+    host_name: row.host_name,
+    status: row.status,
+    current_fact_idx: row.current_fact_idx ?? 0,
+    facts: asJsonArray<string>(row.facts),
+    vote_results: asJsonArray<BredVoteRound>(row.vote_results),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    players,
   };
 }
 
-function mapPlayer(row: LotoPlayerRow): BredPlayer {
+function mapLegacyPlayer(row: LotoPlayerRow): BredPlayer {
   const card = asObject(row.card);
   const avatar = String(row.avatar || '');
 
@@ -161,11 +200,7 @@ function mapPlayer(row: LotoPlayerRow): BredPlayer {
     score: Number(card.score || 0),
     is_host: Boolean(row.is_admin),
     twitch_id: card.twitch_id ? String(card.twitch_id) : null,
-    avatar_url: card.avatar_url
-      ? String(card.avatar_url)
-      : avatar.startsWith('http')
-        ? avatar
-        : null,
+    avatar_url: card.avatar_url ? String(card.avatar_url) : avatar.startsWith('http') ? avatar : null,
     submitted_fact: Boolean(card.submitted_fact),
     fact_a: card.fact_a ? String(card.fact_a) : null,
     fact_b: card.fact_b ? String(card.fact_b) : null,
@@ -174,7 +209,7 @@ function mapPlayer(row: LotoPlayerRow): BredPlayer {
   };
 }
 
-function playerToLoto(player: BredPlayer, lobbyId: string) {
+function legacyPlayerToLoto(player: BredPlayer, lobbyId: string) {
   return {
     id: player.id,
     lobby_id: lobbyId,
@@ -198,11 +233,103 @@ function playerToLoto(player: BredPlayer, lobbyId: string) {
   };
 }
 
-async function loadLobbyWithPlayers(row: LotoLobbyRow | null): Promise<BredLobby | null> {
+function legacyLobbyEvent(lobby: Omit<BredLobby, 'players'>) {
+  return {
+    type: 'bred_state',
+    mode: BRED_MODE,
+    host_name: lobby.host_name,
+    status: lobby.status,
+    current_fact_idx: lobby.current_fact_idx,
+    facts: lobby.facts,
+    vote_results: lobby.vote_results,
+    created_at: lobby.created_at,
+    updated_at: lobby.updated_at,
+  };
+}
+
+async function readDedicatedLobby(row: BredLobbyRow | null): Promise<BredLobby | null> {
   if (!row) return null;
 
-  const supabase = requireSupabase();
-  const { data: playerRows, error } = await supabase
+  const { data: players, error } = await requireSupabase()
+    .from('bred_players')
+    .select('*')
+    .eq('lobby_id', row.id)
+    .order('joined_at', { ascending: true });
+
+  if (isMissingTableError(error)) {
+    markDedicatedTablesMissing();
+    return null;
+  }
+  assertSupabase(error);
+  markDedicatedTablesAvailable();
+
+  return mapDedicatedLobby(row, (players || []) as BredPlayer[]);
+}
+
+async function getDedicatedLobbyById(id: string): Promise<BredLobby | null> {
+  if (!canTryDedicatedTables()) return null;
+
+  const { data, error } = await requireSupabase()
+    .from('bred_lobbies')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (isMissingTableError(error)) {
+    markDedicatedTablesMissing();
+    return null;
+  }
+  assertSupabase(error);
+  markDedicatedTablesAvailable();
+  return readDedicatedLobby(data as BredLobbyRow | null);
+}
+
+async function getDedicatedLobbyByCode(code: string): Promise<BredLobby | null> {
+  if (!canTryDedicatedTables()) return null;
+
+  const { data, error } = await requireSupabase()
+    .from('bred_lobbies')
+    .select('*')
+    .eq('code', code.toUpperCase())
+    .maybeSingle();
+
+  if (isMissingTableError(error)) {
+    markDedicatedTablesMissing();
+    return null;
+  }
+  assertSupabase(error);
+  markDedicatedTablesAvailable();
+  return readDedicatedLobby(data as BredLobbyRow | null);
+}
+
+async function getLegacyLobbyById(id: string): Promise<BredLobby | null> {
+  const { data, error } = await requireSupabase()
+    .from('loto_lobbies')
+    .select('*')
+    .eq('id', id)
+    .eq('mode', BRED_MODE)
+    .maybeSingle();
+
+  assertSupabase(error);
+  return readLegacyLobby(data as LotoLobbyRow | null);
+}
+
+async function getLegacyLobbyByCode(code: string): Promise<BredLobby | null> {
+  const { data, error } = await requireSupabase()
+    .from('loto_lobbies')
+    .select('*')
+    .eq('code', code.toUpperCase())
+    .eq('mode', BRED_MODE)
+    .maybeSingle();
+
+  assertSupabase(error);
+  return readLegacyLobby(data as LotoLobbyRow | null);
+}
+
+async function readLegacyLobby(row: LotoLobbyRow | null): Promise<BredLobby | null> {
+  if (!row) return null;
+
+  const { data: playerRows, error } = await requireSupabase()
     .from('loto_players')
     .select('*')
     .eq('lobby_id', row.id)
@@ -224,62 +351,74 @@ async function loadLobbyWithPlayers(row: LotoLobbyRow | null): Promise<BredLobby
     vote_results: asJsonArray<BredVoteRound>(event.vote_results),
     created_at: String(event.created_at || row.last_activity || now),
     updated_at: String(event.updated_at || row.last_activity || now),
-    players: ((playerRows || []) as LotoPlayerRow[]).map(mapPlayer),
+    players: ((playerRows || []) as LotoPlayerRow[]).map(mapLegacyPlayer),
   };
 }
 
-export function genBredCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-}
+async function saveDedicatedLobby(lobby: BredLobby, syncPlayers: boolean): Promise<BredLobby | null> {
+  if (!canTryDedicatedTables()) return null;
 
-async function isLobbyCodeTaken(code: string) {
-  const { data, error } = await requireSupabase()
-    .from('loto_lobbies')
-    .select('id')
-    .eq('code', code.toUpperCase())
-    .maybeSingle();
-
-  assertSupabase(error);
-  return Boolean(data);
-}
-
-export async function getBredLobbyById(id: string): Promise<BredLobby | null> {
-  const supabase = requireSupabase();
-  const { data, error } = await supabase
-    .from('loto_lobbies')
-    .select('*')
-    .eq('id', id)
-    .eq('mode', BRED_MODE)
-    .maybeSingle();
-
-  assertSupabase(error);
-  return loadLobbyWithPlayers(data as LotoLobbyRow | null);
-}
-
-export async function getBredLobbyByCode(code: string): Promise<BredLobby | null> {
-  const supabase = requireSupabase();
-  const { data, error } = await supabase
-    .from('loto_lobbies')
-    .select('*')
-    .eq('code', code.toUpperCase())
-    .eq('mode', BRED_MODE)
-    .maybeSingle();
-
-  assertSupabase(error);
-  return loadLobbyWithPlayers(data as LotoLobbyRow | null);
-}
-
-export async function saveBredLobby(lobby: BredLobby): Promise<BredLobby> {
-  const supabase = requireSupabase();
   const now = new Date().toISOString();
-  const nextLobby: BredLobby = {
+  const nextLobby = {
     ...lobby,
     code: lobby.code.toUpperCase(),
     updated_at: now,
   };
 
-  const { error: lobbyError } = await supabase
+  const { error: lobbyError } = await requireSupabase().from('bred_lobbies').upsert({
+    id: nextLobby.id,
+    code: nextLobby.code,
+    host_id: nextLobby.host_id,
+    host_name: nextLobby.host_name,
+    status: nextLobby.status,
+    current_fact_idx: nextLobby.current_fact_idx,
+    facts: nextLobby.facts,
+    vote_results: nextLobby.vote_results,
+    created_at: nextLobby.created_at,
+    updated_at: nextLobby.updated_at,
+  });
+
+  if (isMissingTableError(lobbyError)) {
+    markDedicatedTablesMissing();
+    return null;
+  }
+  assertSupabase(lobbyError);
+  markDedicatedTablesAvailable();
+
+  if (syncPlayers && nextLobby.players.length > 0) {
+    const { error: playersError } = await requireSupabase().from('bred_players').upsert(
+      nextLobby.players.map((player) => ({
+        id: player.id,
+        lobby_id: nextLobby.id,
+        name: player.name,
+        score: player.score || 0,
+        is_host: player.is_host,
+        twitch_id: player.twitch_id || null,
+        avatar_url: player.avatar_url || null,
+        submitted_fact: Boolean(player.submitted_fact),
+        fact_a: player.fact_a || null,
+        fact_b: player.fact_b || null,
+        truth_index: player.truth_index ?? null,
+        joined_at: player.joined_at,
+      })),
+      { onConflict: 'id,lobby_id' }
+    );
+
+    assertSupabase(playersError);
+  }
+
+  return (await getDedicatedLobbyById(nextLobby.id)) || nextLobby;
+}
+
+async function saveLegacyLobby(lobby: BredLobby, syncPlayers: boolean): Promise<BredLobby> {
+  const now = new Date().toISOString();
+  const nextLobby = {
+    ...lobby,
+    code: lobby.code.toUpperCase(),
+    updated_at: now,
+  };
+
+  const { error: lobbyError } = await requireSupabase()
     .from('loto_lobbies')
     .update({
       code: nextLobby.code,
@@ -289,23 +428,65 @@ export async function saveBredLobby(lobby: BredLobby): Promise<BredLobby> {
       max_players: DEFAULT_MAX_PLAYERS,
       mode: BRED_MODE,
       drawn_numbers: [],
-      event: buildLobbyEvent(nextLobby),
+      event: legacyLobbyEvent(nextLobby),
     })
     .eq('id', nextLobby.id)
     .eq('mode', BRED_MODE);
 
   assertSupabase(lobbyError);
 
-  if (nextLobby.players.length > 0) {
-    const { error: playersError } = await supabase.from('loto_players').upsert(
-      nextLobby.players.map((player) => playerToLoto(player, nextLobby.id)),
+  if (syncPlayers && nextLobby.players.length > 0) {
+    const { error: playersError } = await requireSupabase().from('loto_players').upsert(
+      nextLobby.players.map((player) => legacyPlayerToLoto(player, nextLobby.id)),
       { onConflict: 'id,lobby_id' }
     );
 
     assertSupabase(playersError);
   }
 
-  return (await getBredLobbyById(nextLobby.id)) || nextLobby;
+  return (await getLegacyLobbyById(nextLobby.id)) || nextLobby;
+}
+
+export function genBredCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+async function isLobbyCodeTaken(code: string) {
+  const normalizedCode = code.toUpperCase();
+  const dedicated = await getDedicatedLobbyByCode(normalizedCode);
+  if (dedicated) return true;
+
+  const legacy = await getLegacyLobbyByCode(normalizedCode);
+  return Boolean(legacy);
+}
+
+export async function getBredLobbyById(id: string): Promise<BredLobby | null> {
+  const dedicated = await getDedicatedLobbyById(id);
+  if (dedicated) return dedicated;
+
+  const legacy = await getLegacyLobbyById(id);
+  if (legacy && canTryDedicatedTables()) {
+    await saveDedicatedLobby(legacy, true);
+  }
+  return legacy;
+}
+
+export async function getBredLobbyByCode(code: string): Promise<BredLobby | null> {
+  const dedicated = await getDedicatedLobbyByCode(code);
+  if (dedicated) return dedicated;
+
+  const legacy = await getLegacyLobbyByCode(code);
+  if (legacy && canTryDedicatedTables()) {
+    await saveDedicatedLobby(legacy, true);
+  }
+  return legacy;
+}
+
+export async function saveBredLobby(lobby: BredLobby, syncPlayers = true): Promise<BredLobby> {
+  const dedicated = await saveDedicatedLobby(lobby, syncPlayers);
+  if (dedicated) return dedicated;
+  return saveLegacyLobby(lobby, syncPlayers);
 }
 
 export async function createBredLobby({
@@ -328,6 +509,58 @@ export async function createBredLobby({
   }
 
   const now = new Date().toISOString();
+  const hostPlayer: BredPlayer = {
+    id: hostId,
+    lobby_id: '',
+    name: hostName,
+    score: 0,
+    is_host: true,
+    twitch_id: twitchId ?? null,
+    avatar_url: avatarUrl ?? null,
+    submitted_fact: false,
+    fact_a: null,
+    fact_b: null,
+    truth_index: null,
+    joined_at: now,
+  };
+
+  if (canTryDedicatedTables()) {
+    const { data: row, error } = await requireSupabase()
+      .from('bred_lobbies')
+      .insert({
+        code,
+        host_id: hostId,
+        host_name: hostName,
+        status: 'waiting',
+        current_fact_idx: 0,
+        facts: [],
+        vote_results: [],
+      })
+      .select('*')
+      .single();
+
+    if (!isMissingTableError(error)) {
+      assertSupabase(error);
+      markDedicatedTablesAvailable();
+      const lobbyId = String(row.id);
+      return saveBredLobby({
+        id: lobbyId,
+        code,
+        host_id: hostId,
+        host_name: hostName,
+        status: 'waiting',
+        current_fact_idx: 0,
+        facts: [],
+        vote_results: [],
+        created_at: row.created_at || now,
+        updated_at: row.updated_at || now,
+        players: [{ ...hostPlayer, lobby_id: lobbyId }],
+      });
+    }
+
+    markDedicatedTablesMissing();
+  }
+
   const { data: row, error: lobbyError } = await requireSupabase()
     .from('loto_lobbies')
     .insert({
@@ -356,28 +589,7 @@ export async function createBredLobby({
   assertSupabase(lobbyError);
 
   const lobbyId = String(row.id);
-  const hostPlayer: BredPlayer = {
-    id: hostId,
-    lobby_id: lobbyId,
-    name: hostName,
-    score: 0,
-    is_host: true,
-    twitch_id: twitchId ?? null,
-    avatar_url: avatarUrl ?? null,
-    submitted_fact: false,
-    fact_a: null,
-    fact_b: null,
-    truth_index: null,
-    joined_at: now,
-  };
-
-  const { error: playerError } = await requireSupabase()
-    .from('loto_players')
-    .upsert(playerToLoto(hostPlayer, lobbyId), { onConflict: 'id,lobby_id' });
-
-  assertSupabase(playerError);
-
-  return (await loadLobbyWithPlayers(row as LotoLobbyRow)) || {
+  const legacyLobby: BredLobby = {
     id: lobbyId,
     code,
     host_id: hostId,
@@ -388,8 +600,10 @@ export async function createBredLobby({
     vote_results: [],
     created_at: now,
     updated_at: now,
-    players: [hostPlayer],
+    players: [{ ...hostPlayer, lobby_id: lobbyId }],
   };
+
+  return saveLegacyLobby(legacyLobby, true);
 }
 
 export async function updateBredLobby(
@@ -401,11 +615,14 @@ export async function updateBredLobby(
   const lobby = await getBredLobbyById(id);
   if (!lobby) return null;
 
-  return saveBredLobby({
-    ...lobby,
-    ...updates,
-    players: updates.players ?? lobby.players,
-  });
+  return saveBredLobby(
+    {
+      ...lobby,
+      ...updates,
+      players: updates.players ?? lobby.players,
+    },
+    Boolean(updates.players)
+  );
 }
 
 export async function upsertBredPlayer(
@@ -428,5 +645,5 @@ export async function upsertBredPlayer(
     nextPlayer,
   ].sort((a, b) => a.joined_at.localeCompare(b.joined_at));
 
-  return saveBredLobby({ ...lobby, players });
+  return saveBredLobby({ ...lobby, players }, true);
 }

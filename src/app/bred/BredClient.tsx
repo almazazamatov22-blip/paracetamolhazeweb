@@ -24,6 +24,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import { signIn, signOut, useSession } from '@/lib/67/authHook';
+import { supabase } from '@/lib/supabase';
 
 type Phase = 'waiting' | 'lobby' | 'input' | 'voting' | 'reveal' | 'leaderboard';
 
@@ -241,9 +242,11 @@ export default function BredClient() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [myVote, setMyVote] = useState<number | null>(null);
   const [timer, setTimer] = useState(0);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const revealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const realtimeSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scoredRoundRef = useRef<string | null>(null);
   const lobbyRef = useRef<Lobby | null>(null);
   const playersRef = useRef<Player[]>([]);
@@ -287,6 +290,13 @@ export default function BredClient() {
     setPlayers((data.players || []) as Player[]);
     return data as Lobby;
   }, []);
+
+  const queueRealtimeSync = useCallback((lobbyId: string) => {
+    if (realtimeSyncTimeoutRef.current) clearTimeout(realtimeSyncTimeoutRef.current);
+    realtimeSyncTimeoutRef.current = setTimeout(() => {
+      syncLobby(lobbyId);
+    }, 120);
+  }, [syncLobby]);
 
   useEffect(() => {
     const code = requestedInviteCode;
@@ -369,7 +379,13 @@ export default function BredClient() {
 
   useEffect(() => {
     if (!lobby?.id || view !== 'game') return;
-    const intervalMs = lobbyStatus === 'lobby' ? 8000 : lobby?.status === 'input' ? 5000 : 3000;
+    const intervalMs = isRealtimeConnected
+      ? 30000
+      : lobbyStatus === 'lobby'
+        ? 8000
+        : lobby?.status === 'input'
+          ? 5000
+          : 3000;
 
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
@@ -377,7 +393,45 @@ export default function BredClient() {
     }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [lobby?.id, lobby?.status, lobbyStatus, syncLobby, view]);
+  }, [isRealtimeConnected, lobby?.id, lobby?.status, lobbyStatus, syncLobby, view]);
+
+  useEffect(() => {
+    if (!lobby?.id || view !== 'game') return;
+
+    setIsRealtimeConnected(false);
+    const channel = supabase
+      .channel(`bred-lobby-${lobby.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bred_lobbies', filter: `id=eq.${lobby.id}` },
+        () => {
+          setIsRealtimeConnected(true);
+          queueRealtimeSync(lobby.id);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bred_players', filter: `lobby_id=eq.${lobby.id}` },
+        () => {
+          setIsRealtimeConnected(true);
+          queueRealtimeSync(lobby.id);
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setIsRealtimeConnected(false);
+        }
+      });
+
+    return () => {
+      setIsRealtimeConnected(false);
+      if (realtimeSyncTimeoutRef.current) {
+        clearTimeout(realtimeSyncTimeoutRef.current);
+        realtimeSyncTimeoutRef.current = null;
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [lobby?.id, queueRealtimeSync, view]);
 
   const handleHostGame = async () => {
     if (authStatus === 'loading') return;
