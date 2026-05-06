@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import TrueOrFalseClient from './TrueOrFalseClient';
 
 export const metadata = {
@@ -6,5 +7,9 @@ export const metadata = {
 };
 
 export default function TrueOrFalsePage() {
-  return <TrueOrFalseClient />;
+  return (
+    <Suspense fallback={<div className="tof-root"><div className="text-white">Загрузка...</div></div>}>
+      <TrueOrFalseClient />
+    </Suspense>
+  );
 }

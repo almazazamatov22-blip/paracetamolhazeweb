@@ -68,7 +68,7 @@ const PROJECTS = [
     title: 'ПРАВДА ИЛИ ЛОЖЬ',
     desc: 'Блефуй и угадывай факты',
     href: '/trueorfalse',
-    disabled: false,
+    disabled: true,
   },
 ]
 
