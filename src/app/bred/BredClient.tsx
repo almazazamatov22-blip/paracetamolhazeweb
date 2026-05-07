@@ -1650,24 +1650,31 @@ export default function BredClient() {
 
     return (
       <motion.section
-        key="reveal"
-        className="bred-phase-panel bred-reveal-panel"
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.96 }}
+        key="voting"
+        className="bred-phase-panel"
+        initial={false}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -16 }}
       >
-        <h1>Раскрытие</h1>
-        <p className="bred-phase-sub">{targetPlayer.name}</p>
-        <div className="bred-reveal-stage">
+        <div className="bred-roundbar">
+          <span>
+            раунд {lobby.current_fact_idx + 1}/{lobby.facts.length}
+          </span>
+          <strong>0</strong>
+        </div>
+        <h1>
+          Какое утверждение об игроке "{targetPlayer.name}" является правдой?
+        </h1>
+        <div className="bred-vote-grid bred-reveal-inline-grid">
           {displayFacts.map((item) => {
             const isTruth = truthIndex === item.factIndex;
             const pickedVoters = getVotersForFact(item.factIndex);
             return (
               <div
                 key={item.factIndex}
-                className={`bred-reveal-card ${isTruth ? 'is-truth' : 'is-lie'}`}
+                className={`bred-vote-card bred-reveal-inline-card ${isTruth ? 'is-truth' : 'is-lie'}`}
               >
-                <strong className="bred-reveal-fact-text">{item.fact}</strong>
+                <strong>{item.fact}</strong>
                 <div className="bred-reveal-choice-tags">
                   {pickedVoters.map((player, index) => (
                     <div
