@@ -2262,7 +2262,7 @@
 }
 
 .bred-reveal-inline-grid {
-  padding-bottom: 62px;
+  padding-bottom: 96px;
 }
 
 .bred-vote-card.bred-reveal-inline-card {
@@ -2334,12 +2334,12 @@
   position: absolute;
   left: 14px;
   right: 14px;
-  bottom: -22px;
+  bottom: -18px;
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
-  z-index: 2;
+  z-index: 4;
 }
 
 .bred-reveal-choice-tag {
@@ -2347,7 +2347,7 @@
   position: relative;
   min-width: 118px;
   max-width: 190px;
-  height: 40px;
+  height: 42px;
   display: grid;
   place-items: center;
   padding: 0 14px;
@@ -2359,6 +2359,7 @@
   transform: rotate(-4deg);
   animation: bredRevealTagPop 0.42s ease-out both;
   animation-delay: var(--tag-delay);
+  overflow: hidden;
 }
 
 .bred-reveal-choice-tag:nth-child(even) {
@@ -2379,12 +2380,13 @@
   text-transform: uppercase;
   animation: bredRevealNameOut 10s ease forwards;
   animation-delay: var(--tag-delay);
+  background: transparent;
 }
 
 .bred-reveal-choice-tag em {
   opacity: 0;
   color: #11f02b;
-  font: 1000 34px 'Geist', 'Inter', system-ui, sans-serif;
+  font: 1000 28px 'Geist', 'Inter', system-ui, sans-serif;
   font-style: normal;
   letter-spacing: 0;
   text-shadow:
@@ -2400,7 +2402,7 @@
 .bred-reveal-truth-ribbon {
   position: absolute;
   left: 50%;
-  bottom: -62px;
+  bottom: -84px;
   min-width: 190px;
   min-height: 48px;
   display: grid;
