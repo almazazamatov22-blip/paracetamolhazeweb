@@ -5,8 +5,8 @@ import FloatingNicknames from '@/components/floating-nicknames'
 
 const DEFAULT_NICKS = [
   'paracetamolhaze', 'paracetamolHAZE', 'HAZE', 'r1ch_crazy', 'deluxe_2004',
-  'yaTomal', 'habarhub', 'RinaMiura', 'm1llenn1ummm', 'txt_abloko',
-  'txt_abloko2', 'gantitupik', 'kukushonoktv', 'Wiesal_t', 'lll_mommy',
+  'yaTomal', 'habarhub', 'milansh1k', 'RinaMiura', 'm1llenn1ummm',
+  'gantitupik', 'kukushonoktv', 'Wiesal_t', 'lll_mommy',
   'Saint_ioannX', 'Juliebayy', 'tripleoff', 'zxckostik2010', 'sasavot',
   'evelone2004', 'kurokoken', 'egypop13', 'GolDi_21', 'STRYPOFF13', 'limonnub'
 ];
@@ -54,21 +54,14 @@ const PROJECTS = [
     href: '/kinoquiz',
   },
   {
-    title: 'Покер',
-    desc: 'С вебкамерами',
-    href: '/poker',
-    disabled: true,
+    title: 'Бредовуха',
+    desc: 'Лобби с режимами для вечеринки',
+    href: '/bred',
   },
   {
     title: 'Эмоджино',
     desc: 'Угадай фильм по эмоджи',
     href: '/emojino',
-  },
-  {
-    title: 'Бредовуха',
-    desc: 'Лобби с режимами для вечеринки',
-    href: '/bred',
-    disabled: true,
   },
 ]
 
@@ -143,7 +136,7 @@ export default function Home() {
         {/* Subtitle */}
         <span className="paracetamol-subtitle">
           <span className="paracetamol-twitch-label">TWITCH:</span>
-          <span className="paracetamol-twitch-name">TXT_ABLOKO</span>
+          <span className="paracetamol-twitch-name">HABARHUB</span>
         </span>
 
         {/* Main Word */}
