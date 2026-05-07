@@ -69,10 +69,12 @@ interface Lobby {
 }
 
 const VOTE_TIME = 15;
-const REVEAL_TIME = 7;
+const REVEAL_TIME = 10;
 const DEFAULT_INPUT_TIME = 60;
 const INPUT_TIME_OPTIONS = [60, 120, 180];
 const BRED_SOURCE = 'bred';
+const SOUND_ENABLED_STORAGE_KEY = 'bred:sound-enabled';
+const MASTER_VOLUME_STORAGE_KEY = 'bred:master-volume';
 const TELEGRAM_URL = process.env.NEXT_PUBLIC_TELEGRAM_URL || 'https://t.me/paracetamolhaze';
 const MAX_FACT_ENTRIES = 5;
 const FACT_BUNDLE_PREFIX = '__BRED_FACTS__:';
@@ -427,6 +429,7 @@ export default function BredClient() {
   const fiveSecondsRef = useRef<HTMLAudioElement | null>(null);
   const audioUnlockedRef = useRef(false);
   const fiveSecondsRoundRef = useRef<string | null>(null);
+  const soundPrefsLoadedRef = useRef(false);
 
   const lobbyStatus = normalizeStatus(lobby?.status);
   const me = players.find((player) => player.id === myPlayerId);
@@ -532,6 +535,31 @@ export default function BredClient() {
   useEffect(() => {
     syncBackgroundMusic();
   }, [syncBackgroundMusic]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    setSoundEnabled(window.localStorage.getItem(SOUND_ENABLED_STORAGE_KEY) !== 'false');
+
+    const savedVolume = Number(window.localStorage.getItem(MASTER_VOLUME_STORAGE_KEY));
+    if (Number.isFinite(savedVolume)) {
+      setMasterVolume(Math.max(0, Math.min(1, savedVolume)));
+    }
+
+    soundPrefsLoadedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!soundPrefsLoadedRef.current) return;
+    window.localStorage.setItem(SOUND_ENABLED_STORAGE_KEY, String(soundEnabled));
+  }, [soundEnabled]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!soundPrefsLoadedRef.current) return;
+    window.localStorage.setItem(MASTER_VOLUME_STORAGE_KEY, String(masterVolume));
+  }, [masterVolume]);
 
   const handleBredPointerSound = useCallback((event: PointerEvent<HTMLElement>) => {
     const target = event.target as HTMLElement | null;
@@ -1050,7 +1078,7 @@ export default function BredClient() {
   }, [isHost, lobby?.id, lobby?.status, lobby?.current_fact_idx, lobby?.phase_deadline_at, roundSeconds]);
 
   const handleVote = async (index: number) => {
-    if (!lobby || !myPlayerId || lobby.status !== 'voting' || myVote !== null) return;
+    if (!lobby || !myPlayerId || lobby.status !== 'voting') return;
 
     const targetRoundId = lobby.facts[lobby.current_fact_idx];
     const { playerId: targetPlayerId } = parseFactRoundId(targetRoundId);
@@ -1082,7 +1110,6 @@ export default function BredClient() {
         onClick={() => {
           audioUnlockedRef.current = true;
           setIsVolumeOpen((current) => !current);
-          if (!soundEnabled) setSoundEnabled(true);
           setTimeout(() => syncBackgroundMusic(), 0);
         }}
       >
@@ -1578,7 +1605,11 @@ export default function BredClient() {
           <strong>{timer}</strong>
         </div>
         <h1>{targetPlayer.name}</h1>
-        <p className="bred-phase-sub">{isOwnRound ? 'Это ваши факты.' : 'Где здесь правда?'}</p>
+        <p className="bred-phase-sub">
+          {isOwnRound
+            ? 'Это ваши факты.'
+            : `Какое утверждение об игроке "${targetPlayer.name}" является правдой?`}
+        </p>
 
         <div className="bred-vote-grid">
           {displayFacts.map((item) => (
@@ -1587,7 +1618,7 @@ export default function BredClient() {
               className={`bred-vote-card ${myVote === item.factIndex ? 'is-picked' : ''}`}
               type="button"
               onClick={() => handleVote(item.factIndex)}
-              disabled={isOwnRound || myVote !== null}
+              disabled={isOwnRound}
             >
               <strong>{item.fact}</strong>
             </button>
