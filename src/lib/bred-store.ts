@@ -14,7 +14,14 @@ export interface BredPlayer {
   fact_a?: string | null;
   fact_b?: string | null;
   truth_index?: number | null;
+  fact_entries?: BredFactEntry[] | null;
   joined_at: string;
+}
+
+export interface BredFactEntry {
+  fact_a: string;
+  fact_b: string;
+  truth_index: number;
 }
 
 export interface BredVoteRound {
@@ -80,6 +87,7 @@ interface LotoPlayerRow {
 
 const BRED_MODE = 'bred';
 const DEFAULT_MAX_PLAYERS = 14;
+const FACT_BUNDLE_PREFIX = '__BRED_FACTS__:';
 
 let supabaseClient: SupabaseClient | null | undefined;
 let hasDedicatedBredTables: boolean | null = null;
@@ -158,6 +166,90 @@ function asJsonArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
+function normalizeFactEntry(value: unknown): BredFactEntry | null {
+  const item = asObject(value);
+  const factA = typeof item.fact_a === 'string' ? item.fact_a.trim() : '';
+  const factB = typeof item.fact_b === 'string' ? item.fact_b.trim() : '';
+  const truthIndex = Number(item.truth_index);
+
+  if (!factA || !factB) return null;
+  return {
+    fact_a: factA,
+    fact_b: factB,
+    truth_index: truthIndex === 1 ? 1 : 0,
+  };
+}
+
+function normalizeFactEntries(value: unknown): BredFactEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(normalizeFactEntry).filter((item): item is BredFactEntry => Boolean(item));
+}
+
+function parseFactEntriesFromFields(
+  factA?: unknown,
+  factB?: unknown,
+  truthIndex?: unknown,
+  explicitEntries?: unknown
+): BredFactEntry[] {
+  const fromExplicit = normalizeFactEntries(explicitEntries);
+  if (fromExplicit.length > 0) return fromExplicit;
+
+  const factAText = typeof factA === 'string' ? factA : '';
+  if (factAText.startsWith(FACT_BUNDLE_PREFIX)) {
+    try {
+      const parsed = JSON.parse(factAText.slice(FACT_BUNDLE_PREFIX.length));
+      const bundled = normalizeFactEntries(parsed);
+      if (bundled.length > 0) return bundled;
+    } catch {
+      // Fall through to the legacy single-pair fields.
+    }
+  }
+
+  const singleFactA = factAText.trim();
+  const singleFactB = typeof factB === 'string' ? factB.trim() : '';
+  if (!singleFactA || !singleFactB) return [];
+
+  return [
+    {
+      fact_a: singleFactA,
+      fact_b: singleFactB,
+      truth_index: Number(truthIndex) === 1 ? 1 : 0,
+    },
+  ];
+}
+
+function getPlayerFactEntries(player: Pick<BredPlayer, 'fact_a' | 'fact_b' | 'truth_index' | 'fact_entries'>) {
+  return parseFactEntriesFromFields(player.fact_a, player.fact_b, player.truth_index, player.fact_entries);
+}
+
+function encodePlayerFactFields(player: Pick<BredPlayer, 'fact_a' | 'fact_b' | 'truth_index' | 'fact_entries'>) {
+  const entries = getPlayerFactEntries(player);
+  if (entries.length === 0) {
+    return {
+      fact_a: null,
+      fact_b: null,
+      truth_index: null,
+      fact_entries: [],
+    };
+  }
+
+  if (entries.length === 1) {
+    return {
+      fact_a: entries[0].fact_a,
+      fact_b: entries[0].fact_b,
+      truth_index: entries[0].truth_index,
+      fact_entries: entries,
+    };
+  }
+
+  return {
+    fact_a: `${FACT_BUNDLE_PREFIX}${JSON.stringify(entries)}`,
+    fact_b: null,
+    truth_index: null,
+    fact_entries: entries,
+  };
+}
+
 function asBredPhase(value: unknown, fallback: string): BredPhase {
   if (
     value === 'waiting' ||
@@ -197,9 +289,25 @@ function mapDedicatedLobby(row: BredLobbyRow, players: BredPlayer[]): BredLobby 
   };
 }
 
+function mapDedicatedPlayer(row: BredPlayer): BredPlayer {
+  const factEntries = getPlayerFactEntries(row);
+
+  return {
+    ...row,
+    score: Number(row.score || 0),
+    is_host: Boolean(row.is_host),
+    submitted_fact: Boolean(row.submitted_fact),
+    fact_a: factEntries[0]?.fact_a || row.fact_a || null,
+    fact_b: factEntries[0]?.fact_b || row.fact_b || null,
+    truth_index: factEntries[0]?.truth_index ?? row.truth_index ?? null,
+    fact_entries: factEntries,
+  };
+}
+
 function mapLegacyPlayer(row: LotoPlayerRow): BredPlayer {
   const card = asObject(row.card);
   const avatar = String(row.avatar || '');
+  const factEntries = parseFactEntriesFromFields(card.fact_a, card.fact_b, card.truth_index, card.fact_entries);
 
   return {
     id: String(row.id),
@@ -210,14 +318,17 @@ function mapLegacyPlayer(row: LotoPlayerRow): BredPlayer {
     twitch_id: card.twitch_id ? String(card.twitch_id) : null,
     avatar_url: card.avatar_url ? String(card.avatar_url) : avatar.startsWith('http') ? avatar : null,
     submitted_fact: Boolean(card.submitted_fact),
-    fact_a: card.fact_a ? String(card.fact_a) : null,
-    fact_b: card.fact_b ? String(card.fact_b) : null,
-    truth_index: Number.isFinite(Number(card.truth_index)) ? Number(card.truth_index) : null,
+    fact_a: factEntries[0]?.fact_a || (card.fact_a ? String(card.fact_a) : null),
+    fact_b: factEntries[0]?.fact_b || (card.fact_b ? String(card.fact_b) : null),
+    truth_index: factEntries[0]?.truth_index ?? (Number.isFinite(Number(card.truth_index)) ? Number(card.truth_index) : null),
+    fact_entries: factEntries,
     joined_at: row.joined_at || new Date().toISOString(),
   };
 }
 
 function legacyPlayerToLoto(player: BredPlayer, lobbyId: string) {
+  const encodedFacts = encodePlayerFactFields(player);
+
   return {
     id: player.id,
     lobby_id: lobbyId,
@@ -234,9 +345,10 @@ function legacyPlayerToLoto(player: BredPlayer, lobbyId: string) {
       twitch_id: player.twitch_id || null,
       avatar_url: player.avatar_url || null,
       submitted_fact: Boolean(player.submitted_fact),
-      fact_a: player.fact_a || null,
-      fact_b: player.fact_b || null,
-      truth_index: player.truth_index ?? null,
+      fact_a: encodedFacts.fact_a,
+      fact_b: encodedFacts.fact_b,
+      truth_index: encodedFacts.truth_index,
+      fact_entries: encodedFacts.fact_entries,
     },
   };
 }
@@ -273,7 +385,7 @@ async function readDedicatedLobby(row: BredLobbyRow | null): Promise<BredLobby |
   assertSupabase(error);
   markDedicatedTablesAvailable();
 
-  return mapDedicatedLobby(row, (players || []) as BredPlayer[]);
+  return mapDedicatedLobby(row, ((players || []) as BredPlayer[]).map(mapDedicatedPlayer));
 }
 
 async function getDedicatedLobbyById(id: string): Promise<BredLobby | null> {
@@ -401,20 +513,24 @@ async function saveDedicatedLobby(lobby: BredLobby, syncPlayers: boolean): Promi
 
   if (syncPlayers && nextLobby.players.length > 0) {
     const { error: playersError } = await requireSupabase().from('bred_players').upsert(
-      nextLobby.players.map((player) => ({
-        id: player.id,
-        lobby_id: nextLobby.id,
-        name: player.name,
-        score: player.score || 0,
-        is_host: player.is_host,
-        twitch_id: player.twitch_id || null,
-        avatar_url: player.avatar_url || null,
-        submitted_fact: Boolean(player.submitted_fact),
-        fact_a: player.fact_a || null,
-        fact_b: player.fact_b || null,
-        truth_index: player.truth_index ?? null,
-        joined_at: player.joined_at,
-      })),
+      nextLobby.players.map((player) => {
+        const encodedFacts = encodePlayerFactFields(player);
+
+        return {
+          id: player.id,
+          lobby_id: nextLobby.id,
+          name: player.name,
+          score: player.score || 0,
+          is_host: player.is_host,
+          twitch_id: player.twitch_id || null,
+          avatar_url: player.avatar_url || null,
+          submitted_fact: Boolean(player.submitted_fact),
+          fact_a: encodedFacts.fact_a,
+          fact_b: encodedFacts.fact_b,
+          truth_index: encodedFacts.truth_index,
+          joined_at: player.joined_at,
+        };
+      }),
       { onConflict: 'id,lobby_id' }
     );
 
@@ -535,6 +651,7 @@ export async function createBredLobby({
     fact_a: null,
     fact_b: null,
     truth_index: null,
+    fact_entries: [],
     joined_at: now,
   };
 

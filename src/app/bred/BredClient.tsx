@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -22,6 +22,7 @@ import {
   UserRound,
   Users,
   Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { signIn, signOut, useSession } from '@/lib/67/authHook';
 import { supabase } from '@/lib/supabase';
@@ -39,7 +40,14 @@ interface Player {
   fact_a?: string | null;
   fact_b?: string | null;
   truth_index?: number | null;
+  fact_entries?: FactEntry[] | null;
   joined_at?: string;
+}
+
+interface FactEntry {
+  fact_a: string;
+  fact_b: string;
+  truth_index: number;
 }
 
 interface VoteRound {
@@ -64,6 +72,16 @@ const VOTE_TIME = 15;
 const REVEAL_TIME = 7;
 const BRED_SOURCE = 'bred';
 const TELEGRAM_URL = process.env.NEXT_PUBLIC_TELEGRAM_URL || 'https://t.me/paracetamolhaze';
+const MAX_FACT_ENTRIES = 5;
+const FACT_BUNDLE_PREFIX = '__BRED_FACTS__:';
+const FACT_ROUND_SEPARATOR = '::fact::';
+const BRED_AUDIO = {
+  menu: '/bred-audio/menu.mp3',
+  game: '/bred-audio/game.mp3',
+  soft: '/bred-audio/button-soft.mp3',
+  primary: '/bred-audio/button-primary.mp3',
+  five: '/bred-audio/five-seconds.mp3',
+};
 
 const modeCards = [
   {
@@ -171,18 +189,123 @@ function hashFactOrder(input: string) {
   return hash >>> 0;
 }
 
-function getFactDisplayOrder(lobby: Lobby, targetPlayerId: string) {
-  const seed = `${lobby.id}:${lobby.current_fact_idx}:${targetPlayerId}`;
+function sanitizeFactEntries(entries: FactEntry[]) {
+  return entries
+    .map((entry) => ({
+      fact_a: entry.fact_a.trim(),
+      fact_b: entry.fact_b.trim(),
+      truth_index: entry.truth_index === 1 ? 1 : 0,
+    }))
+    .filter((entry) => entry.fact_a && entry.fact_b)
+    .slice(0, MAX_FACT_ENTRIES);
+}
+
+function parseFactEntriesFromFields(player?: Pick<Player, 'fact_a' | 'fact_b' | 'truth_index' | 'fact_entries'> | null) {
+  if (!player) return [];
+
+  if (Array.isArray(player.fact_entries)) {
+    const entries = sanitizeFactEntries(player.fact_entries);
+    if (entries.length > 0) return entries;
+  }
+
+  const factA = player.fact_a || '';
+  if (factA.startsWith(FACT_BUNDLE_PREFIX)) {
+    try {
+      const parsed = JSON.parse(factA.slice(FACT_BUNDLE_PREFIX.length));
+      if (Array.isArray(parsed)) {
+        const entries = sanitizeFactEntries(parsed as FactEntry[]);
+        if (entries.length > 0) return entries;
+      }
+    } catch {
+      // Keep support for the original single-pair format below.
+    }
+  }
+
+  if (!factA.trim() || !player.fact_b?.trim()) return [];
+
+  return [
+    {
+      fact_a: factA.trim(),
+      fact_b: player.fact_b.trim(),
+      truth_index: player.truth_index === 1 ? 1 : 0,
+    },
+  ];
+}
+
+function encodeFactEntries(entries: FactEntry[]) {
+  const cleanEntries = sanitizeFactEntries(entries);
+  if (cleanEntries.length <= 1) {
+    const first = cleanEntries[0];
+    return {
+      fact_a: first?.fact_a || null,
+      fact_b: first?.fact_b || null,
+      truth_index: first?.truth_index ?? null,
+      fact_entries: cleanEntries,
+    };
+  }
+
+  return {
+    fact_a: `${FACT_BUNDLE_PREFIX}${JSON.stringify(cleanEntries)}`,
+    fact_b: null,
+    truth_index: null,
+    fact_entries: cleanEntries,
+  };
+}
+
+function makeFactRoundId(playerId: string, entryIndex: number) {
+  return `${playerId}${FACT_ROUND_SEPARATOR}${entryIndex}`;
+}
+
+function parseFactRoundId(roundId?: string | null) {
+  if (!roundId) return { playerId: '', entryIndex: 0 };
+  const separatorIndex = roundId.lastIndexOf(FACT_ROUND_SEPARATOR);
+  if (separatorIndex < 0) return { playerId: roundId, entryIndex: 0 };
+
+  const playerId = roundId.slice(0, separatorIndex);
+  const entryIndex = Number(roundId.slice(separatorIndex + FACT_ROUND_SEPARATOR.length));
+  return {
+    playerId,
+    entryIndex: Number.isInteger(entryIndex) && entryIndex >= 0 ? entryIndex : 0,
+  };
+}
+
+function getCurrentRoundId(lobby?: Lobby | null) {
+  return lobby?.facts?.[lobby.current_fact_idx] || '';
+}
+
+function getPlayerFactEntries(player?: Player | null) {
+  return parseFactEntriesFromFields(player);
+}
+
+function getRoundEntry(player: Player, roundId: string) {
+  const { entryIndex } = parseFactRoundId(roundId);
+  const entries = getPlayerFactEntries(player);
+  return entries[entryIndex] || entries[0] || null;
+}
+
+function makeFactSequence(players: Player[]) {
+  return players
+    .flatMap((player) => getPlayerFactEntries(player).map((_, index) => makeFactRoundId(player.id, index)))
+    .sort(() => Math.random() - 0.5);
+}
+
+function getFactDisplayOrder(lobby: Lobby, roundId: string) {
+  const seed = `${lobby.id}:${lobby.current_fact_idx}:${roundId}`;
   return hashFactOrder(seed) % 2 === 0 ? [0, 1] : [1, 0];
 }
 
-function getDisplayFacts(lobby: Lobby, targetPlayer: Player) {
-  const facts = [targetPlayer.fact_a, targetPlayer.fact_b];
-  return getFactDisplayOrder(lobby, targetPlayer.id).map((factIndex, displayIndex) => ({
+function getDisplayFacts(lobby: Lobby, targetPlayer: Player, roundId = getCurrentRoundId(lobby)) {
+  const entry = getRoundEntry(targetPlayer, roundId);
+  const facts = [entry?.fact_a, entry?.fact_b];
+  return getFactDisplayOrder(lobby, roundId || targetPlayer.id).map((factIndex, displayIndex) => ({
     factIndex,
     fact: facts[factIndex],
     label: displayIndex === 0 ? 'A' : 'Б',
   }));
+}
+
+function getRoundTruthIndex(targetPlayer: Player, roundId: string) {
+  return getRoundEntry(targetPlayer, roundId)?.truth_index ?? targetPlayer.truth_index ?? 0;
 }
 
 function createPhaseTiming(seconds: number) {
@@ -200,13 +323,13 @@ function getRemainingSeconds(deadline?: string | null) {
   return Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
 }
 
-function getScoreDeltas(players: Player[], targetPlayer: Player, results?: VoteRound) {
+function getScoreDeltas(players: Player[], targetPlayer: Player, truthIndex: number, results?: VoteRound) {
   const deltas: Record<string, number> = {};
   let correctCount = 0;
   const votes = results?.votes || {};
 
   Object.entries(votes).forEach(([voterId, choice]) => {
-    if (choice === targetPlayer.truth_index) {
+    if (choice === truthIndex) {
       correctCount += 1;
       deltas[voterId] = (deltas[voterId] || 0) + 100;
     } else {
@@ -278,13 +401,14 @@ export default function BredClient() {
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState(14);
   const [roundSeconds, setRoundSeconds] = useState(VOTE_TIME);
-  const [factA, setFactA] = useState('');
-  const [factB, setFactB] = useState('');
-  const [truthIndex, setTruthIndex] = useState(0);
+  const [factEntries, setFactEntries] = useState<FactEntry[]>([{ fact_a: '', fact_b: '', truth_index: 0 }]);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [myVote, setMyVote] = useState<number | null>(null);
   const [timer, setTimer] = useState(0);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [masterVolume, setMasterVolume] = useState(0.58);
+  const [isVolumeOpen, setIsVolumeOpen] = useState(false);
 
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const revealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -293,6 +417,13 @@ export default function BredClient() {
   const lobbyRef = useRef<Lobby | null>(null);
   const playersRef = useRef<Player[]>([]);
   const autoInviteJoinRef = useRef<string | null>(null);
+  const menuMusicRef = useRef<HTMLAudioElement | null>(null);
+  const gameMusicRef = useRef<HTMLAudioElement | null>(null);
+  const softClickRef = useRef<HTMLAudioElement | null>(null);
+  const primaryClickRef = useRef<HTMLAudioElement | null>(null);
+  const fiveSecondsRef = useRef<HTMLAudioElement | null>(null);
+  const audioUnlockedRef = useRef(false);
+  const fiveSecondsRoundRef = useRef<string | null>(null);
 
   const lobbyStatus = normalizeStatus(lobby?.status);
   const me = players.find((player) => player.id === myPlayerId);
@@ -301,12 +432,114 @@ export default function BredClient() {
   const requestedInviteCode = searchParams.get('code')?.trim().toUpperCase() || '';
 
   useEffect(() => {
+    if (lobby?.status !== 'input') return;
+
+    const playerEntries = getPlayerFactEntries(me);
+    setHasSubmitted(Boolean(me?.submitted_fact));
+
+    if (me?.submitted_fact && playerEntries.length > 0) {
+      setFactEntries(playerEntries);
+    } else if (hasSubmitted) {
+      setFactEntries([{ fact_a: '', fact_b: '', truth_index: 0 }]);
+    }
+  }, [hasSubmitted, lobby?.status, me?.id, me?.submitted_fact]);
+
+  useEffect(() => {
     lobbyRef.current = lobby;
   }, [lobby]);
 
   useEffect(() => {
     playersRef.current = players;
   }, [players]);
+
+  const initAudio = useCallback(() => {
+    if (typeof Audio === 'undefined') return;
+    if (menuMusicRef.current) return;
+
+    menuMusicRef.current = new Audio(BRED_AUDIO.menu);
+    gameMusicRef.current = new Audio(BRED_AUDIO.game);
+    softClickRef.current = new Audio(BRED_AUDIO.soft);
+    primaryClickRef.current = new Audio(BRED_AUDIO.primary);
+    fiveSecondsRef.current = new Audio(BRED_AUDIO.five);
+
+    [menuMusicRef.current, gameMusicRef.current].forEach((track) => {
+      track.loop = true;
+      track.preload = 'auto';
+    });
+
+    [softClickRef.current, primaryClickRef.current, fiveSecondsRef.current].forEach((track) => {
+      track.preload = 'auto';
+    });
+  }, []);
+
+  const applyAudioVolume = useCallback(() => {
+    const musicVolume = soundEnabled ? masterVolume * 0.42 : 0;
+    const clickVolume = soundEnabled ? masterVolume * 0.82 : 0;
+
+    if (menuMusicRef.current) menuMusicRef.current.volume = musicVolume;
+    if (gameMusicRef.current) gameMusicRef.current.volume = musicVolume;
+    if (softClickRef.current) softClickRef.current.volume = clickVolume;
+    if (primaryClickRef.current) primaryClickRef.current.volume = clickVolume;
+    if (fiveSecondsRef.current) fiveSecondsRef.current.volume = soundEnabled ? masterVolume : 0;
+  }, [masterVolume, soundEnabled]);
+
+  const playAudio = useCallback((audio: HTMLAudioElement | null) => {
+    if (!audio || !soundEnabled) return;
+    try {
+      audio.currentTime = 0;
+      void audio.play().catch(() => undefined);
+    } catch {
+      // Browser audio can be blocked until the first user gesture.
+    }
+  }, [soundEnabled]);
+
+  const playInterfaceSound = useCallback((kind: 'soft' | 'primary' | 'five') => {
+    initAudio();
+    applyAudioVolume();
+    if (kind === 'primary') playAudio(primaryClickRef.current);
+    if (kind === 'soft') playAudio(softClickRef.current);
+    if (kind === 'five') playAudio(fiveSecondsRef.current);
+  }, [applyAudioVolume, initAudio, playAudio]);
+
+  const syncBackgroundMusic = useCallback(() => {
+    initAudio();
+    applyAudioVolume();
+
+    const menuTrack = menuMusicRef.current;
+    const gameTrack = gameMusicRef.current;
+    if (!menuTrack || !gameTrack) return;
+
+    const activeTrack = view === 'menu' ? menuTrack : gameTrack;
+    const inactiveTrack = view === 'menu' ? gameTrack : menuTrack;
+    inactiveTrack.pause();
+
+    if (!soundEnabled || !audioUnlockedRef.current) {
+      activeTrack.pause();
+      return;
+    }
+
+    void activeTrack.play().catch(() => undefined);
+  }, [applyAudioVolume, initAudio, soundEnabled, view]);
+
+  useEffect(() => {
+    initAudio();
+    applyAudioVolume();
+  }, [applyAudioVolume, initAudio]);
+
+  useEffect(() => {
+    syncBackgroundMusic();
+  }, [syncBackgroundMusic]);
+
+  const handleBredPointerSound = useCallback((event: PointerEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement | null;
+    const action = target?.closest<HTMLElement>('[data-bred-sound], button, a');
+    if (!action || action.hasAttribute('disabled') || action.getAttribute('aria-disabled') === 'true') return;
+    if (action.dataset.bredNoSound === 'true') return;
+
+    audioUnlockedRef.current = true;
+    playInterfaceSound(action.dataset.bredSound === 'primary' ? 'primary' : 'soft');
+    setTimeout(() => syncBackgroundMusic(), 0);
+  }, [playInterfaceSound, syncBackgroundMusic]);
 
   const inviteUrl = useMemo(() => {
     if (!lobby?.code || typeof window === 'undefined') return '';
@@ -638,23 +871,33 @@ export default function BredClient() {
       vote_results: [],
       phase_started_at: null,
       phase_deadline_at: null,
+      players: players.map((player) => ({
+        ...player,
+        submitted_fact: false,
+        fact_a: null,
+        fact_b: null,
+        truth_index: null,
+        fact_entries: [],
+      })),
     });
+    setFactEntries([{ fact_a: '', fact_b: '', truth_index: 0 }]);
+    setHasSubmitted(false);
   };
 
   const submitFacts = async () => {
     if (!lobby || !myPlayerId) return;
-    if (!factA.trim() || !factB.trim()) {
-      setError('Заполните оба факта');
+    const cleanEntries = sanitizeFactEntries(factEntries);
+    if (cleanEntries.length !== factEntries.length) {
+      setError('Заполните все пары фактов');
       return;
     }
+    const encodedFacts = encodeFactEntries(cleanEntries);
 
     try {
       await patchLobby({
         players: players.map((player) => player.id === myPlayerId ? {
           ...player,
-          fact_a: factA.trim(),
-          fact_b: factB.trim(),
-          truth_index: truthIndex,
+          ...encodedFacts,
           submitted_fact: true,
         } : player),
       });
@@ -668,13 +911,10 @@ export default function BredClient() {
   useEffect(() => {
     if (!isHost || !lobby || lobby.status !== 'input') return;
 
-    const allSubmitted = players.length > 0 && players.every((player) => player.submitted_fact);
+    const allSubmitted = players.length > 0 && players.every((player) => player.submitted_fact && getPlayerFactEntries(player).length > 0);
     if (!allSubmitted) return;
 
-    const playerSequence = [...players]
-      .filter((player) => player.fact_a && player.fact_b)
-      .map((player) => player.id)
-      .sort(() => Math.random() - 0.5);
+    const playerSequence = makeFactSequence(players);
 
     if (playerSequence.length === 0) return;
 
@@ -701,6 +941,12 @@ export default function BredClient() {
     const updateTimer = () => {
       const remaining = getRemainingSeconds(lobby.phase_deadline_at);
       setTimer(lobby.phase_deadline_at ? remaining : roundSeconds);
+      const fiveSecondKey = `${lobby.id}:${lobby.current_fact_idx}:${lobby.phase_deadline_at || ''}`;
+
+      if (remaining > 0 && remaining <= 5 && lobby.phase_deadline_at && fiveSecondsRoundRef.current !== fiveSecondKey) {
+        fiveSecondsRoundRef.current = fiveSecondKey;
+        playInterfaceSound('five');
+      }
 
       if (remaining <= 0 && lobby.phase_deadline_at) {
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
@@ -721,7 +967,7 @@ export default function BredClient() {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [isHost, lobby?.id, lobby?.phase_deadline_at, lobby?.status, roundSeconds]);
+  }, [isHost, lobby?.id, lobby?.phase_deadline_at, lobby?.status, playInterfaceSound, roundSeconds]);
 
   useEffect(() => {
     if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current);
@@ -737,12 +983,13 @@ export default function BredClient() {
         if (!currentLobby || currentLobby.status !== 'reveal') return;
         if (currentLobby.current_fact_idx !== lobby.current_fact_idx) return;
 
-        const targetPlayerId = currentLobby.facts[currentLobby.current_fact_idx];
+        const targetRoundId = currentLobby.facts[currentLobby.current_fact_idx];
+        const { playerId: targetPlayerId } = parseFactRoundId(targetRoundId);
         const targetPlayer = currentPlayers.find((player) => player.id === targetPlayerId);
         const results = currentLobby.vote_results?.[currentLobby.current_fact_idx];
         if (!targetPlayer || !results) return;
 
-        const updates = getScoreDeltas(currentPlayers, targetPlayer, results);
+        const updates = getScoreDeltas(currentPlayers, targetPlayer, getRoundTruthIndex(targetPlayer, targetRoundId), results);
 
         if (Object.values(updates).some((delta) => delta > 0)) {
           await patchLobby({
@@ -784,14 +1031,15 @@ export default function BredClient() {
   const handleVote = async (index: number) => {
     if (!lobby || !myPlayerId || lobby.status !== 'voting' || myVote !== null) return;
 
-    const targetPlayerId = lobby.facts[lobby.current_fact_idx];
+    const targetRoundId = lobby.facts[lobby.current_fact_idx];
+    const { playerId: targetPlayerId } = parseFactRoundId(targetRoundId);
     if (targetPlayerId === myPlayerId) return;
 
     setMyVote(index);
 
     const results = [...(lobby.vote_results || [])] as VoteRound[];
-    const currentRound = results[lobby.current_fact_idx] || { targetId: targetPlayerId, votes: {} };
-    currentRound.targetId = targetPlayerId;
+    const currentRound = results[lobby.current_fact_idx] || { targetId: targetRoundId, votes: {} };
+    currentRound.targetId = targetRoundId;
     currentRound.votes = { ...currentRound.votes, [myPlayerId]: index };
     results[lobby.current_fact_idx] = currentRound;
 
@@ -803,6 +1051,71 @@ export default function BredClient() {
   };
 
   const activeHowSlide = howSlides[howStep];
+
+  const renderSoundControl = () => (
+    <div className="bred-sound-control">
+      <button
+        className="bred-icon-button"
+        type="button"
+        aria-label="Звук"
+        onClick={() => {
+          audioUnlockedRef.current = true;
+          setIsVolumeOpen((current) => !current);
+          if (!soundEnabled) setSoundEnabled(true);
+          setTimeout(() => syncBackgroundMusic(), 0);
+        }}
+      >
+        {soundEnabled ? <Volume2 size={31} aria-hidden="true" /> : <VolumeX size={31} aria-hidden="true" />}
+      </button>
+      {isVolumeOpen && (
+        <div className="bred-volume-popover">
+          <button
+            type="button"
+            className="bred-volume-toggle"
+            onClick={() => {
+              audioUnlockedRef.current = true;
+              setSoundEnabled((current) => !current);
+            }}
+          >
+            {soundEnabled ? 'звук включен' : 'звук выключен'}
+          </button>
+          <label>
+            <span>громкость</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={masterVolume}
+              onChange={(event) => {
+                audioUnlockedRef.current = true;
+                setMasterVolume(Number(event.target.value));
+              }}
+            />
+          </label>
+        </div>
+      )}
+    </div>
+  );
+
+  const updateFactEntry = (entryIndex: number, field: 'fact_a' | 'fact_b', value: string) => {
+    setFactEntries((current) =>
+      current.map((entry, index) => (index === entryIndex ? { ...entry, [field]: value } : entry))
+    );
+  };
+
+  const updateFactTruth = (entryIndex: number, truthIndex: number) => {
+    setFactEntries((current) =>
+      current.map((entry, index) => (index === entryIndex ? { ...entry, truth_index: truthIndex } : entry))
+    );
+  };
+
+  const addFactEntry = () => {
+    setFactEntries((current) => {
+      if (current.length >= MAX_FACT_ENTRIES) return current;
+      return [...current, { fact_a: '', fact_b: '', truth_index: 0 }];
+    });
+  };
 
   const renderAuthPanel = () => {
     if (inviteCode) {
@@ -894,6 +1207,7 @@ export default function BredClient() {
                 <button
                   className="bred-primary-button"
                   type="button"
+                  data-bred-sound="primary"
                   onClick={handleAnonymousGame}
                   disabled={isJoining}
                 >
@@ -910,6 +1224,7 @@ export default function BredClient() {
                 <button
                   className="bred-primary-button"
                   type="button"
+                  data-bred-sound="primary"
                   onClick={handleHostGame}
                   disabled={isJoining}
                 >
@@ -952,7 +1267,7 @@ export default function BredClient() {
   };
 
   const renderMenu = () => (
-    <div className="bred-root">
+    <div className="bred-root" onPointerDownCapture={handleBredPointerSound}>
       <div className="bred-bg" />
       <main className="bred-frame bred-frame-menu">
         <header className="bred-topbar">
@@ -960,9 +1275,7 @@ export default function BredClient() {
             <span className="bred-globe">◎</span>
             RU
           </button>
-          <div className="bred-live">
-            <Volume2 size={30} aria-hidden="true" />
-          </div>
+          {renderSoundControl()}
         </header>
 
         <section className="bred-brand-block">
@@ -1008,7 +1321,7 @@ export default function BredClient() {
   );
 
   const renderLobby = () => (
-    <div className="bred-root">
+    <div className="bred-root" onPointerDownCapture={handleBredPointerSound}>
       <div className="bred-bg bred-bg-lobby" />
       <main className="bred-frame bred-frame-lobby">
         <header className="bred-lobby-header">
@@ -1019,9 +1332,7 @@ export default function BredClient() {
           <div className="bred-logo bred-logo-small">
             <span>Бредовуха</span>
           </div>
-          <button className="bred-icon-button" type="button" aria-label="Звук">
-            <Volume2 size={31} aria-hidden="true" />
-          </button>
+          {renderSoundControl()}
         </header>
 
         <section className="bred-lobby-grid">
@@ -1120,6 +1431,7 @@ export default function BredClient() {
           <button
             className="bred-primary-button"
             type="button"
+            data-bred-sound="primary"
             onClick={handleStartGame}
             disabled={!isHost || players.length < 2}
           >
@@ -1142,26 +1454,38 @@ export default function BredClient() {
       exit={{ opacity: 0, y: -16 }}
     >
       <h1>Правда или ложь</h1>
-      <p className="bred-phase-sub">Напишите два факта. Один должен быть правдой.</p>
+      <p className="bred-phase-sub">Напишите от 1 до 5 пар. В каждой паре одна правда и одна ложь.</p>
       <div className="bred-submit-counter">
         готово: {submittedCount}/{players.length}
       </div>
 
       {!hasSubmitted ? (
-        <div className="bred-fact-grid">
-          {[0, 1].map((index) => (
-            <div key={index} className={`bred-fact-card ${truthIndex === index ? 'is-truth' : 'is-lie'}`}>
-              <button type="button" onClick={() => setTruthIndex(index)}>
-                {truthIndex === index ? 'правда' : 'ложь'}
-              </button>
-              <textarea
-                value={index === 0 ? factA : factB}
-                onChange={(event) => (index === 0 ? setFactA(event.target.value) : setFactB(event.target.value))}
-                placeholder={index === 0 ? 'Факт А' : 'Факт Б'}
-              />
+        <div className="bred-fact-list">
+          {factEntries.map((entry, entryIndex) => (
+            <div key={entryIndex} className="bred-fact-pair">
+              <div className="bred-fact-pair-title">пара {entryIndex + 1}</div>
+              <div className="bred-fact-grid">
+                {[0, 1].map((index) => (
+                  <div key={index} className={`bred-fact-card ${entry.truth_index === index ? 'is-truth' : 'is-lie'}`}>
+                    <button type="button" onClick={() => updateFactTruth(entryIndex, index)}>
+                      {entry.truth_index === index ? 'правда' : 'ложь'}
+                    </button>
+                    <textarea
+                      value={index === 0 ? entry.fact_a : entry.fact_b}
+                      onChange={(event) => updateFactEntry(entryIndex, index === 0 ? 'fact_a' : 'fact_b', event.target.value)}
+                      placeholder={index === 0 ? 'Факт А' : 'Факт Б'}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
-          <button className="bred-primary-button" type="button" onClick={submitFacts}>
+          {factEntries.length < MAX_FACT_ENTRIES && (
+            <button className="bred-secondary-button bred-add-fact-button" type="button" onClick={addFactEntry}>
+              добавить
+            </button>
+          )}
+          <button className="bred-primary-button" type="button" data-bred-sound="primary" onClick={submitFacts}>
             <Check size={24} aria-hidden="true" />
             отправить
           </button>
@@ -1177,11 +1501,13 @@ export default function BredClient() {
   );
 
   const renderVotingPhase = () => {
-    const targetPlayer = players.find((player) => player.id === lobby?.facts[lobby.current_fact_idx]);
+    const roundId = getCurrentRoundId(lobby);
+    const { playerId: targetPlayerId } = parseFactRoundId(roundId);
+    const targetPlayer = players.find((player) => player.id === targetPlayerId);
     if (!lobby || !targetPlayer) return null;
 
     const isOwnRound = targetPlayer.id === myPlayerId;
-    const displayFacts = getDisplayFacts(lobby, targetPlayer);
+    const displayFacts = getDisplayFacts(lobby, targetPlayer, roundId);
 
     return (
       <motion.section
@@ -1219,12 +1545,15 @@ export default function BredClient() {
   };
 
   const renderRevealPhase = () => {
-    const targetPlayer = players.find((player) => player.id === lobby?.facts[lobby.current_fact_idx]);
+    const roundId = getCurrentRoundId(lobby);
+    const { playerId: targetPlayerId } = parseFactRoundId(roundId);
+    const targetPlayer = players.find((player) => player.id === targetPlayerId);
     if (!lobby || !targetPlayer) return null;
 
-    const displayFacts = getDisplayFacts(lobby, targetPlayer);
+    const displayFacts = getDisplayFacts(lobby, targetPlayer, roundId);
+    const truthIndex = getRoundTruthIndex(targetPlayer, roundId);
     const results = lobby.vote_results?.[lobby.current_fact_idx];
-    const scoreDeltas = getScoreDeltas(players, targetPlayer, results);
+    const scoreDeltas = getScoreDeltas(players, targetPlayer, truthIndex, results);
     const getChoiceLabel = (choice?: number) => {
       if (choice === undefined) return 'не выбрал';
       return displayFacts.find((item) => item.factIndex === choice)?.label || 'не выбрал';
@@ -1245,9 +1574,9 @@ export default function BredClient() {
           {displayFacts.map((item) => (
             <div
               key={item.factIndex}
-              className={`bred-reveal-card ${targetPlayer.truth_index === item.factIndex ? 'is-truth' : 'is-lie'}`}
+              className={`bred-reveal-card ${truthIndex === item.factIndex ? 'is-truth' : 'is-lie'}`}
             >
-              <span>{targetPlayer.truth_index === item.factIndex ? 'правда' : 'ложь'}</span>
+              <span>{truthIndex === item.factIndex ? 'правда' : 'ложь'}</span>
               <strong>{item.fact}</strong>
             </div>
           ))}
@@ -1257,7 +1586,7 @@ export default function BredClient() {
           <div className="bred-reveal-result-list">
             {voters.map((player) => {
               const choice = results?.votes?.[player.id];
-              const isCorrect = choice === targetPlayer.truth_index;
+              const isCorrect = choice === truthIndex;
               return (
                 <div key={player.id} className="bred-reveal-result-row">
                   <span>{player.name}</span>
@@ -1306,7 +1635,7 @@ export default function BredClient() {
   );
 
   const renderGamePhase = () => (
-    <div className="bred-root">
+    <div className="bred-root" onPointerDownCapture={handleBredPointerSound}>
       <div className="bred-bg bred-bg-lobby" />
       <main className="bred-frame bred-frame-phase">
         <header className="bred-lobby-header">
@@ -1317,7 +1646,10 @@ export default function BredClient() {
           <div className="bred-logo bred-logo-small">
             <span>Бредовуха</span>
           </div>
-          <div className="bred-code-pill">{lobby?.code}</div>
+          <div className="bred-phase-actions">
+            <div className="bred-code-pill">{lobby?.code}</div>
+            {renderSoundControl()}
+          </div>
         </header>
 
         <AnimatePresence mode="wait">

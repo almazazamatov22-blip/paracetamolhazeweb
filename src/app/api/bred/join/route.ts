@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       fact_a: null,
       fact_b: null,
       truth_index: null,
+      fact_entries: [],
     });
 
     return NextResponse.json({ ok: true, lobby: nextLobby, players: nextLobby?.players ?? [] });

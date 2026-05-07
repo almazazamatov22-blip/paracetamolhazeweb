@@ -1120,6 +1120,53 @@
   filter: drop-shadow(0 3px 0 #321052) drop-shadow(0 0 2px #321052);
 }
 
+.bred-sound-control {
+  position: relative;
+  display: grid;
+  place-items: center;
+  z-index: 5;
+}
+
+.bred-volume-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 230px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 3px solid rgba(239, 226, 255, 0.88);
+  border-radius: 8px;
+  background: rgba(91, 24, 135, 0.96);
+  box-shadow: inset 0 -5px 0 rgba(49, 12, 88, 0.52), 0 8px 0 rgba(45, 12, 82, 0.48);
+}
+
+.bred-volume-popover label {
+  display: grid;
+  gap: 8px;
+  color: #fff;
+  font-family: 'Geist', 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.bred-volume-popover input {
+  width: 100%;
+  accent-color: #00ffc2;
+}
+
+.bred-volume-toggle {
+  min-height: 38px;
+  border: 2px solid rgba(239, 226, 255, 0.82);
+  border-radius: 8px;
+  color: #38205a;
+  background: #efe8ff;
+  font: 900 14px 'Geist', 'Inter', system-ui, sans-serif;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 .bred-brand-block {
   display: grid;
   place-items: center;
@@ -1926,6 +1973,12 @@
   font-weight: 900;
 }
 
+.bred-phase-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .bred-frame-phase {
   display: grid;
   grid-template-rows: auto 1fr auto;
@@ -1966,6 +2019,40 @@
   gap: 14px;
 }
 
+.bred-fact-list {
+  width: 100%;
+  max-height: min(54vh, 540px);
+  display: grid;
+  gap: 16px;
+  overflow-y: auto;
+  padding: 2px 8px 8px;
+}
+
+.bred-fact-pair {
+  display: grid;
+  gap: 8px;
+}
+
+.bred-fact-pair-title {
+  justify-self: start;
+  color: #54f4c6;
+  font-size: 20px;
+  font-weight: 900;
+  text-transform: uppercase;
+  text-shadow: 0 3px 0 #381460;
+}
+
+.bred-fact-list .bred-primary-button,
+.bred-add-fact-button {
+  justify-self: center;
+}
+
+.bred-add-fact-button {
+  min-height: 48px;
+  padding: 0 22px;
+  font-size: 20px;
+}
+
 .bred-fact-grid .bred-primary-button {
   grid-column: 1 / -1;
   justify-self: center;
@@ -1988,22 +2075,22 @@
 
 .bred-fact-card.is-truth,
 .bred-reveal-card.is-truth {
-  border-color: #00ffc2;
+  border-color: #1dffd0;
   box-shadow:
-    inset 0 -8px 0 rgba(0, 255, 194, 0.28),
+    inset 0 -8px 0 rgba(0, 255, 194, 0.34),
     0 4px 0 rgba(37, 12, 67, 0.8),
-    0 0 0 2px rgba(255, 255, 255, 0.48),
-    0 0 18px rgba(0, 255, 194, 0.62);
+    0 0 0 3px rgba(221, 255, 246, 0.72),
+    0 0 24px rgba(0, 255, 194, 0.88);
 }
 
 .bred-fact-card.is-lie,
 .bred-reveal-card.is-lie {
-  border-color: #ff2f87;
+  border-color: #ff5fa3;
   box-shadow:
-    inset 0 -8px 0 rgba(255, 47, 135, 0.24),
+    inset 0 -8px 0 rgba(255, 47, 135, 0.32),
     0 4px 0 rgba(37, 12, 67, 0.8),
-    0 0 0 2px rgba(255, 255, 255, 0.48),
-    0 0 18px rgba(255, 47, 135, 0.62);
+    0 0 0 3px rgba(255, 225, 239, 0.72),
+    0 0 24px rgba(255, 47, 135, 0.86);
 }
 
 .bred-fact-card button {
@@ -2346,5 +2433,19 @@
 
   .bred-phase-panel {
     padding: 20px 14px;
+  }
+
+  .bred-fact-list {
+    max-height: none;
+    padding-inline: 0;
+  }
+
+  .bred-phase-actions {
+    gap: 6px;
+  }
+
+  .bred-volume-popover {
+    right: -6px;
+    width: min(220px, 82vw);
   }
 }
