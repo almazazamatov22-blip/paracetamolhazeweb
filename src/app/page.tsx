@@ -11,7 +11,7 @@ const DEFAULT_NICKS = [
   'evelone2004', 'kurokoken', 'egypop13', 'GolDi_21', 'STRYPOFF13', 'limonnub'
 ];
 
-const LOTTOMAL_URL = process.env.NEXT_PUBLIC_LOTOMAL_URL || 'https://lotomal.paracetamolhaze.ru'
+const LOTTOMAL_URL = process.env.NEXT_PUBLIC_LOTOMAL_URL || 'https://lotomal.paracetamol.workers.dev'
 const PROJECTS = [
   {
     title: 'РОЗ',
@@ -75,18 +75,7 @@ const PROJECTS = [
 export default function Home() {
   const containerRef = useRef<HTMLDivElement>(null)
   const ticking = useRef(false)
-  const [lotomalUrl, setLotomalUrl] = useState(LOTTOMAL_URL)
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      if (hostname.endsWith('paracetamolhaze.online')) {
-        setLotomalUrl('https://lotomal.paracetamolhaze.online');
-      } else if (hostname.endsWith('paracetamolhaze.ru')) {
-        setLotomalUrl('https://lotomal.paracetamolhaze.ru');
-      }
-    }
-  }, []);
+  const [lotomalUrl] = useState(LOTTOMAL_URL)
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!ticking.current) {

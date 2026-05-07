@@ -1,0 +1,31 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "lotomal",
+  "account_id": "e1391011f450e53be632100bfe048e20",
+  "main": "src/index.js",
+  "compatibility_date": "2026-05-01",
+  "assets": {
+    "directory": "../../public/lotomal",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "LOTOMAL_GAME",
+        "class_name": "LotomalGame"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "LotomalGame"
+      ]
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

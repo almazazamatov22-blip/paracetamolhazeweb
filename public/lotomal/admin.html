@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Лото - Админ панель</title>
-    <script src="/loto-realtime.js?v=12"></script>
     <style>
         * {
             margin: 0;
@@ -695,10 +694,10 @@
         async function initAdminRealtime() {
             return;
             if (!lobbyId) return;
-            // Используем тот же anon-ключ что и в loto-realtime.js
+            // Legacy Supabase realtime is disabled for the Cloudflare Worker version.
             const sb = window.supabase.createClient(
-                'https://dlybapjwphbcynfkdxyk.supabase.co',
-                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWJhcGp3cGhiY3luZmtkeHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTEzMzQsImV4cCI6MjA5MjAyNzMzNH0.XVjs3XJVUR51NXjxgFKnCrW1f-Irv3AQRItonjeDDPk'
+                '',
+                ''
             );
             
             // Подписка на изменения лобби (бочонки)
