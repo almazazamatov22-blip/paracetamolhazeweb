@@ -2347,7 +2347,7 @@
   position: relative;
   min-width: 118px;
   max-width: 190px;
-  height: 42px;
+  height: 48px;
   display: grid;
   place-items: center;
   padding: 0 14px;
@@ -2359,7 +2359,8 @@
   transform: rotate(-4deg);
   animation: bredRevealTagPop 0.42s ease-out both;
   animation-delay: var(--tag-delay);
-  overflow: hidden;
+  overflow: visible;
+  z-index: 5;
 }
 
 .bred-reveal-choice-tag:nth-child(even) {
@@ -2369,15 +2370,24 @@
 .bred-reveal-choice-tag span,
 .bred-reveal-choice-tag em {
   grid-area: 1 / 1;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .bred-reveal-choice-tag span {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  max-width: 100%;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 0;
+  color: #1b1430;
+  box-shadow: none;
   font: 900 14px 'Geist', 'Inter', system-ui, sans-serif;
+  line-height: 1;
   text-transform: uppercase;
+  text-shadow: none;
   animation: bredRevealNameOut 10s ease forwards;
   animation-delay: var(--tag-delay);
   background: transparent;
@@ -2385,9 +2395,12 @@
 
 .bred-reveal-choice-tag em {
   opacity: 0;
+  max-width: none;
+  overflow: visible;
   color: #11f02b;
-  font: 1000 28px 'Geist', 'Inter', system-ui, sans-serif;
+  font: 1000 30px 'Geist', 'Inter', system-ui, sans-serif;
   font-style: normal;
+  line-height: 1;
   letter-spacing: 0;
   text-shadow:
     -2px -2px 0 #064509,

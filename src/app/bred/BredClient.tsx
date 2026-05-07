@@ -1607,7 +1607,7 @@ export default function BredClient() {
         <h1>
           {isOwnRound
             ? targetPlayer.name
-            : `Какое утверждение об игроке "${targetPlayer.name}" является правдой?`}
+            : `Какое утверждение об игроке ${targetPlayer.name} является правдой?`}
         </h1>
         {isOwnRound && <p className="bred-phase-sub">Это ваши факты.</p>}
 
@@ -1663,7 +1663,7 @@ export default function BredClient() {
           <strong>0</strong>
         </div>
         <h1>
-          Какое утверждение об игроке "{targetPlayer.name}" является правдой?
+          Какое утверждение об игроке {targetPlayer.name} является правдой?
         </h1>
         <div className="bred-vote-grid bred-reveal-inline-grid">
           {displayFacts.map((item) => {
