@@ -1604,12 +1604,12 @@ export default function BredClient() {
           </span>
           <strong>{timer}</strong>
         </div>
-        <h1>{targetPlayer.name}</h1>
-        <p className="bred-phase-sub">
+        <h1>
           {isOwnRound
-            ? 'Это ваши факты.'
+            ? targetPlayer.name
             : `Какое утверждение об игроке "${targetPlayer.name}" является правдой?`}
-        </p>
+        </h1>
+        {isOwnRound && <p className="bred-phase-sub">Это ваши факты.</p>}
 
         <div className="bred-vote-grid">
           {displayFacts.map((item) => (
