@@ -1,6 +1,6 @@
 'use client';
 
-import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -70,7 +70,8 @@ interface Lobby {
 
 const VOTE_TIME = 15;
 const REVEAL_TIME = 7;
-const INPUT_TIME = 60;
+const DEFAULT_INPUT_TIME = 60;
+const INPUT_TIME_OPTIONS = [60, 120, 180];
 const BRED_SOURCE = 'bred';
 const TELEGRAM_URL = process.env.NEXT_PUBLIC_TELEGRAM_URL || 'https://t.me/paracetamolhaze';
 const MAX_FACT_ENTRIES = 5;
@@ -401,6 +402,7 @@ export default function BredClient() {
   const [howStep, setHowStep] = useState(0);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState(14);
+  const [inputSeconds, setInputSeconds] = useState(DEFAULT_INPUT_TIME);
   const [roundSeconds, setRoundSeconds] = useState(VOTE_TIME);
   const [factEntries, setFactEntries] = useState<FactEntry[]>([{ fact_a: '', fact_b: '', truth_index: 0 }]);
   const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -870,7 +872,7 @@ export default function BredClient() {
       facts: [],
       current_fact_idx: 0,
       vote_results: [],
-      ...createPhaseTiming(INPUT_TIME),
+      ...createPhaseTiming(inputSeconds),
       players: players.map((player) => ({
         ...player,
         submitted_fact: false,
@@ -925,7 +927,7 @@ export default function BredClient() {
       vote_results: [],
       ...createPhaseTiming(roundSeconds),
     }).catch((err) => setError(err.message || 'Не удалось начать голосование'));
-  }, [isHost, lobby?.id, lobby?.status, players]);
+  }, [isHost, lobby?.id, lobby?.status, players, roundSeconds]);
 
   useEffect(() => {
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
@@ -935,19 +937,36 @@ export default function BredClient() {
     if (!isInputPhase && !isVotingPhase) return;
 
     if (!lobby.phase_deadline_at && isHost) {
-      patchLobby(createPhaseTiming(isInputPhase ? INPUT_TIME : roundSeconds))
+      patchLobby(createPhaseTiming(isInputPhase ? inputSeconds : roundSeconds))
         .catch((err) => setError(err.message || 'Не удалось синхронизировать таймер'));
     }
 
     if (isVotingPhase) setMyVote(null);
     const updateTimer = () => {
       const remaining = getRemainingSeconds(lobby.phase_deadline_at);
-      setTimer(lobby.phase_deadline_at ? remaining : isInputPhase ? INPUT_TIME : roundSeconds);
+      setTimer(lobby.phase_deadline_at ? remaining : isInputPhase ? inputSeconds : roundSeconds);
       const fiveSecondKey = `${lobby.id}:${lobby.status}:${lobby.current_fact_idx}:${lobby.phase_deadline_at || ''}`;
 
       if (remaining > 0 && remaining <= 5 && lobby.phase_deadline_at && fiveSecondsRoundRef.current !== fiveSecondKey) {
         fiveSecondsRoundRef.current = fiveSecondKey;
         playInterfaceSound('five');
+      }
+
+      if (isInputPhase && remaining <= 0 && lobby.phase_deadline_at) {
+        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        if (isHost && lobby.id) {
+          const currentPlayers = playersRef.current;
+          const playerSequence = makeFactSequence(currentPlayers);
+          if (playerSequence.length > 0) {
+            patchLobby({
+              status: 'voting',
+              facts: playerSequence,
+              current_fact_idx: 0,
+              vote_results: [],
+              ...createPhaseTiming(roundSeconds),
+            }).catch((err) => setError(err.message || 'Не удалось начать голосование'));
+          }
+        }
       }
 
       if (isVotingPhase && remaining <= 0 && lobby.phase_deadline_at) {
@@ -969,7 +988,7 @@ export default function BredClient() {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [isHost, lobby?.id, lobby?.phase_deadline_at, lobby?.status, lobby?.current_fact_idx, playInterfaceSound, roundSeconds]);
+  }, [inputSeconds, isHost, lobby?.id, lobby?.phase_deadline_at, lobby?.status, lobby?.current_fact_idx, playInterfaceSound, roundSeconds]);
 
   useEffect(() => {
     if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current);
@@ -1417,6 +1436,21 @@ export default function BredClient() {
               />
             </label>
             <label className="bred-setting-row">
+              <Timer size={24} aria-hidden="true" />
+              <span>секунд на факты</span>
+              <select
+                value={inputSeconds}
+                onChange={(event) => setInputSeconds(Number(event.target.value))}
+                disabled={!isHost}
+              >
+                {INPUT_TIME_OPTIONS.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="bred-setting-row">
               <Check size={24} aria-hidden="true" />
               <span>режим</span>
               <strong>Правда или ложь</strong>
@@ -1468,7 +1502,7 @@ export default function BredClient() {
           готово: {submittedCount}/{players.length}
         </div>
         <strong className="bred-input-timer">
-          {lobby?.phase_deadline_at ? getRemainingSeconds(lobby.phase_deadline_at) : INPUT_TIME}
+          {lobby?.phase_deadline_at ? timer : inputSeconds}
         </strong>
       </div>
 
@@ -1493,7 +1527,7 @@ export default function BredClient() {
                     <textarea
                       value={index === 0 ? entry.fact_a : entry.fact_b}
                       onChange={(event) => updateFactEntry(entryIndex, index === 0 ? 'fact_a' : 'fact_b', event.target.value)}
-                      placeholder={index === 0 ? 'Факт А' : 'Факт Б'}
+                      placeholder=""
                     />
                   </div>
                 ))}
@@ -1555,7 +1589,6 @@ export default function BredClient() {
               onClick={() => handleVote(item.factIndex)}
               disabled={isOwnRound || myVote !== null}
             >
-              <span>{item.label}</span>
               <strong>{item.fact}</strong>
             </button>
           ))}
@@ -1574,54 +1607,61 @@ export default function BredClient() {
     const truthIndex = getRoundTruthIndex(targetPlayer, roundId);
     const results = lobby.vote_results?.[lobby.current_fact_idx];
     const scoreDeltas = getScoreDeltas(players, targetPlayer, truthIndex, results);
-    const getChoiceLabel = (choice?: number) => {
-      if (choice === undefined) return 'не выбрал';
-      return displayFacts.find((item) => item.factIndex === choice)?.label || 'не выбрал';
-    };
     const voters = players.filter((player) => player.id !== targetPlayer.id);
+    const targetBonus = scoreDeltas[targetPlayer.id] || 0;
+    const getVotersForFact = (factIndex: number) =>
+      voters.filter((player) => results?.votes?.[player.id] === factIndex);
+    const getVoterDelta = (playerId: string) => {
+      const choice = results?.votes?.[playerId];
+      if (choice === undefined) return 0;
+      return choice === truthIndex ? 100 : 0;
+    };
 
     return (
       <motion.section
         key="reveal"
-        className="bred-phase-panel"
+        className="bred-phase-panel bred-reveal-panel"
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.96 }}
       >
         <h1>Раскрытие</h1>
         <p className="bred-phase-sub">{targetPlayer.name}</p>
-        <div className="bred-vote-grid">
-          {displayFacts.map((item) => (
-            <div
-              key={item.factIndex}
-              className={`bred-reveal-card ${truthIndex === item.factIndex ? 'is-truth' : 'is-lie'}`}
-            >
-              <span>{truthIndex === item.factIndex ? 'правда' : 'ложь'}</span>
-              <strong>{item.fact}</strong>
-            </div>
-          ))}
-        </div>
-        <div className="bred-reveal-results">
-          <h3>Кто что выбрал</h3>
-          <div className="bred-reveal-result-list">
-            {voters.map((player) => {
-              const choice = results?.votes?.[player.id];
-              const isCorrect = choice === truthIndex;
-              return (
-                <div key={player.id} className="bred-reveal-result-row">
-                  <span>{player.name}</span>
-                  <strong>{getChoiceLabel(choice)}</strong>
-                  <em>{choice === undefined ? '+0' : isCorrect ? '+100' : '+0'}</em>
+        <div className="bred-reveal-stage">
+          {displayFacts.map((item) => {
+            const isTruth = truthIndex === item.factIndex;
+            const pickedVoters = getVotersForFact(item.factIndex);
+            return (
+              <div
+                key={item.factIndex}
+                className={`bred-reveal-card ${isTruth ? 'is-truth' : 'is-lie'}`}
+              >
+                <strong className="bred-reveal-fact-text">{item.fact}</strong>
+                <div className="bred-reveal-choice-tags">
+                  {pickedVoters.map((player, index) => (
+                    <div
+                      key={player.id}
+                      className="bred-reveal-choice-tag"
+                      style={{ '--tag-delay': `${index * 90}ms` } as CSSProperties}
+                    >
+                      <span>{player.name}</span>
+                      <em>+{getVoterDelta(player.id)}</em>
+                    </div>
+                  ))}
                 </div>
-              );
-            })}
-            <div className="bred-reveal-result-row is-target">
-              <span>{targetPlayer.name}</span>
-              <strong>за блеф</strong>
-              <em>+{scoreDeltas[targetPlayer.id] || 0}</em>
-            </div>
-          </div>
+                <div className={`bred-reveal-truth-ribbon ${isTruth ? 'is-truth' : 'is-lie'}`}>
+                  {isTruth ? 'правда' : 'ложь'}
+                </div>
+              </div>
+            );
+          })}
         </div>
+        {targetBonus > 0 && (
+          <div className="bred-reveal-target-bonus">
+            <span>{targetPlayer.name} лжет!</span>
+            <strong>+{targetBonus}</strong>
+          </div>
+        )}
       </motion.section>
     );
   };
