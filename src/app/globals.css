@@ -2011,6 +2011,29 @@
   text-transform: uppercase;
 }
 
+.bred-input-statusbar {
+  width: min(520px, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.bred-input-timer {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #ff477f;
+  border: 4px solid #42105d;
+  font-size: 24px;
+  font-weight: 900;
+  text-shadow: 0 3px 0 #381460;
+  box-shadow: inset 0 -5px 0 rgba(117, 22, 83, 0.48), 0 4px 0 rgba(37, 12, 67, 0.8);
+}
+
 .bred-fact-grid,
 .bred-vote-grid {
   width: 100%;
@@ -2033,6 +2056,13 @@
   gap: 8px;
 }
 
+.bred-fact-pair-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .bred-fact-pair-title {
   justify-self: start;
   color: #54f4c6;
@@ -2040,6 +2070,19 @@
   font-weight: 900;
   text-transform: uppercase;
   text-shadow: 0 3px 0 #381460;
+}
+
+.bred-remove-fact-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 2px solid rgba(255, 225, 239, 0.9);
+  border-radius: 8px;
+  color: #fff;
+  background: rgba(255, 47, 135, 0.38);
+  box-shadow: inset 0 -3px 0 rgba(92, 16, 78, 0.48), 0 3px 0 rgba(48, 12, 72, 0.56);
+  font: 900 14px 'Geist', 'Inter', system-ui, sans-serif;
+  text-transform: uppercase;
+  cursor: pointer;
 }
 
 .bred-fact-list .bred-primary-button,
@@ -2433,6 +2476,16 @@
 
   .bred-phase-panel {
     padding: 20px 14px;
+  }
+
+  .bred-input-statusbar {
+    gap: 10px;
+  }
+
+  .bred-input-timer {
+    width: 52px;
+    height: 52px;
+    font-size: 21px;
   }
 
   .bred-fact-list {

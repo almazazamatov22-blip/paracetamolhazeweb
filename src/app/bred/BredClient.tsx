@@ -70,6 +70,7 @@ interface Lobby {
 
 const VOTE_TIME = 15;
 const REVEAL_TIME = 7;
+const INPUT_TIME = 60;
 const BRED_SOURCE = 'bred';
 const TELEGRAM_URL = process.env.NEXT_PUBLIC_TELEGRAM_URL || 'https://t.me/paracetamolhaze';
 const MAX_FACT_ENTRIES = 5;
@@ -869,8 +870,7 @@ export default function BredClient() {
       facts: [],
       current_fact_idx: 0,
       vote_results: [],
-      phase_started_at: null,
-      phase_deadline_at: null,
+      ...createPhaseTiming(INPUT_TIME),
       players: players.map((player) => ({
         ...player,
         submitted_fact: false,
@@ -930,25 +930,27 @@ export default function BredClient() {
   useEffect(() => {
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
 
-    if (lobby?.status !== 'voting') return;
+    const isInputPhase = lobby?.status === 'input';
+    const isVotingPhase = lobby?.status === 'voting';
+    if (!isInputPhase && !isVotingPhase) return;
 
     if (!lobby.phase_deadline_at && isHost) {
-      patchLobby(createPhaseTiming(roundSeconds))
+      patchLobby(createPhaseTiming(isInputPhase ? INPUT_TIME : roundSeconds))
         .catch((err) => setError(err.message || 'Не удалось синхронизировать таймер'));
     }
 
-    setMyVote(null);
+    if (isVotingPhase) setMyVote(null);
     const updateTimer = () => {
       const remaining = getRemainingSeconds(lobby.phase_deadline_at);
-      setTimer(lobby.phase_deadline_at ? remaining : roundSeconds);
-      const fiveSecondKey = `${lobby.id}:${lobby.current_fact_idx}:${lobby.phase_deadline_at || ''}`;
+      setTimer(lobby.phase_deadline_at ? remaining : isInputPhase ? INPUT_TIME : roundSeconds);
+      const fiveSecondKey = `${lobby.id}:${lobby.status}:${lobby.current_fact_idx}:${lobby.phase_deadline_at || ''}`;
 
       if (remaining > 0 && remaining <= 5 && lobby.phase_deadline_at && fiveSecondsRoundRef.current !== fiveSecondKey) {
         fiveSecondsRoundRef.current = fiveSecondKey;
         playInterfaceSound('five');
       }
 
-      if (remaining <= 0 && lobby.phase_deadline_at) {
+      if (isVotingPhase && remaining <= 0 && lobby.phase_deadline_at) {
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
         if (isHost && lobby.id) {
           patchLobby({
@@ -967,7 +969,7 @@ export default function BredClient() {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [isHost, lobby?.id, lobby?.phase_deadline_at, lobby?.status, playInterfaceSound, roundSeconds]);
+  }, [isHost, lobby?.id, lobby?.phase_deadline_at, lobby?.status, lobby?.current_fact_idx, playInterfaceSound, roundSeconds]);
 
   useEffect(() => {
     if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current);
@@ -1114,6 +1116,13 @@ export default function BredClient() {
     setFactEntries((current) => {
       if (current.length >= MAX_FACT_ENTRIES) return current;
       return [...current, { fact_a: '', fact_b: '', truth_index: 0 }];
+    });
+  };
+
+  const removeFactEntry = (entryIndex: number) => {
+    setFactEntries((current) => {
+      if (current.length <= 1) return current;
+      return current.filter((_, index) => index !== entryIndex);
     });
   };
 
@@ -1454,16 +1463,27 @@ export default function BredClient() {
       exit={{ opacity: 0, y: -16 }}
     >
       <h1>Правда или ложь</h1>
-      <p className="bred-phase-sub">Напишите от 1 до 5 пар. В каждой паре одна правда и одна ложь.</p>
-      <div className="bred-submit-counter">
-        готово: {submittedCount}/{players.length}
+      <div className="bred-input-statusbar">
+        <div className="bred-submit-counter">
+          готово: {submittedCount}/{players.length}
+        </div>
+        <strong className="bred-input-timer">
+          {lobby?.phase_deadline_at ? getRemainingSeconds(lobby.phase_deadline_at) : INPUT_TIME}
+        </strong>
       </div>
 
       {!hasSubmitted ? (
         <div className="bred-fact-list">
           {factEntries.map((entry, entryIndex) => (
             <div key={entryIndex} className="bred-fact-pair">
-              <div className="bred-fact-pair-title">пара {entryIndex + 1}</div>
+              <div className="bred-fact-pair-header">
+                <div className="bred-fact-pair-title">пара {entryIndex + 1}</div>
+                {factEntries.length > 1 && (
+                  <button className="bred-remove-fact-button" type="button" onClick={() => removeFactEntry(entryIndex)}>
+                    убрать
+                  </button>
+                )}
+              </div>
               <div className="bred-fact-grid">
                 {[0, 1].map((index) => (
                   <div key={index} className={`bred-fact-card ${entry.truth_index === index ? 'is-truth' : 'is-lie'}`}>
