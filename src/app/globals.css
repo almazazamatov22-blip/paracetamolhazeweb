@@ -434,33 +434,128 @@
 
 /* ─── Responsive ─── */
 @media (max-width: 768px) {
-  .paracetamol-subtitle { font-size: 1.8vh; }
-  .paracetamol-main-word { font-size: 10vh; margin-bottom: 2vh; }
+  .paracetamol-body {
+    width: 100vw;
+    max-width: 100vw;
+    min-height: 100svh;
+    display: block;
+    align-items: flex-start;
+    background: #020205;
+  }
+  .paracetamol-container {
+    width: 100vw;
+    min-width: 0;
+    max-width: 100vw;
+    overflow-x: clip;
+    box-sizing: border-box;
+    padding: max(18px, env(safe-area-inset-top)) 16px calc(86px + env(safe-area-inset-bottom));
+    transform: none !important;
+    perspective: none;
+  }
+  .paracetamol-subtitle {
+    font-size: clamp(12px, 3.4vw, 15px);
+    line-height: 1.35;
+    letter-spacing: 0.18em;
+    margin-bottom: 18px;
+  }
+  .paracetamol-main-word {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    font-size: clamp(36px, 10.8vw, 56px);
+    line-height: 0.92;
+    letter-spacing: -0.04em;
+    margin-bottom: 22px;
+  }
+  .paracetamol-word-container,
+  .paracetamol-word-base {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .paracetamol-di-highlight {
+    margin-top: 0.06em;
+  }
   .paracetamol-bottom-left,
   .paracetamol-bottom-right { font-size: 2vh; }
   .paracetamol-bottom-line {
-    flex-direction: column;
-    align-items: flex-start;
-    padding-top: 2vh;
+    display: none;
   }
-  .paracetamol-bottom-right { margin-top: 1vh; }
   .paracetamol-bottom-line::before { content: none; }
-  .paracetamol-projects-section { margin-top: 4vh; }
+  .paracetamol-projects-section {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    margin-top: 18px;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 28px;
+    padding: 0;
+  }
+  .paracetamol-projects-title {
+    font-size: clamp(11px, 3vw, 13px);
+    letter-spacing: 0.32em;
+    margin-bottom: 18px;
+  }
   .paracetamol-projects-grid {
     grid-template-columns: 1fr;
-    gap: 20px;
+    gap: 12px;
     grid-auto-rows: auto;
   }
-  .paracetamol-project-title { font-size: 2.8vh; }
-  .paracetamol-project-desc { font-size: 2.3vh; }
-  .paracetamol-container { padding-bottom: 70px; }
+  .paracetamol-project-card {
+    width: min(100%, 361px);
+    max-width: calc(100vw - 32px);
+    margin-inline: auto;
+    box-sizing: border-box;
+    min-height: 116px;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    padding: 20px 16px;
+    transform: none !important;
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+  .paracetamol-project-card::before {
+    display: none;
+  }
+  .paracetamol-project-card:hover {
+    transform: none !important;
+  }
+  .paracetamol-project-title {
+    width: 100%;
+    min-width: 0;
+    font-size: clamp(24px, 7.8vw, 34px);
+    line-height: 1.05;
+    letter-spacing: 0.16em;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .paracetamol-project-desc {
+    width: 100%;
+    min-width: 0;
+    max-width: 28ch;
+    font-size: clamp(17px, 4.8vw, 22px);
+    line-height: 1.28;
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
 }
 
 @media (max-width: 480px) {
-  .paracetamol-main-word { font-size: 8vh; }
-  .paracetamol-project-title { font-size: 3.2vh; }
-  .paracetamol-project-desc { font-size: 2.6vh; }
-  .paracetamol-project-card { padding: 24px 15px; }
+  .paracetamol-container {
+    padding-inline: 12px;
+  }
+  .paracetamol-main-word {
+    font-size: clamp(24px, 7.8vw, 34px);
+  }
+  .paracetamol-project-card {
+    min-height: 104px;
+    padding: 18px 14px;
+  }
+  .paracetamol-project-title {
+    font-size: clamp(22px, 7.2vw, 30px);
+  }
+  .paracetamol-project-desc {
+    font-size: clamp(16px, 4.6vw, 20px);
+  }
 }
 
 /* ─── Scrollbar ─── */
@@ -975,6 +1070,12 @@
 }
 
 /* Bredovukha party lobby */
+.bred-root *,
+.bred-root *::before,
+.bred-root *::after {
+  box-sizing: border-box;
+}
+
 .bred-root {
   min-height: 100vh;
   width: 100%;
@@ -2719,17 +2820,97 @@
 
 @media (max-width: 720px) {
   .bred-root {
+    width: 100vw;
+    max-width: 100vw;
     align-items: stretch;
-    overflow: auto;
+    min-height: 100svh;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .bred-frame {
-    width: 100%;
+    width: 100vw;
+    min-width: 0;
+    max-width: 100vw;
     min-height: 100vh;
     border-radius: 0;
     border-left: 0;
     border-right: 0;
-    padding: 14px;
+    overflow-x: hidden;
+    padding: 12px 10px calc(72px + env(safe-area-inset-bottom));
+  }
+
+  .bred-frame-lobby {
+    gap: 10px;
+  }
+
+  .bred-topbar,
+  .bred-lobby-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    min-height: 52px;
+  }
+
+  .bred-small-button {
+    min-height: 44px;
+    padding: 0 10px;
+    font-size: 16px;
+  }
+
+  .bred-back-button {
+    min-height: 46px;
+    padding: 0 12px;
+    gap: 6px;
+    font-size: 18px;
+  }
+
+  .bred-back-button svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .bred-live,
+  .bred-icon-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .bred-logo span {
+    max-width: 100%;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    font-size: clamp(29px, 8.8vw, 40px);
+    line-height: 0.92;
+  }
+
+  .bred-brand-block,
+  .bred-logo,
+  .bred-auth-panel,
+  .bred-how-panel,
+  .bred-auth-controls,
+  .bred-name-input,
+  .bred-name-field {
+    width: 100%;
+    min-width: 0;
+    max-width: calc(100vw - 20px);
+  }
+
+  .bred-logo-small {
+    min-width: 0;
+    justify-self: center;
+  }
+
+  .bred-logo-small span {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: clamp(25px, 8vw, 36px);
+    -webkit-text-stroke-width: 1px;
+    text-shadow:
+      0 3px 0 #43135e,
+      0 5px 0 rgba(39, 12, 73, 0.72),
+      0 0 2px #43135e;
   }
 
   .bred-auth-body,
@@ -2753,15 +2934,143 @@
   }
 
   .bred-tabs {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    height: 64px;
     font-size: 14px;
   }
 
-  .bred-lobby-header {
+  .bred-tabs button {
+    min-width: 0;
+    padding: 0 6px;
+    font-size: clamp(10px, 3vw, 13px);
+    line-height: 1.05;
+    white-space: normal;
+  }
+
+  .bred-auth-panel {
+    min-height: 380px;
+  }
+
+  .bred-auth-controls {
+    width: min(300px, calc(100vw - 64px));
+    gap: 14px;
+  }
+
+  .bred-auth-controls h2,
+  .bred-how-panel h2 {
+    width: min(300px, calc(100vw - 64px));
+    max-width: 100%;
+    font-size: clamp(18px, 5.8vw, 25px);
+    line-height: 1.05;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .bred-name-input,
+  .bred-name-field {
+    width: min(300px, calc(100vw - 64px));
+    min-height: 58px;
+    font-size: clamp(20px, 6.4vw, 28px);
+  }
+
+  .bred-auth-body {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .bred-how-copy {
+    width: min(100%, calc(100vw - 58px));
+    max-width: 100%;
+  }
+
+  .bred-primary-button,
+  .bred-secondary-button {
+    min-height: 58px;
+    padding: 0 18px;
+    font-size: clamp(17px, 5.4vw, 23px);
+  }
+
+  .bred-menu-grid,
+  .bred-lobby-grid {
+    width: 100%;
+    max-width: 100%;
+    gap: 12px;
+    overflow: visible;
+  }
+
+  .bred-players-panel,
+  .bred-presets-panel,
+  .bred-settings-panel {
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+    padding: 12px;
+  }
+
+  .bred-players-panel h2,
+  .bred-presets-panel h2,
+  .bred-settings-panel h2 {
+    font-size: clamp(26px, 9vw, 38px);
+    line-height: 1.05;
+  }
+
+  .bred-select-row,
+  .bred-setting-row {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    min-height: 54px;
+    gap: 8px;
+    margin: 10px 0;
+    padding: 0 10px;
+    font-size: clamp(17px, 5.1vw, 21px);
+  }
+
+  .bred-setting-row {
+    font-size: clamp(16px, 4.8vw, 20px);
+  }
+
+  .bred-select-row span,
+  .bred-setting-row span,
+  .bred-setting-row strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bred-select-row select,
+  .bred-setting-row input,
+  .bred-setting-row select {
+    width: min(128px, 38vw);
+    height: 42px;
+    padding: 0 8px;
+    font-size: clamp(16px, 4.7vw, 20px);
+  }
+
+  .bred-setting-row select {
+    width: min(188px, 50vw);
+    font-size: clamp(14px, 4vw, 18px);
+  }
+
+  .bred-player-list {
+    max-height: none;
+    padding-right: 2px;
+  }
+
+  .bred-player-row {
+    grid-template-columns: 54px minmax(0, 1fr) auto;
+    min-height: 66px;
     gap: 10px;
+    padding: 6px 8px 6px 6px;
+    font-size: clamp(17px, 5vw, 20px);
   }
 
   .bred-lobby-actions {
     flex-wrap: wrap;
+    min-height: auto;
+    gap: 12px;
+    overflow: visible;
   }
 
   .bred-lobby-actions .bred-primary-button,
@@ -2771,6 +3080,53 @@
 
   .bred-mode-grid {
     grid-template-columns: 1fr;
+    grid-auto-rows: minmax(112px, auto);
+    gap: 10px;
+    padding-top: 10px;
+  }
+
+  .bred-mode-card {
+    min-height: 112px;
+    padding: 12px;
+  }
+
+  .bred-mode-card > svg:not(.bred-mode-settings) {
+    width: 42px;
+    height: 42px;
+  }
+
+  .bred-mode-card strong {
+    font-size: clamp(18px, 5.6vw, 22px);
+    line-height: 1.08;
+  }
+
+  .bred-mode-settings {
+    top: 12px;
+    left: 12px;
+  }
+
+  .bred-invite-card {
+    padding: 14px 12px;
+  }
+
+  .bred-invite-card strong {
+    font-size: clamp(36px, 12vw, 48px);
+  }
+
+  .bred-invite-card button,
+  .bred-primary-button,
+  .bred-secondary-button {
+    max-width: 100%;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.05;
+  }
+
+  .bred-invite-card button {
+    width: 100%;
+    padding-inline: 10px;
+    font-size: clamp(14px, 4.4vw, 18px);
   }
 
   .bred-phase-panel {
@@ -2794,10 +3150,36 @@
 
   .bred-phase-actions {
     gap: 6px;
+    min-width: 0;
+  }
+
+  .bred-code-pill {
+    min-width: 0;
+    min-height: 42px;
+    padding: 0 10px;
+    font-size: clamp(18px, 6vw, 24px);
   }
 
   .bred-volume-popover {
     right: -6px;
     width: min(220px, 82vw);
+  }
+}
+
+@media (max-width: 390px) {
+  .bred-back-button {
+    width: 52px;
+    justify-content: center;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .bred-back-button svg {
+    width: 25px;
+    height: 25px;
+  }
+
+  .bred-logo-small span {
+    font-size: clamp(23px, 7.6vw, 31px);
   }
 }

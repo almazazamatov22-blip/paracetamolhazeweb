@@ -13,6 +13,11 @@ const DEFAULT_NICKS = [
 ];
 
 const LOTTOMAL_URL = process.env.NEXT_PUBLIC_LOTOMAL_URL || 'https://lotomal.paracetamol.workers.dev'
+
+function canUsePointerEffects() {
+  return typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+}
+
 const PROJECTS = [
   {
     title: 'РОЗ',
@@ -100,6 +105,8 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
+    if (!canUsePointerEffects()) return
+
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseleave', handleMouseLeave)
     return () => {
@@ -109,6 +116,8 @@ export default function Home() {
   }, [handleMouseMove, handleMouseLeave])
 
   const handleCardMouseMove = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!canUsePointerEffects()) return
+
     const card = e.currentTarget
     const rect = card.getBoundingClientRect()
     const x = e.clientX - rect.left
@@ -126,6 +135,8 @@ export default function Home() {
   }, [])
 
   const handleCardMouseLeave = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!canUsePointerEffects()) return
+
     e.currentTarget.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale(1)'
   }, [])
 

@@ -39,6 +39,12 @@ interface Star {
   twinkleSpeed: number;
 }
 
+const LOW_POWER_QUERIES = [
+  '(max-width: 768px)',
+  '(pointer: coarse)',
+  '(prefers-reduced-motion: reduce)',
+];
+
 const COLORS = [
   { text: '#f87171', glow: '0 0 12px #f8717166' }, // Red
   { text: '#fb923c', glow: '0 0 12px #fb923c66' }, // Orange
@@ -53,9 +59,41 @@ const COLORS = [
   { text: '#a78bfa', glow: '0 0 12px #a78bfa66' }, // Violet
 ];
 
-function generateParticles(nicknames: string[]): ParticleState[] {
+function useLowPowerBackground() {
+  const isClient = useIsClient();
+  const [lowPower, setLowPower] = useState(true);
+
+  useEffect(() => {
+    if (!isClient) return;
+
+    const mediaQueries = LOW_POWER_QUERIES.map((query) => window.matchMedia(query));
+    const update = () => setLowPower(mediaQueries.some((query) => query.matches));
+
+    update();
+    mediaQueries.forEach((query) => {
+      if (query.addEventListener) {
+        query.addEventListener('change', update);
+      } else {
+        query.addListener(update);
+      }
+    });
+
+    return () => {
+      mediaQueries.forEach((query) => {
+        if (query.removeEventListener) {
+          query.removeEventListener('change', update);
+        } else {
+          query.removeListener(update);
+        }
+      });
+    };
+  }, [isClient]);
+
+  return lowPower;
+}
+
+function generateParticles(nicknames: string[], count: number): ParticleState[] {
   if (nicknames.length === 0) return [];
-  const count = 200;
   const particles: ParticleState[] = [];
 
   for (let i = 0; i < count; i++) {
@@ -80,9 +118,9 @@ function generateParticles(nicknames: string[]): ParticleState[] {
   return particles;
 }
 
-function generateStars(): Star[] {
+function generateStars(count: number): Star[] {
   const stars: Star[] = [];
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < count; i++) {
     stars.push({
       id: i,
       x: Math.random() * 100,
@@ -97,21 +135,34 @@ function generateStars(): Star[] {
 
 export default function FloatingNicknames({ nicknames }: FloatingNicknamesProps) {
   const isClient = useIsClient();
+  const lowPower = useLowPowerBackground();
   const containerRef = useRef<HTMLDivElement>(null);
   const elRefs = useRef<Map<number, HTMLSpanElement>>(new Map());
   const mouseRef = useRef({ x: -9999, y: -9999 });
 
-  const particles = useMemo(() => generateParticles(nicknames), [nicknames]);
-  const stars = useMemo(() => generateStars(), []);
+  const particles = useMemo(
+    () => generateParticles(nicknames, lowPower ? 0 : 120),
+    [nicknames, lowPower]
+  );
+  const stars = useMemo(() => generateStars(lowPower ? 0 : 90), [lowPower]);
   
   const particlesRef = useRef(particles);
 
   useEffect(() => {
     particlesRef.current = particles;
     const el = containerRef.current;
-    if (!el) return;
+    if (!el || lowPower || particles.length === 0) return;
 
     let animId: number;
+    const size = {
+      width: el.clientWidth || window.innerWidth,
+      height: el.clientHeight || window.innerHeight,
+    };
+
+    const measure = () => {
+      size.width = el.clientWidth || window.innerWidth;
+      size.height = el.clientHeight || window.innerHeight;
+    };
 
     const onMouseMove = (e: MouseEvent) => {
       mouseRef.current = { x: e.clientX, y: e.clientY };
@@ -123,26 +174,27 @@ export default function FloatingNicknames({ nicknames }: FloatingNicknamesProps)
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseleave', onMouseLeave);
+    window.addEventListener('resize', measure, { passive: true });
 
-    const REPEL_RADIUS = 200;   // Larger radius for broader pushing
-    const PUSH_FORCE = 0.030;    // Doubled force for more impact
-    const FRICTION = 0.96;       // Slows them down over time
-    const MIN_DRIFT = 0.02;      // Minimum speed to keep them moving
-    const MAX_SPEED = 0.25;      // Speed limit
+    const REPEL_RADIUS = 200;
+    const PUSH_FORCE = 0.030;
+    const FRICTION = 0.96;
+    const MIN_DRIFT = 0.02;
+    const MAX_SPEED = 0.25;
 
     const loop = () => {
       const mouse = mouseRef.current;
-      const rect = el.getBoundingClientRect();
-      const mx = mouse.x - rect.left;
-      const my = mouse.y - rect.top;
+      const width = size.width;
+      const height = size.height;
+      const mx = mouse.x;
+      const my = mouse.y;
 
       for (const p of particlesRef.current) {
         const elSpan = elRefs.current.get(p.id);
         if (!elSpan) continue;
 
-        // Calculate absolute screen position
-        const screenX = (p.baseX / 100) * rect.width;
-        const screenY = (p.baseY / 100) * rect.height;
+        const screenX = (p.baseX / 100) * width;
+        const screenY = (p.baseY / 100) * height;
         
         const dx = screenX - mx;
         const dy = screenY - my;
@@ -183,10 +235,7 @@ export default function FloatingNicknames({ nicknames }: FloatingNicknamesProps)
         if (p.baseY > 105) p.baseY = -5;
         if (p.baseY < -5) p.baseY = 105;
 
-        // Position & Render
-        elSpan.style.left = `${p.baseX}%`;
-        elSpan.style.top = `${p.baseY}%`;
-        elSpan.style.transform = 'none';
+        elSpan.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
       }
 
       animId = requestAnimationFrame(loop);
@@ -198,10 +247,11 @@ export default function FloatingNicknames({ nicknames }: FloatingNicknamesProps)
       cancelAnimationFrame(animId);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseleave', onMouseLeave);
+      window.removeEventListener('resize', measure);
     };
-  }, [isClient, nicknames, particles]);
+  }, [lowPower, particles]);
 
-  if (!isClient) {
+  if (!isClient || lowPower) {
     return <div className="fixed inset-0 bg-[#020205]" />;
   }
 
@@ -227,11 +277,13 @@ export default function FloatingNicknames({ nicknames }: FloatingNicknamesProps)
       </div>
 
       {/* Nebula Glows */}
-      <div className="absolute inset-0 pointer-events-none opacity-40">
-        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full bg-purple-900/20 blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-900/10 blur-[100px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] rounded-full bg-blue-900/5 blur-[150px]" />
-      </div>
+      <div
+        className="absolute inset-0 pointer-events-none opacity-50"
+        style={{
+          background:
+            'radial-gradient(circle at 10% 10%, rgba(88, 28, 135, 0.28), transparent 34%), radial-gradient(circle at 86% 88%, rgba(49, 46, 129, 0.18), transparent 32%), radial-gradient(circle at 50% 50%, rgba(30, 64, 175, 0.08), transparent 46%)',
+        }}
+      />
 
       {/* Floating nicknames */}
       <div ref={containerRef} className="absolute inset-0 cursor-default">
@@ -241,10 +293,9 @@ export default function FloatingNicknames({ nicknames }: FloatingNicknamesProps)
             ref={(el) => {
               if (el) elRefs.current.set(p.id, el);
             }}
-            className="absolute pointer-events-none select-none whitespace-nowrap blur-[0.4px]"
+            className="absolute left-0 top-0 pointer-events-none select-none whitespace-nowrap"
             style={{
-              left: `${p.baseX}%`,
-              top: `${p.baseY}%`,
+              transform: `translate3d(${p.baseX}vw, ${p.baseY}vh, 0)`,
               fontSize: `${p.fontSize}px`,
               fontWeight: p.fontWeight,
               color: p.color,
