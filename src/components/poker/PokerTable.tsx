@@ -278,13 +278,6 @@ function SeatVideo({
 
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),transparent_35%,rgba(0,0,0,0.3))]" />
 
-        {occupied && mediaEnabled && (
-          <div className="absolute left-2 top-2 flex items-center gap-1 rounded-full border border-white/15 bg-black/50 px-2 py-1 text-[10px] font-bold text-white/80 backdrop-blur">
-            <span className={`h-2 w-2 rounded-full ${remoteStream || isMe ? 'bg-emerald-300' : 'bg-amber-300'}`} />
-            cam
-          </div>
-        )}
-
         {occupied && (
           <div className="absolute right-2 top-2 rounded-full border border-white/15 bg-black/50 p-1 text-white/70 opacity-0 transition group-hover:opacity-100">
             <Maximize2 className="h-3.5 w-3.5" />
@@ -1010,20 +1003,18 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
               style={{ left: `${seat.x}%`, top: `${seat.y}%` }}
             >
               <motion.div animate={isTurn ? { y: [0, -4, 0] } : { y: 0 }} transition={{ repeat: isTurn ? Infinity : 0, duration: 1.4 }}>
-                <div style={{ transform: `rotate(${seat.rotate}deg)` }}>
-                  <SeatVideo
-                    player={player}
-                    gamePlayer={gamePlayer}
-                    isMe={isMe}
-                    isTurn={isTurn}
-                    isFocused={focusPlayerId === playerId}
-                    localStream={localStream}
-                    remoteStream={remoteStream}
-                    mediaEnabled={tableSettings.withWebcams}
-                    stackAmount={gamePlayer?.chips ?? tableSettings.buyIn}
-                    onFocus={() => setFocusPlayerId(playerId)}
-                  />
-                </div>
+                <SeatVideo
+                  player={player}
+                  gamePlayer={gamePlayer}
+                  isMe={isMe}
+                  isTurn={isTurn}
+                  isFocused={focusPlayerId === playerId}
+                  localStream={localStream}
+                  remoteStream={remoteStream}
+                  mediaEnabled={tableSettings.withWebcams}
+                  stackAmount={gamePlayer?.chips ?? tableSettings.buyIn}
+                  onFocus={() => setFocusPlayerId(playerId)}
+                />
 
                 {isTurn && (
                   <div className="pointer-events-none absolute -inset-2 rounded-[24px] border border-cyan-200/40 shadow-[0_0_28px_rgba(34,211,238,0.36)]" />
@@ -1069,11 +1060,7 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
         </div>
 
         <div className="mt-4 grid gap-2">
-          {eventLog.length === 0 ? (
-            <div className="rounded-[12px] border border-white/8 bg-white/5 px-3 py-2 text-sm font-bold text-white/35">
-              События появятся здесь
-            </div>
-          ) : (
+          {eventLog.length > 0 &&
             eventLog.map((event) => (
               <div
                 key={`${event.ts}-${event.text}`}
@@ -1081,8 +1068,7 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
               >
                 {event.text}
               </div>
-            ))
-          )}
+            ))}
         </div>
       </aside>
 
@@ -1237,7 +1223,6 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
             >
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-black uppercase text-white/40">Крупный кадр</div>
                   <div className="text-2xl font-black text-white">{focusedPlayer.display_name}</div>
                 </div>
                 <button
