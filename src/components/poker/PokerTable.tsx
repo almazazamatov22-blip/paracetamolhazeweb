@@ -18,8 +18,6 @@ import {
   Users,
   Video,
   VideoOff,
-  Volume2,
-  VolumeX,
   X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -114,20 +112,6 @@ const EVENT_STYLES: Record<EventTone, string> = {
   info: 'border-white/15 text-white/70',
 }
 
-const SOUND_FILES: Record<string, string> = {
-  allIn: '/audio/all_in.mp3',
-  bet: '/audio/bet.mp3',
-  check: '/audio/check.mp3',
-  dealBoard: '/audio/deal_board.mp3',
-  dealPlayer: '/audio/deal_player.mp3',
-  fold: '/audio/fold.mp3',
-  raise: '/audio/raise.mp3',
-  reveal: '/audio/reveal_hand.mp3',
-  turn: '/audio/your_turn.mp3',
-  win: '/audio/win.mp3',
-  timeout: '/audio/out_of_time.mp3',
-}
-
 function normalizeSettings(settings: any): NormalizedSettings {
   const requestedSize = Number(settings?.size || 9)
   const size = ([2, 4, 5, 6, 9].includes(requestedSize) ? requestedSize : 9) as NormalizedSettings['size']
@@ -143,6 +127,85 @@ function normalizeSettings(settings: any): NormalizedSettings {
 
 function money(value: number | undefined | null) {
   return `$${Number(value || 0).toFixed(2)}`
+}
+
+const CARD_NAMES: Record<string, string> = {
+  A: 'A',
+  K: 'K',
+  Q: 'Q',
+  J: 'J',
+  T: '10',
+  '10': '10',
+  '9': '9',
+  '8': '8',
+  '7': '7',
+  '6': '6',
+  '5': '5',
+  '4': '4',
+  '3': '3',
+  '2': '2',
+}
+
+const CARD_RANKS: Record<string, number> = {
+  '2': 2,
+  '3': 3,
+  '4': 4,
+  '5': 5,
+  '6': 6,
+  '7': 7,
+  '8': 8,
+  '9': 9,
+  T: 10,
+  '10': 10,
+  J: 11,
+  Q: 12,
+  K: 13,
+  A: 14,
+}
+
+function getHandLabel(cards: any[] = [], board: any[] = []) {
+  const visible = [...cards, ...board].filter((card) => card?.suit && card?.value && card.suit !== 'X')
+  if (visible.length < 2) return ''
+
+  const rankCounts = new Map<string, number>()
+  const suitCounts = new Map<string, number>()
+
+  visible.forEach((card) => {
+    rankCounts.set(card.value, (rankCounts.get(card.value) || 0) + 1)
+    suitCounts.set(card.suit, (suitCounts.get(card.suit) || 0) + 1)
+  })
+
+  const grouped = Array.from(rankCounts.entries())
+    .map(([value, count]) => ({ value, count, rank: CARD_RANKS[value] || 0, label: CARD_NAMES[value] || value }))
+    .sort((a, b) => b.count - a.count || b.rank - a.rank)
+
+  const hasFlush = Array.from(suitCounts.values()).some((count) => count >= 5)
+  const uniqueRanks = Array.from(new Set(visible.map((card) => CARD_RANKS[card.value] || 0))).sort((a, b) => b - a)
+  if (uniqueRanks.includes(14)) uniqueRanks.push(1)
+
+  let hasStraight = false
+  for (let index = 0; index <= uniqueRanks.length - 5; index += 1) {
+    if (uniqueRanks[index] - uniqueRanks[index + 4] === 4) {
+      hasStraight = true
+      break
+    }
+  }
+
+  const four = grouped.find((item) => item.count === 4)
+  if (four) return `Каре ${four.label}`
+
+  const three = grouped.find((item) => item.count === 3)
+  const pairs = grouped.filter((item) => item.count === 2)
+  if (three && pairs.length > 0) return `Фулл-хаус ${three.label}`
+  if (hasFlush && hasStraight) return 'Стрит-флеш'
+  if (hasFlush) return 'Флеш'
+  if (hasStraight) return 'Стрит'
+  if (three) return `Сет ${three.label}`
+  if (pairs.length >= 2) return `Две пары ${pairs[0].label} и ${pairs[1].label}`
+  if (pairs.length === 1) return `Пара ${pairs[0].label}${pairs[0].label}`
+
+  const high = grouped.sort((a, b) => b.rank - a.rank)[0]
+  return high ? `Старшая ${high.label}` : ''
 }
 
 function cleanPeerPart(value: string) {
@@ -190,21 +253,18 @@ function PokerChip({ value, index }: { value: number; index: number }) {
   const color = CHIP_COLORS.find((chip) => value >= chip.v) || CHIP_COLORS[CHIP_COLORS.length - 1]
 
   return (
-    <motion.div
-      initial={{ y: -8, opacity: 0, scale: 0.8 }}
-      animate={{ y: 0, opacity: 1, scale: 1 }}
-      transition={{ delay: index * 0.035, type: 'spring', stiffness: 420, damping: 24 }}
-      className="relative grid h-7 w-7 place-items-center rounded-full border-2 text-[7px] font-black text-white shadow-lg"
+    <span
+      className="relative grid h-6 w-6 place-items-center rounded-full border text-[0px] shadow-md"
       style={{
-        marginTop: index > 0 ? -19 : 0,
+        marginLeft: index > 0 ? -9 : 0,
         zIndex: 20 + index,
         background: color.fill,
         borderColor: color.edge,
       }}
     >
-      <span className="absolute inset-[4px] rounded-full border border-white/45" />
-      <span className="relative">{value}</span>
-    </motion.div>
+      <span className="absolute inset-[5px] rounded-full border border-white/35" />
+      {value}
+    </span>
   )
 }
 
@@ -221,10 +281,13 @@ function ChipsStack({ amount }: { amount: number }) {
   })
 
   return (
-    <div className="flex flex-col-reverse items-center">
-      {chips.map((value, index) => (
-        <PokerChip key={`${value}-${index}`} value={value} index={index} />
-      ))}
+    <div className="flex items-center gap-2 rounded-full border border-amber-200/25 bg-black/80 px-3 py-1.5 shadow-xl backdrop-blur">
+      <div className="flex items-center">
+        {chips.slice(0, 4).map((value, index) => (
+          <PokerChip key={`${value}-${index}`} value={value} index={index} />
+        ))}
+      </div>
+      <span className="text-xs font-black text-amber-100">{money(amount)}</span>
     </div>
   )
 }
@@ -325,7 +388,7 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
   const [raiseAmount, setRaiseAmount] = useState(tableSettings.blind * 4)
   const [winnerInfo, setWinnerInfo] = useState<any[]>([])
   const [showSettings, setShowSettings] = useState(false)
-  const [soundEnabled, setSoundEnabled] = useState(true)
+  const [showPlayers, setShowPlayers] = useState(false)
   const [cameraEnabled, setCameraEnabled] = useState(tableSettings.withWebcams)
   const [micEnabled, setMicEnabled] = useState(true)
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
@@ -348,11 +411,10 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
   const peerRef = useRef<any>(null)
   const callsRef = useRef<Record<string, any>>({})
   const joinedPlayersRef = useRef<any[]>([])
-  const soundRefs = useRef<Record<string, HTMLAudioElement>>({})
   const lastTurnRef = useRef<string | null>(null)
   const lastPhaseRef = useRef('waiting')
   const lastCommunityCountRef = useRef(0)
-  const timeoutSoundPlayedRef = useRef(false)
+  const timeoutActionRef = useRef(false)
 
   const isMyTurn = String(currentTurn) === myId
   const myPlayer = players.find((player) => String(player.id) === myId)
@@ -376,25 +438,6 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
   useEffect(() => {
     setCameraEnabled(tableSettings.withWebcams)
   }, [tableSettings.withWebcams])
-
-  const playSound = useCallback(
-    (name: keyof typeof SOUND_FILES, volume = 0.55) => {
-      if (!soundEnabled || typeof window === 'undefined') return
-
-      const src = SOUND_FILES[name]
-      if (!src) return
-
-      if (!soundRefs.current[name]) {
-        soundRefs.current[name] = new Audio(src)
-      }
-
-      const audio = soundRefs.current[name]
-      audio.volume = volume
-      audio.currentTime = 0
-      audio.play().catch(() => undefined)
-    },
-    [soundEnabled]
-  )
 
   const addEvent = useCallback((event: TableEvent) => {
     setEventLog((prev) => [event, ...prev].slice(0, 5))
@@ -441,23 +484,11 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
 
       if (msg.lastEvent) addEvent(msg.lastEvent)
 
-      if (nextCommunityCards.length > lastCommunityCountRef.current) {
-        playSound('dealBoard', 0.42)
-      }
-
-      if (nextTurn && String(nextTurn) === myId && lastTurnRef.current !== myId) {
-        playSound('turn', 0.55)
-      }
-
-      if (nextPhase === 'showdown' && lastPhaseRef.current !== 'showdown') {
-        playSound(msg.winners?.length ? 'win' : 'reveal', 0.55)
-      }
-
       lastTurnRef.current = nextTurn ? String(nextTurn) : null
       lastPhaseRef.current = nextPhase
       lastCommunityCountRef.current = nextCommunityCards.length
     },
-    [addEvent, gameState, myId, playSound]
+    [addEvent, gameState, myId]
   )
 
   const broadcastState = useCallback(
@@ -712,7 +743,7 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
 
   useEffect(() => {
     setTurnSeconds(30)
-    timeoutSoundPlayedRef.current = false
+    timeoutActionRef.current = false
 
     if (!currentTurn || gameState === 'waiting' || gameState === 'showdown') return
 
@@ -722,13 +753,6 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
 
     return () => window.clearInterval(timer)
   }, [currentTurn, gameState])
-
-  useEffect(() => {
-    if (turnSeconds === 0 && isMyTurn && !timeoutSoundPlayedRef.current) {
-      timeoutSoundPlayedRef.current = true
-      playSound('timeout', 0.45)
-    }
-  }, [isMyTurn, playSound, turnSeconds])
 
   useEffect(() => {
     if (!myPlayer) return
@@ -770,11 +794,10 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
         tableSettings.ante
       )
       await broadcastState(state, { text: 'Новая раздача', tone: 'deal' })
-      playSound('dealPlayer', 0.5)
     } catch (error) {
       console.error(error)
     }
-  }, [addEvent, broadcastState, joinedPlayers, playSound, tableSettings.ante, tableSettings.blind, tableSettings.buyIn, tableSettings.size])
+  }, [addEvent, broadcastState, joinedPlayers, tableSettings.ante, tableSettings.blind, tableSettings.buyIn, tableSettings.size])
 
   const handleAction = useCallback(
     async (action: 'fold' | 'call' | 'raise' | 'check' | 'allIn', amount?: number) => {
@@ -797,22 +820,17 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
                 : `${actor}: рейз до ${money(amount)}`
 
       const tone: EventTone = action === 'fold' ? 'fold' : action === 'check' ? 'info' : 'bet'
-      const soundName =
-        action === 'fold'
-          ? 'fold'
-          : action === 'check'
-            ? 'check'
-            : action === 'allIn'
-              ? 'allIn'
-              : action === 'raise'
-                ? 'raise'
-                : 'bet'
-
-      playSound(soundName as keyof typeof SOUND_FILES, 0.55)
       await broadcastState(nextState, { text: actionText, tone })
     },
-    [broadcastState, callAmount, isMyTurn, myId, playSound, user?.display_name]
+    [broadcastState, callAmount, isMyTurn, myId, user?.display_name]
   )
+
+  useEffect(() => {
+    if (turnSeconds !== 0 || !isMyTurn || timeoutActionRef.current || gameState === 'waiting' || gameState === 'showdown') return
+
+    timeoutActionRef.current = true
+    handleAction(callAmount > 0 ? 'fold' : 'check')
+  }, [callAmount, gameState, handleAction, isMyTurn, turnSeconds])
 
   const setRaisePreset = (preset: 'min' | 'half' | 'twoThirds' | 'pot' | 'max') => {
     const stackCap = maxRaise || minRaise
@@ -864,14 +882,6 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
         <div className="flex items-center gap-2 rounded-[18px] border border-white/10 bg-black/48 p-2 shadow-2xl backdrop-blur-md">
           <button
             type="button"
-            title={soundEnabled ? 'Выключить звук' : 'Включить звук'}
-            onClick={() => setSoundEnabled((value) => !value)}
-            className="grid h-12 w-12 place-items-center rounded-[14px] bg-white/7 text-white/70 transition hover:bg-white/12 hover:text-white"
-          >
-            {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-          </button>
-          <button
-            type="button"
             title={cameraEnabled ? 'Выключить камеру' : 'Включить камеру'}
             onClick={() => setCameraEnabled((value) => !value)}
             className="grid h-12 w-12 place-items-center rounded-[14px] bg-white/7 text-white/70 transition hover:bg-white/12 hover:text-white"
@@ -896,8 +906,8 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
           </button>
           <button
             type="button"
-            title="Лобби"
-            onClick={onBack}
+            title="Игроки"
+            onClick={() => setShowPlayers((value) => !value)}
             className="grid h-12 w-12 place-items-center rounded-[14px] bg-white/7 text-white/70 transition hover:bg-white/12 hover:text-white"
           >
             <Users className="h-5 w-5" />
@@ -913,30 +923,57 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
         </div>
       </header>
 
-      <main className="absolute inset-0 z-10">
-        <section className="absolute left-1/2 top-1/2 h-[54vh] min-h-[470px] w-[67vw] min-w-[930px] max-w-[1220px] -translate-x-1/2 -translate-y-1/2">
-          <div
-            className="absolute inset-[-30px] bg-[linear-gradient(135deg,#442612,#17100d_46%,#765027_52%,#1c110b)] shadow-[0_30px_90px_rgba(0,0,0,0.75)]"
-            style={{
-              clipPath:
-                'polygon(7% 19%, 21% 3%, 79% 3%, 93% 19%, 99% 52%, 90% 86%, 72% 99%, 28% 99%, 10% 86%, 1% 52%)',
-            }}
-          />
-          <div
-            className="absolute inset-0 overflow-hidden bg-[linear-gradient(145deg,#16523d,#0f342a_48%,#123026_49%,#09201c)] shadow-[inset_0_0_80px_rgba(0,0,0,0.86),inset_0_0_0_1px_rgba(255,255,255,0.14)]"
-            style={{
-              clipPath:
-                'polygon(8% 20%, 22% 5%, 78% 5%, 92% 20%, 97% 52%, 88% 83%, 71% 96%, 29% 96%, 12% 83%, 3% 52%)',
-            }}
+      <AnimatePresence>
+        {showPlayers && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="absolute right-6 top-24 z-[80] w-[280px] rounded-[18px] border border-white/10 bg-black/78 p-4 shadow-2xl backdrop-blur-md"
           >
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-sm font-black uppercase text-white/50">Игроки</div>
+              <button
+                type="button"
+                onClick={() => setShowPlayers(false)}
+                className="grid h-8 w-8 place-items-center rounded-[10px] bg-white/8 text-white/60 transition hover:bg-white/14 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid gap-2">
+              {joinedPlayers.length === 0 ? (
+                <div className="rounded-[12px] border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold text-white/45">
+                  Никого нет
+                </div>
+              ) : (
+                joinedPlayers.map((player) => {
+                  const gamePlayer = players.find((item) => String(item.id) === String(player.id))
+
+                  return (
+                    <div
+                      key={String(player.id)}
+                      className="flex items-center justify-between gap-3 rounded-[12px] border border-white/10 bg-white/5 px-3 py-2"
+                    >
+                      <span className="min-w-0 truncate text-sm font-black text-white">{player.display_name}</span>
+                      <span className="shrink-0 rounded-full bg-emerald-300/12 px-2 py-0.5 text-xs font-black text-emerald-100">
+                        {money(gamePlayer?.chips ?? tableSettings.buyIn)}
+                      </span>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <main className="absolute inset-0 z-10">
+        <section className="absolute left-1/2 top-1/2 h-[52vh] min-h-[470px] w-[66vw] min-w-[940px] max-w-[1240px] -translate-x-1/2 -translate-y-1/2">
+          <div className="absolute inset-[-30px] rounded-[999px] bg-[linear-gradient(135deg,#5a3418,#2a190f_42%,#8b5d2a_54%,#24140c)] shadow-[0_30px_90px_rgba(0,0,0,0.75)]" />
+          <div className="absolute inset-0 overflow-hidden rounded-[999px] border-[10px] border-[#6b4522] bg-[linear-gradient(145deg,#15533e,#0f342a_48%,#123026_49%,#09201c)] shadow-[inset_0_0_80px_rgba(0,0,0,0.86),inset_0_0_0_1px_rgba(255,255,255,0.14)]">
             <div className="absolute inset-0 opacity-35 mix-blend-screen bg-[linear-gradient(100deg,transparent_0%,rgba(255,255,255,0.14)_34%,transparent_48%,rgba(34,211,238,0.12)_74%,transparent_100%)]" />
-            <div
-              className="absolute inset-[7%] border border-white/10"
-              style={{
-                clipPath:
-                  'polygon(8% 20%, 22% 5%, 78% 5%, 92% 20%, 97% 52%, 88% 83%, 71% 96%, 29% 96%, 12% 83%, 3% 52%)',
-              }}
-            />
+            <div className="absolute inset-[8%] rounded-[999px] border border-white/10" />
 
             <div className="absolute left-1/2 top-[37%] -translate-x-1/2 -translate-y-1/2 rounded-[18px] border border-white/12 bg-black/62 px-6 py-3 text-center shadow-2xl backdrop-blur">
               <div className="text-xs font-black uppercase text-white/45">Банк</div>
@@ -991,7 +1028,23 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
           const isMe = playerId === myId
           const isTurn = Boolean(player && String(currentTurn) === playerId)
           const lowerSeat = seat.y > 67
+          const upperSeat = seat.y < 34
           const remoteStream = playerId ? remoteStreams[playerId] : undefined
+          const handLabel = getHandLabel(gamePlayer?.cards || [], communityCards)
+          const cardsPosition = lowerSeat
+            ? 'left-1/2 -top-[118px] -translate-x-1/2'
+            : upperSeat
+              ? 'left-1/2 -bottom-[118px] -translate-x-1/2'
+              : seat.x < 50
+                ? 'left-[calc(100%+18px)] top-1/2 -translate-y-1/2'
+                : 'right-[calc(100%+18px)] top-1/2 -translate-y-1/2'
+          const betPosition = lowerSeat
+            ? 'left-1/2 -top-[164px] -translate-x-1/2'
+            : upperSeat
+              ? 'left-1/2 -bottom-[164px] -translate-x-1/2'
+              : seat.x < 50
+                ? 'left-[calc(100%+18px)] top-[calc(50%+74px)]'
+                : 'right-[calc(100%+18px)] top-[calc(50%+74px)]'
 
           return (
             <motion.div
@@ -1002,7 +1055,7 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
               className="absolute z-30 w-[168px] -translate-x-1/2 -translate-y-1/2 xl:w-[196px]"
               style={{ left: `${seat.x}%`, top: `${seat.y}%` }}
             >
-              <motion.div animate={isTurn ? { y: [0, -4, 0] } : { y: 0 }} transition={{ repeat: isTurn ? Infinity : 0, duration: 1.4 }}>
+              <div>
                 <SeatVideo
                   player={player}
                   gamePlayer={gamePlayer}
@@ -1021,28 +1074,32 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
                 )}
 
                 {gamePlayer?.bet > 0 && (
-                  <div className={`absolute left-1/2 flex -translate-x-1/2 flex-col items-center ${lowerSeat ? '-top-28' : '-bottom-28'}`}>
+                  <div className={`absolute z-50 ${betPosition}`}>
                     <ChipsStack amount={gamePlayer.bet} />
-                    <div className="mt-1 rounded-full border border-white/10 bg-black/75 px-3 py-1 text-xs font-black text-amber-100 shadow-xl">
-                      {money(gamePlayer.bet)}
-                    </div>
                   </div>
                 )}
 
                 {gamePlayer?.cards?.length > 0 && (
-                  <div className={`absolute left-1/2 flex -translate-x-1/2 gap-1 ${lowerSeat ? '-top-14' : '-bottom-16'}`}>
-                    {gamePlayer.cards.map((card: any, cardIndex: number) => (
-                      <PokerCard
-                        key={`${playerId}-${cardIndex}-${card.suit}-${card.value}`}
-                        suit={card.suit}
-                        value={card.value}
-                        isFlipped={card.suit === 'X'}
-                        className="h-[62px] w-[44px] rounded-[10px]"
-                      />
-                    ))}
+                  <div className={`absolute z-40 flex items-center gap-2 ${cardsPosition}`}>
+                    <div className="flex gap-1">
+                      {gamePlayer.cards.map((card: any, cardIndex: number) => (
+                        <PokerCard
+                          key={`${playerId}-${cardIndex}-${card.suit}-${card.value}`}
+                          suit={card.suit}
+                          value={card.value}
+                          isFlipped={card.suit === 'X'}
+                          className="h-[72px] w-[50px] rounded-[10px]"
+                        />
+                      ))}
+                    </div>
+                    {handLabel && (
+                      <div className="whitespace-nowrap rounded-full border border-cyan-200/25 bg-black/78 px-3 py-1.5 text-xs font-black text-cyan-100 shadow-xl backdrop-blur">
+                        {handLabel}
+                      </div>
+                    )}
                   </div>
                 )}
-              </motion.div>
+              </div>
             </motion.div>
           )
         })}
@@ -1318,7 +1375,7 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
                   </select>
                 </label>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setCameraEnabled((value) => !value)}
@@ -1340,17 +1397,6 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
                     }`}
                   >
                     Голос
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSoundEnabled((value) => !value)}
-                    className={`rounded-[16px] border px-3 py-4 text-sm font-black uppercase transition ${
-                      soundEnabled
-                        ? 'border-amber-200/30 bg-amber-300/12 text-amber-100'
-                        : 'border-white/10 bg-white/6 text-white/45'
-                    }`}
-                  >
-                    Звуки
                   </button>
                 </div>
 
