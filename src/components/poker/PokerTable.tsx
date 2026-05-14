@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  BadgeDollarSign,
   ChevronDown,
   ChevronUp,
   CircleDollarSign,
@@ -27,16 +26,11 @@ import { PokerLogic, type PokerGameState } from '@/lib/pokerLogic'
 type SeatPoint = {
   x: number
   y: number
-  rotate: number
+  cardX: number
+  cardY: number
+  betX: number
+  betY: number
   lean: 'left' | 'center' | 'right'
-}
-
-type EventTone = 'deal' | 'bet' | 'fold' | 'win' | 'info'
-
-type TableEvent = {
-  text: string
-  tone: EventTone
-  ts: number
 }
 
 type NormalizedSettings = {
@@ -49,50 +43,41 @@ type NormalizedSettings = {
 
 const SEAT_LAYOUTS: Record<number, SeatPoint[]> = {
   2: [
-    { x: 50, y: 84, rotate: 0, lean: 'center' },
-    { x: 50, y: 16, rotate: 180, lean: 'center' },
+    { x: 50, y: 84, cardX: 50, cardY: 68, betX: 50, betY: 58, lean: 'center' },
+    { x: 50, y: 16, cardX: 50, cardY: 34, betX: 50, betY: 44, lean: 'center' },
   ],
   4: [
-    { x: 50, y: 84, rotate: 0, lean: 'center' },
-    { x: 19, y: 52, rotate: -9, lean: 'left' },
-    { x: 50, y: 16, rotate: 180, lean: 'center' },
-    { x: 81, y: 52, rotate: 9, lean: 'right' },
+    { x: 50, y: 84, cardX: 50, cardY: 68, betX: 50, betY: 58, lean: 'center' },
+    { x: 19, y: 52, cardX: 31, cardY: 52, betX: 40, betY: 48, lean: 'left' },
+    { x: 50, y: 16, cardX: 50, cardY: 34, betX: 50, betY: 44, lean: 'center' },
+    { x: 81, y: 52, cardX: 69, cardY: 52, betX: 60, betY: 48, lean: 'right' },
   ],
   5: [
-    { x: 50, y: 84, rotate: 0, lean: 'center' },
-    { x: 20, y: 61, rotate: -8, lean: 'left' },
-    { x: 30, y: 24, rotate: -5, lean: 'left' },
-    { x: 70, y: 24, rotate: 5, lean: 'right' },
-    { x: 80, y: 61, rotate: 8, lean: 'right' },
+    { x: 50, y: 84, cardX: 50, cardY: 68, betX: 50, betY: 58, lean: 'center' },
+    { x: 20, y: 62, cardX: 34, cardY: 62, betX: 42, betY: 57, lean: 'left' },
+    { x: 30, y: 27, cardX: 38, cardY: 39, betX: 45, betY: 43, lean: 'left' },
+    { x: 70, y: 27, cardX: 62, cardY: 39, betX: 55, betY: 43, lean: 'right' },
+    { x: 80, y: 62, cardX: 66, cardY: 62, betX: 58, betY: 57, lean: 'right' },
   ],
   6: [
-    { x: 50, y: 84, rotate: 0, lean: 'center' },
-    { x: 24, y: 71, rotate: -7, lean: 'left' },
-    { x: 20, y: 38, rotate: -10, lean: 'left' },
-    { x: 50, y: 16, rotate: 180, lean: 'center' },
-    { x: 80, y: 38, rotate: 10, lean: 'right' },
-    { x: 76, y: 71, rotate: 7, lean: 'right' },
+    { x: 50, y: 84, cardX: 50, cardY: 68, betX: 50, betY: 58, lean: 'center' },
+    { x: 24, y: 71, cardX: 35, cardY: 63, betX: 42, betY: 57, lean: 'left' },
+    { x: 20, y: 38, cardX: 32, cardY: 43, betX: 40, betY: 46, lean: 'left' },
+    { x: 50, y: 16, cardX: 50, cardY: 34, betX: 50, betY: 44, lean: 'center' },
+    { x: 80, y: 38, cardX: 68, cardY: 43, betX: 60, betY: 46, lean: 'right' },
+    { x: 76, y: 71, cardX: 65, cardY: 63, betX: 58, betY: 57, lean: 'right' },
   ],
   9: [
-    { x: 50, y: 85, rotate: 0, lean: 'center' },
-    { x: 30, y: 78, rotate: -5, lean: 'left' },
-    { x: 17, y: 57, rotate: -10, lean: 'left' },
-    { x: 24, y: 32, rotate: -8, lean: 'left' },
-    { x: 41, y: 16, rotate: -4, lean: 'center' },
-    { x: 59, y: 16, rotate: 4, lean: 'center' },
-    { x: 76, y: 32, rotate: 8, lean: 'right' },
-    { x: 83, y: 57, rotate: 10, lean: 'right' },
-    { x: 70, y: 78, rotate: 5, lean: 'right' },
+    { x: 50, y: 85, cardX: 50, cardY: 68, betX: 50, betY: 58, lean: 'center' },
+    { x: 30, y: 78, cardX: 38, cardY: 65, betX: 43, betY: 57, lean: 'left' },
+    { x: 17, y: 57, cardX: 29, cardY: 56, betX: 38, betY: 52, lean: 'left' },
+    { x: 24, y: 32, cardX: 34, cardY: 42, betX: 42, betY: 45, lean: 'left' },
+    { x: 41, y: 16, cardX: 43, cardY: 33, betX: 47, betY: 43, lean: 'center' },
+    { x: 59, y: 16, cardX: 57, cardY: 33, betX: 53, betY: 43, lean: 'center' },
+    { x: 76, y: 32, cardX: 66, cardY: 42, betX: 58, betY: 45, lean: 'right' },
+    { x: 83, y: 57, cardX: 71, cardY: 56, betX: 62, betY: 52, lean: 'right' },
+    { x: 70, y: 78, cardX: 62, cardY: 65, betX: 57, betY: 57, lean: 'right' },
   ],
-}
-
-const PHASE_LABELS: Record<string, string> = {
-  waiting: 'Ожидание',
-  preflop: 'Префлоп',
-  flop: 'Флоп',
-  turn: 'Терн',
-  river: 'Ривер',
-  showdown: 'Шоудаун',
 }
 
 const CHIP_COLORS = [
@@ -103,14 +88,6 @@ const CHIP_COLORS = [
   { v: 5, fill: '#dc2626', edge: '#7f1d1d' },
   { v: 1, fill: '#f8fafc', edge: '#94a3b8' },
 ]
-
-const EVENT_STYLES: Record<EventTone, string> = {
-  deal: 'border-cyan-300/30 text-cyan-100',
-  bet: 'border-amber-300/30 text-amber-100',
-  fold: 'border-red-300/30 text-red-100',
-  win: 'border-emerald-300/30 text-emerald-100',
-  info: 'border-white/15 text-white/70',
-}
 
 function normalizeSettings(settings: any): NormalizedSettings {
   const requestedSize = Number(settings?.size || 9)
@@ -127,6 +104,39 @@ function normalizeSettings(settings: any): NormalizedSettings {
 
 function money(value: number | undefined | null) {
   return `$${Number(value || 0).toFixed(2)}`
+}
+
+function normalizePresencePlayers(rawPlayers: any[], previousPlayers: any[], size: number) {
+  const byId = new Map<string, any>()
+
+  rawPlayers.forEach((player) => {
+    const id = String(player?.id || '')
+    if (!id) return
+
+    const current = byId.get(id)
+    if (!current || Number(player.joinedAt || 0) < Number(current.joinedAt || 0)) {
+      byId.set(id, player)
+    }
+  })
+
+  const kept = previousPlayers
+    .filter((player) => byId.has(String(player.id)))
+    .map((player) => ({ ...byId.get(String(player.id)), joinedAt: player.joinedAt || byId.get(String(player.id))?.joinedAt }))
+
+  const keptIds = new Set(kept.map((player) => String(player.id)))
+  const added = Array.from(byId.values())
+    .filter((player) => !keptIds.has(String(player.id)))
+    .sort((a, b) => Number(a.joinedAt || 0) - Number(b.joinedAt || 0) || String(a.id).localeCompare(String(b.id)))
+
+  return [...kept, ...added].slice(0, size)
+}
+
+function buildStatePayload(state: PokerGameState, stateVersion: number) {
+  return {
+    ...state,
+    currentTurn: state.players[state.activePlayerIndex]?.id ?? null,
+    stateVersion,
+  }
 }
 
 const CARD_NAMES: Record<string, string> = {
@@ -254,15 +264,16 @@ function PokerChip({ value, index }: { value: number; index: number }) {
 
   return (
     <span
-      className="relative grid h-6 w-6 place-items-center rounded-full border text-[0px] shadow-md"
+      className="relative grid h-7 w-7 place-items-center rounded-full border-2 text-[0px] shadow-[0_5px_0_rgba(0,0,0,0.28)]"
       style={{
-        marginLeft: index > 0 ? -9 : 0,
         zIndex: 20 + index,
-        background: color.fill,
+        background: `radial-gradient(circle at 34% 28%, rgba(255,255,255,0.68), transparent 18%), ${color.fill}`,
         borderColor: color.edge,
       }}
     >
-      <span className="absolute inset-[5px] rounded-full border border-white/35" />
+      <span className="absolute inset-[4px] rounded-full border border-white/45" />
+      <span className="absolute left-1/2 top-0 h-full w-[3px] -translate-x-1/2 bg-white/20" />
+      <span className="absolute left-0 top-1/2 h-[3px] w-full -translate-y-1/2 bg-white/20" />
       {value}
     </span>
   )
@@ -281,13 +292,13 @@ function ChipsStack({ amount }: { amount: number }) {
   })
 
   return (
-    <div className="flex items-center gap-2 rounded-full border border-amber-200/25 bg-black/80 px-3 py-1.5 shadow-xl backdrop-blur">
-      <div className="flex items-center">
+    <div className="flex items-center gap-2 rounded-full border border-white/25 bg-[#334e6f]/90 px-2.5 py-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.34)] backdrop-blur">
+      <div className="flex -space-x-2">
         {chips.slice(0, 4).map((value, index) => (
           <PokerChip key={`${value}-${index}`} value={value} index={index} />
         ))}
       </div>
-      <span className="text-xs font-black text-amber-100">{money(amount)}</span>
+      <span className="text-xs font-black text-white">{money(amount)}</span>
     </div>
   )
 }
@@ -297,6 +308,7 @@ function SeatVideo({
   gamePlayer,
   isMe,
   isTurn,
+  isWinner,
   isFocused,
   localStream,
   remoteStream,
@@ -308,6 +320,7 @@ function SeatVideo({
   gamePlayer: any
   isMe: boolean
   isTurn: boolean
+  isWinner: boolean
   isFocused: boolean
   localStream: MediaStream | null
   remoteStream?: MediaStream
@@ -323,7 +336,11 @@ function SeatVideo({
       type="button"
       onClick={occupied ? onFocus : undefined}
       className={`group relative block w-full rounded-[18px] border bg-[#080b0c] p-1 shadow-[0_24px_50px_rgba(0,0,0,0.5)] outline-none transition ${
-        isTurn ? 'border-cyan-200 shadow-cyan-500/20' : 'border-white/12 hover:border-white/30'
+        isWinner
+          ? 'border-amber-200 shadow-[0_0_34px_rgba(251,191,36,0.46)]'
+          : isTurn
+            ? 'border-cyan-200 shadow-cyan-500/20'
+            : 'border-white/12 hover:border-white/30'
       } ${gamePlayer?.folded ? 'opacity-45 saturate-50' : ''}`}
     >
       <div className="relative aspect-[16/10] overflow-hidden rounded-[14px] bg-[#020304]">
@@ -401,7 +418,6 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
   const [peerReady, setPeerReady] = useState(false)
   const [peerNudge, setPeerNudge] = useState(0)
   const [turnSeconds, setTurnSeconds] = useState(30)
-  const [eventLog, setEventLog] = useState<TableEvent[]>([])
   const [focusPlayerId, setFocusPlayerId] = useState<string | null>(null)
 
   const myId = String(user?.id || user?.display_name || '')
@@ -411,6 +427,8 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
   const peerRef = useRef<any>(null)
   const callsRef = useRef<Record<string, any>>({})
   const joinedPlayersRef = useRef<any[]>([])
+  const stateVersionRef = useRef(0)
+  const resendTimersRef = useRef<number[]>([])
   const lastTurnRef = useRef<string | null>(null)
   const lastPhaseRef = useRef('waiting')
   const lastCommunityCountRef = useRef(0)
@@ -425,11 +443,54 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
   const canRaise = Boolean(myPlayer && maxRaise > currentBet && maxRaise >= minRaise)
   const isHost = String(joinedPlayers[0]?.id || '') === myId
   const activePlayer = joinedPlayers.find((player) => String(player.id) === String(currentTurn))
-  const phaseLabel = PHASE_LABELS[gameState] || gameState
   const focusedPlayer = focusPlayerId ? joinedPlayers.find((player) => String(player.id) === focusPlayerId) : null
   const focusedGamePlayer = focusedPlayer
     ? players.find((player) => String(player.id) === String(focusedPlayer.id))
     : null
+  const winnerIds = useMemo(() => new Set(winnerInfo.map((winner) => String(winner.id))), [winnerInfo])
+  const seatPlayers = useMemo(() => {
+    if (players.length === 0) return joinedPlayers
+
+    const presenceById = new Map(joinedPlayers.map((player) => [String(player.id), player]))
+    const orderedFromGame = players.map((gamePlayer) => {
+      const presence = presenceById.get(String(gamePlayer.id))
+
+      return {
+        ...presence,
+        id: gamePlayer.id,
+        display_name: presence?.display_name || gamePlayer.name,
+        profile_image_url: presence?.profile_image_url,
+        peerId: presence?.peerId,
+        joinedAt: presence?.joinedAt,
+      }
+    })
+    const gameIds = new Set(orderedFromGame.map((player) => String(player.id)))
+    const waitingPlayers = joinedPlayers.filter((player) => !gameIds.has(String(player.id)))
+
+    return [...orderedFromGame, ...waitingPlayers].slice(0, tableSettings.size)
+  }, [joinedPlayers, players, tableSettings.size])
+  const seatEntries = useMemo(
+    () =>
+      seats.map((seat, index) => {
+        const player = seatPlayers[index]
+        const playerId = player ? String(player.id) : ''
+        const gamePlayer = player ? players.find((item) => String(item.id) === playerId) : null
+
+        return {
+          seat,
+          index,
+          player,
+          playerId,
+          gamePlayer,
+          isMe: playerId === myId,
+          isTurn: Boolean(player && String(currentTurn) === playerId),
+          isWinner: winnerIds.has(playerId),
+          handLabel: getHandLabel(gamePlayer?.cards || [], communityCards),
+          remoteStream: playerId ? remoteStreams[playerId] : undefined,
+        }
+      }),
+    [communityCards, currentTurn, myId, players, remoteStreams, seatPlayers, seats, winnerIds]
+  )
 
   useEffect(() => {
     joinedPlayersRef.current = joinedPlayers
@@ -439,15 +500,15 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
     setCameraEnabled(tableSettings.withWebcams)
   }, [tableSettings.withWebcams])
 
-  const addEvent = useCallback((event: TableEvent) => {
-    setEventLog((prev) => [event, ...prev].slice(0, 5))
-  }, [])
-
   const applyGameMessage = useCallback(
     (msg: any) => {
       if (!msg) return
 
-      const nextPhase = msg.phase || gameState
+      const incomingVersion = Number(msg.stateVersion || 0)
+      if (incomingVersion > 0 && incomingVersion < stateVersionRef.current) return
+      if (incomingVersion > 0) stateVersionRef.current = incomingVersion
+
+      const nextPhase = msg.phase || fullStateRef.current?.phase || 'waiting'
       const nextPlayers = Array.isArray(msg.players) ? msg.players : []
       const nextTurn = msg.currentTurn ?? nextPlayers[msg.activePlayerIndex]?.id ?? null
       const nextCommunityCards = msg.communityCards || []
@@ -467,7 +528,7 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
       if (msg.currentBet !== undefined) setCurrentBet(msg.currentBet)
       setCurrentTurn(nextTurn ? String(nextTurn) : null)
       if (msg.communityCards) setCommunityCards(msg.communityCards)
-      if (msg.winners) setWinnerInfo(msg.winners)
+      setWinnerInfo(Array.isArray(msg.winners) ? msg.winners : [])
 
       if (nextPlayers.length > 0) {
         const isShowdown = nextPhase === 'showdown'
@@ -482,22 +543,20 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
         )
       }
 
-      if (msg.lastEvent) addEvent(msg.lastEvent)
-
       lastTurnRef.current = nextTurn ? String(nextTurn) : null
       lastPhaseRef.current = nextPhase
       lastCommunityCountRef.current = nextCommunityCards.length
     },
-    [addEvent, gameState, myId]
+    [myId]
   )
 
   const broadcastState = useCallback(
-    async (state: PokerGameState, lastEvent?: Omit<TableEvent, 'ts'>) => {
-      const payload = {
-        ...state,
-        currentTurn: state.players[state.activePlayerIndex]?.id ?? null,
-        lastEvent: lastEvent ? { ...lastEvent, ts: Date.now() } : undefined,
-      }
+    async (state: PokerGameState) => {
+      resendTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+      resendTimersRef.current = []
+
+      const nextVersion = stateVersionRef.current + 1
+      const payload = buildStatePayload(state, nextVersion)
 
       fullStateRef.current = state
       applyGameMessage(payload)
@@ -507,6 +566,16 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
         event: 'game_logic',
         payload,
       })
+
+      resendTimersRef.current = [450, 1200].map((delay) =>
+        window.setTimeout(() => {
+          channelRef.current?.send({
+            type: 'broadcast',
+            event: 'state_snapshot',
+            payload: buildStatePayload(state, nextVersion),
+          })
+        }, delay)
+      )
     },
     [applyGameMessage]
   )
@@ -514,18 +583,37 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
   useEffect(() => {
     if (!roomId || !myId || !user?.id) return
 
-    const channel = supabase.channel(`poker:${roomId}`, { config: { presence: { key: myId } } })
+    const channel = supabase.channel(`poker:${roomId}`, { config: { presence: { key: myId }, broadcast: { ack: true } } })
     channelRef.current = channel
 
     channel
       .on('presence', { event: 'sync' }, () => {
         const raw = Object.values(channel.presenceState()).flat() as any[]
-        const unique = Array.from(new Map(raw.map((player) => [String(player.id), player])).values())
-          .sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0) || String(a.id).localeCompare(String(b.id)))
-          .slice(0, tableSettings.size)
-        setJoinedPlayers(unique)
+        setJoinedPlayers((previous) => normalizePresencePlayers(raw, previous, tableSettings.size))
       })
       .on('broadcast', { event: 'game_logic' }, (payload: any) => applyGameMessage(payload.payload))
+      .on('broadcast', { event: 'state_snapshot' }, (payload: any) => {
+        const snapshot = payload.payload
+        if (snapshot?.target && String(snapshot.target) !== myId) return
+        applyGameMessage(snapshot)
+      })
+      .on('broadcast', { event: 'state_request' }, (payload: any) => {
+        const requester = String(payload.payload?.requester || '')
+        const requesterVersion = Number(payload.payload?.stateVersion || 0)
+        const state = fullStateRef.current
+        if (!requester || requester === myId || !state || stateVersionRef.current <= requesterVersion) return
+
+        window.setTimeout(() => {
+          channelRef.current?.send({
+            type: 'broadcast',
+            event: 'state_snapshot',
+            payload: {
+              ...buildStatePayload(state, stateVersionRef.current),
+              target: requester,
+            },
+          })
+        }, 120 + Math.floor(Math.random() * 260))
+      })
       .on('broadcast', { event: 'peer_ready' }, (payload: any) => {
         if (String(payload.payload?.id) !== myId) setPeerNudge((value) => value + 1)
       })
@@ -538,14 +626,35 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
             peerId: makePeerId(roomId, myId),
             joinedAt: Date.now(),
           })
+          await channel.send({
+            type: 'broadcast',
+            event: 'state_request',
+            payload: { requester: myId, stateVersion: stateVersionRef.current },
+          })
         }
       })
 
     return () => {
+      resendTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+      resendTimersRef.current = []
       channel.unsubscribe()
       channelRef.current = null
     }
   }, [applyGameMessage, myId, roomId, tableSettings.size, user?.display_name, user?.id, user?.profile_image_url])
+
+  useEffect(() => {
+    if (!roomId || !myId) return
+
+    const timer = window.setInterval(() => {
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'state_request',
+        payload: { requester: myId, stateVersion: stateVersionRef.current },
+      })
+    }, 4500)
+
+    return () => window.clearInterval(timer)
+  }, [myId, roomId])
 
   useEffect(() => {
     let cancelled = false
@@ -766,7 +875,6 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
 
   const startHand = useCallback(async () => {
     if (joinedPlayers.length < 2) {
-      addEvent({ text: 'Нужно минимум 2 игрока', tone: 'info', ts: Date.now() })
       return
     }
 
@@ -793,11 +901,11 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
         tableSettings.buyIn,
         tableSettings.ante
       )
-      await broadcastState(state, { text: 'Новая раздача', tone: 'deal' })
+      await broadcastState(state)
     } catch (error) {
       console.error(error)
     }
-  }, [addEvent, broadcastState, joinedPlayers, tableSettings.ante, tableSettings.blind, tableSettings.buyIn, tableSettings.size])
+  }, [broadcastState, joinedPlayers, tableSettings.ante, tableSettings.blind, tableSettings.buyIn, tableSettings.size])
 
   const handleAction = useCallback(
     async (action: 'fold' | 'call' | 'raise' | 'check' | 'allIn', amount?: number) => {
@@ -806,23 +914,9 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
       if (!state || !isMyTurn || !actorPlayer) return
 
       const nextState = PokerLogic.handleAction(state, myId, action, amount)
-      const actor = actorPlayer.name || user?.display_name || 'Игрок'
-
-      const actionText =
-        action === 'fold'
-          ? `${actor}: фолд`
-          : action === 'check'
-            ? `${actor}: чек`
-            : action === 'call'
-              ? `${actor}: колл ${money(callAmount)}`
-              : action === 'allIn'
-                ? `${actor}: олл-ин`
-                : `${actor}: рейз до ${money(amount)}`
-
-      const tone: EventTone = action === 'fold' ? 'fold' : action === 'check' ? 'info' : 'bet'
-      await broadcastState(nextState, { text: actionText, tone })
+      await broadcastState(nextState)
     },
-    [broadcastState, callAmount, isMyTurn, myId, user?.display_name]
+    [broadcastState, isMyTurn, myId]
   )
 
   useEffect(() => {
@@ -847,7 +941,9 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
 
   const canStart = isHost && joinedPlayers.length >= 2 && (gameState === 'waiting' || gameState === 'showdown')
   const canAct = isMyTurn && gameState !== 'waiting' && gameState !== 'showdown'
-  const turnProgress = Math.max(0, Math.min(100, (turnSeconds / 30) * 100))
+  const turnProgress =
+    gameState === 'waiting' || gameState === 'showdown' ? 0 : Math.max(0, Math.min(100, (turnSeconds / 30) * 100))
+  const turnLabel = gameState === 'waiting' ? 'Ожидание' : gameState === 'showdown' ? 'Раздача окончена' : isMyTurn ? 'Ваш ход' : activePlayer?.display_name || 'Ход игрока'
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-[#07090a] text-white select-none">
@@ -869,13 +965,6 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
           </div>
           <div className="mt-1 text-3xl font-black text-white">
             {money(tableSettings.blind)} / {money(tableSettings.blind * 2)}
-          </div>
-        </div>
-
-        <div className="hidden rounded-[18px] border border-white/10 bg-black/45 px-5 py-3 text-center shadow-2xl backdrop-blur-md lg:block">
-          <div className="text-sm font-bold uppercase text-white/45">{phaseLabel}</div>
-          <div className="mt-1 text-lg font-black text-white">
-            {activePlayer ? `Ход: ${activePlayer.display_name}` : gameState === 'waiting' ? 'Собираем игроков' : 'Стол готов'}
           </div>
         </div>
 
@@ -969,13 +1058,13 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
       </AnimatePresence>
 
       <main className="absolute inset-0 z-10">
-        <section className="absolute left-1/2 top-1/2 h-[52vh] min-h-[470px] w-[66vw] min-w-[940px] max-w-[1240px] -translate-x-1/2 -translate-y-1/2">
-          <div className="absolute inset-[-30px] rounded-[999px] bg-[linear-gradient(135deg,#5a3418,#2a190f_42%,#8b5d2a_54%,#24140c)] shadow-[0_30px_90px_rgba(0,0,0,0.75)]" />
-          <div className="absolute inset-0 overflow-hidden rounded-[999px] border-[10px] border-[#6b4522] bg-[linear-gradient(145deg,#15533e,#0f342a_48%,#123026_49%,#09201c)] shadow-[inset_0_0_80px_rgba(0,0,0,0.86),inset_0_0_0_1px_rgba(255,255,255,0.14)]">
+        <section className="absolute left-1/2 top-1/2 h-[58vh] min-h-[520px] w-[72vw] min-w-[1020px] max-w-[1320px] -translate-x-1/2 -translate-y-1/2">
+          <div className="absolute inset-[-34px] rounded-[999px] bg-[linear-gradient(135deg,#5f391d,#273454_39%,#9b6f35_54%,#24140c)] shadow-[0_30px_90px_rgba(0,0,0,0.78)]" />
+          <div className="absolute inset-0 overflow-hidden rounded-[999px] border-[12px] border-[#26365d] bg-[linear-gradient(145deg,#79bd86,#65ad78_48%,#539c70_49%,#37775f)] shadow-[inset_0_0_70px_rgba(16,65,47,0.56),inset_0_0_0_1px_rgba(255,255,255,0.18)]">
             <div className="absolute inset-0 opacity-35 mix-blend-screen bg-[linear-gradient(100deg,transparent_0%,rgba(255,255,255,0.14)_34%,transparent_48%,rgba(34,211,238,0.12)_74%,transparent_100%)]" />
-            <div className="absolute inset-[8%] rounded-[999px] border border-white/10" />
+            <div className="absolute inset-[8%] rounded-[999px] border border-white/20" />
 
-            <div className="absolute left-1/2 top-[37%] -translate-x-1/2 -translate-y-1/2 rounded-[18px] border border-white/12 bg-black/62 px-6 py-3 text-center shadow-2xl backdrop-blur">
+            <div className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/18 bg-[#3b5f6b]/86 px-8 py-3 text-center shadow-2xl backdrop-blur">
               <div className="text-xs font-black uppercase text-white/45">Банк</div>
               <motion.div
                 key={pot}
@@ -988,7 +1077,7 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
               </motion.div>
             </div>
 
-            <div className="absolute left-1/2 top-[58%] flex -translate-x-1/2 -translate-y-1/2 gap-3">
+            <div className="absolute left-1/2 top-[55%] flex -translate-x-1/2 -translate-y-1/2 gap-3">
               {Array.from({ length: 5 }).map((_, index) => {
                 const card = communityCards[index]
 
@@ -1010,124 +1099,80 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
               })}
             </div>
 
-            <div className="absolute right-[14%] top-[50%] grid h-[112px] w-[76px] -translate-y-1/2 place-items-center rounded-[14px] border border-amber-200/20 bg-black/35 shadow-xl">
+            <div className="absolute right-[14%] top-[52%] grid h-[104px] w-[72px] -translate-y-1/2 place-items-center rounded-[14px] border border-white/20 bg-[#35526d]/35 shadow-xl">
               <div className="h-[92px] w-[62px] rounded-[10px] border border-white/15 bg-[linear-gradient(135deg,#1e293b,#0f172a)] shadow-[0_8px_0_rgba(0,0,0,0.3)]" />
-            </div>
-
-            <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-black/35 px-5 py-2 text-sm font-bold text-white/55 backdrop-blur">
-              <BadgeDollarSign className="h-4 w-4 text-amber-200" />
-              Текущая ставка {money(currentBet)}
             </div>
           </div>
         </section>
 
-        {seats.map((seat, index) => {
-          const player = joinedPlayers[index]
-          const playerId = player ? String(player.id) : ''
-          const gamePlayer = player ? players.find((item) => String(item.id) === playerId) : null
-          const isMe = playerId === myId
-          const isTurn = Boolean(player && String(currentTurn) === playerId)
-          const lowerSeat = seat.y > 67
-          const upperSeat = seat.y < 34
-          const remoteStream = playerId ? remoteStreams[playerId] : undefined
-          const handLabel = getHandLabel(gamePlayer?.cards || [], communityCards)
-          const cardsPosition = lowerSeat
-            ? 'left-1/2 -top-[118px] -translate-x-1/2'
-            : upperSeat
-              ? 'left-1/2 -bottom-[118px] -translate-x-1/2'
-              : seat.x < 50
-                ? 'left-[calc(100%+18px)] top-1/2 -translate-y-1/2'
-                : 'right-[calc(100%+18px)] top-1/2 -translate-y-1/2'
-          const betPosition = lowerSeat
-            ? 'left-1/2 -top-[164px] -translate-x-1/2'
-            : upperSeat
-              ? 'left-1/2 -bottom-[164px] -translate-x-1/2'
-              : seat.x < 50
-                ? 'left-[calc(100%+18px)] top-[calc(50%+74px)]'
-                : 'right-[calc(100%+18px)] top-[calc(50%+74px)]'
+        {seatEntries.map((entry) => (
+          <motion.div
+            key={entry.index}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: entry.index * 0.035, type: 'spring', stiffness: 260, damping: 22 }}
+            className="absolute z-30 w-[168px] -translate-x-1/2 -translate-y-1/2 xl:w-[196px]"
+            style={{ left: `${entry.seat.x}%`, top: `${entry.seat.y}%` }}
+          >
+            <SeatVideo
+              player={entry.player}
+              gamePlayer={entry.gamePlayer}
+              isMe={entry.isMe}
+              isTurn={entry.isTurn}
+              isWinner={entry.isWinner}
+              isFocused={focusPlayerId === entry.playerId}
+              localStream={localStream}
+              remoteStream={entry.remoteStream}
+              mediaEnabled={tableSettings.withWebcams}
+              stackAmount={entry.gamePlayer?.chips ?? tableSettings.buyIn}
+              onFocus={() => setFocusPlayerId(entry.playerId)}
+            />
 
-          return (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: index * 0.035, type: 'spring', stiffness: 260, damping: 22 }}
-              className="absolute z-30 w-[168px] -translate-x-1/2 -translate-y-1/2 xl:w-[196px]"
-              style={{ left: `${seat.x}%`, top: `${seat.y}%` }}
+            {entry.isTurn && (
+              <div className="pointer-events-none absolute -inset-2 rounded-[24px] border border-cyan-200/45 shadow-[0_0_34px_rgba(34,211,238,0.42)]" />
+            )}
+          </motion.div>
+        ))}
+
+        {seatEntries.map((entry) =>
+          entry.gamePlayer?.bet > 0 ? (
+            <div
+              key={`bet-${entry.index}`}
+              className="absolute z-40 -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${entry.seat.betX}%`, top: `${entry.seat.betY}%` }}
             >
-              <div>
-                <SeatVideo
-                  player={player}
-                  gamePlayer={gamePlayer}
-                  isMe={isMe}
-                  isTurn={isTurn}
-                  isFocused={focusPlayerId === playerId}
-                  localStream={localStream}
-                  remoteStream={remoteStream}
-                  mediaEnabled={tableSettings.withWebcams}
-                  stackAmount={gamePlayer?.chips ?? tableSettings.buyIn}
-                  onFocus={() => setFocusPlayerId(playerId)}
-                />
+              <ChipsStack amount={entry.gamePlayer.bet} />
+            </div>
+          ) : null
+        )}
 
-                {isTurn && (
-                  <div className="pointer-events-none absolute -inset-2 rounded-[24px] border border-cyan-200/40 shadow-[0_0_28px_rgba(34,211,238,0.36)]" />
-                )}
-
-                {gamePlayer?.bet > 0 && (
-                  <div className={`absolute z-50 ${betPosition}`}>
-                    <ChipsStack amount={gamePlayer.bet} />
-                  </div>
-                )}
-
-                {gamePlayer?.cards?.length > 0 && (
-                  <div className={`absolute z-40 flex items-center gap-2 ${cardsPosition}`}>
-                    <div className="flex gap-1">
-                      {gamePlayer.cards.map((card: any, cardIndex: number) => (
-                        <PokerCard
-                          key={`${playerId}-${cardIndex}-${card.suit}-${card.value}`}
-                          suit={card.suit}
-                          value={card.value}
-                          isFlipped={card.suit === 'X'}
-                          className="h-[72px] w-[50px] rounded-[10px]"
-                        />
-                      ))}
-                    </div>
-                    {handLabel && (
-                      <div className="whitespace-nowrap rounded-full border border-cyan-200/25 bg-black/78 px-3 py-1.5 text-xs font-black text-cyan-100 shadow-xl backdrop-blur">
-                        {handLabel}
-                      </div>
-                    )}
-                  </div>
-                )}
+        {seatEntries.map((entry) =>
+          entry.gamePlayer?.cards?.length > 0 ? (
+            <div
+              key={`cards-${entry.index}`}
+              className="absolute z-40 -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${entry.seat.cardX}%`, top: `${entry.seat.cardY}%` }}
+            >
+              <div className="flex justify-center gap-1">
+                {entry.gamePlayer.cards.map((card: any, cardIndex: number) => (
+                  <PokerCard
+                    key={`${entry.playerId}-${cardIndex}-${card.suit}-${card.value}`}
+                    suit={card.suit}
+                    value={card.value}
+                    isFlipped={card.suit === 'X'}
+                    className="h-[70px] w-[50px] rounded-[10px]"
+                  />
+                ))}
               </div>
-            </motion.div>
-          )
-        })}
+              {entry.handLabel && (
+                <div className="mx-auto mt-1 w-max max-w-[150px] rounded-full border border-cyan-200/30 bg-[#0d3540]/90 px-3 py-1 text-center text-[11px] font-black text-cyan-50 shadow-xl backdrop-blur">
+                  {entry.handLabel}
+                </div>
+              )}
+            </div>
+          ) : null
+        )}
       </main>
-
-      <aside className="absolute bottom-6 left-6 z-50 w-[300px] rounded-[18px] border border-white/10 bg-black/52 p-4 shadow-2xl backdrop-blur-md">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-xs font-black uppercase text-white/40">Комната</div>
-            <div className="mt-1 font-mono text-lg font-black text-white">{roomId}</div>
-          </div>
-          <div className="rounded-full border border-emerald-200/20 bg-emerald-300/10 px-3 py-1 text-sm font-black text-emerald-100">
-            {joinedPlayers.length}/{tableSettings.size}
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-2">
-          {eventLog.length > 0 &&
-            eventLog.map((event) => (
-              <div
-                key={`${event.ts}-${event.text}`}
-                className={`rounded-[12px] border bg-white/5 px-3 py-2 text-sm font-bold ${EVENT_STYLES[event.tone]}`}
-              >
-                {event.text}
-              </div>
-            ))}
-        </div>
-      </aside>
 
       <aside className="absolute right-6 top-1/2 z-50 w-[168px] -translate-y-1/2 rounded-[22px] border border-white/10 bg-black/64 p-3 shadow-2xl backdrop-blur-md">
         <div className="mb-3 grid place-items-center">
@@ -1138,11 +1183,11 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
             }}
           >
             <div className="grid h-full w-full place-items-center rounded-full bg-[#050708] text-lg font-black text-white">
-              {gameState === 'waiting' || gameState === 'showdown' ? '∞' : turnSeconds}
+              {gameState === 'waiting' || gameState === 'showdown' ? '--' : turnSeconds}
             </div>
           </div>
           <div className="mt-2 text-center text-xs font-black uppercase text-white/40">
-            {isMyTurn ? 'Ваш ход' : activePlayer?.display_name || phaseLabel}
+            {turnLabel}
           </div>
         </div>
 
@@ -1240,27 +1285,6 @@ export default function PokerTable({ roomId, user, settings, onBack }: any) {
           </div>
         </div>
       </aside>
-
-      <AnimatePresence>
-        {gameState === 'showdown' && winnerInfo.length > 0 && (
-          <motion.div
-            initial={{ y: -30, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -30, opacity: 0 }}
-            className="absolute left-1/2 top-28 z-[70] -translate-x-1/2 rounded-[22px] border border-emerald-200/25 bg-black/72 px-7 py-4 text-center shadow-2xl backdrop-blur-md"
-          >
-            <div className="text-xs font-black uppercase text-emerald-200/65">Победитель</div>
-            <div className="mt-1 text-2xl font-black text-white">
-              {winnerInfo
-                .map((winner) => joinedPlayers.find((player) => String(player.id) === String(winner.id))?.display_name || winner.id)
-                .join(', ')}
-            </div>
-            <div className="mt-1 text-sm font-bold text-emerald-100/70">
-              {winnerInfo.map((winner) => winner.handName).join(' / ')}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {focusedPlayer && (
