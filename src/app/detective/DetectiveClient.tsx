@@ -11,6 +11,7 @@ import {
   FolderOpen,
   GitBranch,
   KeyRound,
+  ListChecks,
   Lock,
   MapPin,
   MessageSquare,
@@ -389,11 +390,12 @@ export default function DetectiveClient() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 text-center sm:flex">
-            <Metric label="открыто" value={`${visibleEvidence.length}/${currentCase.evidence.length}`} />
-            <Metric label="прогресс" value={`${progress}%`} />
-            <Metric label="сложность" value={currentCase.difficulty} />
-          </div>
+          <CaseStatusCards
+            currentCase={currentCase}
+            foundCount={visibleEvidence.length}
+            totalCount={currentCase.evidence.length}
+            progress={progress}
+          />
         </div>
       </div>
 
@@ -407,6 +409,26 @@ export default function DetectiveClient() {
             <p className="text-sm leading-6 text-stone-300">{currentCase.description}</p>
             <div className="mt-4 h-2 rounded bg-stone-900">
               <div className="h-full rounded bg-stone-100" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="mt-3 text-xs leading-5 text-stone-500">
+              Прогресс считает найденные и восстановленные улики. Это не процент раскрытия правды, а состояние вашего архива.
+            </p>
+          </section>
+
+          <section className={cx("rounded-md border p-4", caseAccent[currentCase.id].line, caseAccent[currentCase.id].soft)}>
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-stone-100">
+              <ListChecks className="h-4 w-4" />
+              План расследования
+            </div>
+            <div className="grid gap-2">
+              {currentCase.tasks.slice(0, 4).map((task, index) => (
+                <div key={task.title} className="flex gap-2 text-sm leading-5 text-stone-200">
+                  <span style={monoFont} className={cx("mt-0.5 text-xs", caseAccent[currentCase.id].text)}>
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span>{task.title}</span>
+                </div>
+              ))}
             </div>
           </section>
 
@@ -729,6 +751,61 @@ function CaseSignalArt({ currentCase }: { currentCase: DetectiveCase }) {
   );
 }
 
+function CaseStatusCards({
+  currentCase,
+  foundCount,
+  totalCount,
+  progress,
+}: {
+  currentCase: DetectiveCase;
+  foundCount: number;
+  totalCount: number;
+  progress: number;
+}) {
+  return (
+    <div className="grid w-full gap-3 sm:grid-cols-3 xl:w-[720px]">
+      <StatusCard
+        accent={currentCase.id}
+        label="Найдено улик"
+        value={`${foundCount} из ${totalCount}`}
+        detail="Материалы, которые уже можно открыть и использовать в версии."
+      />
+      <StatusCard
+        accent={currentCase.id}
+        label="Прогресс архива"
+        value={`${progress}%`}
+        detail="Доля найденных цифровых следов. Финальная правда все равно зависит от связки улик."
+      />
+      <StatusCard
+        accent={currentCase.id}
+        label="Сложность дела"
+        value={currentCase.difficulty}
+        detail="Показывает, сколько ложных следов, допросов и скрытых артефактов будет внутри."
+      />
+    </div>
+  );
+}
+
+function StatusCard({
+  accent,
+  label,
+  value,
+  detail,
+}: {
+  accent: DetectiveCaseId;
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className={cx("min-w-0 rounded-md border bg-stone-950/90 p-3 text-left", caseAccent[accent].line)}>
+      <div className={cx("text-xs font-medium uppercase", caseAccent[accent].text)}>{label}</div>
+      <div className="mt-1 min-w-0 break-words text-xl font-semibold leading-tight text-stone-50">{value}</div>
+      <p className="mt-2 text-xs leading-5 text-stone-500">{detail}</p>
+    </div>
+  );
+}
+
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-stone-800 bg-stone-950 px-3 py-2">
@@ -749,9 +826,53 @@ function SmallFact({ label, value, wide }: { label: string; value: string; wide?
   );
 }
 
+function TaskBoard({ currentCase }: { currentCase: DetectiveCase }) {
+  return (
+    <section className={cx("rounded-md border p-4", caseAccent[currentCase.id].line, caseAccent[currentCase.id].soft)}>
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-semibold text-stone-100">
+            <ListChecks className="h-4 w-4" />
+            Что нужно разгадать
+          </div>
+          <p className="mt-1 text-sm text-stone-400">Идите по задачам, но проверяйте версии в любом порядке.</p>
+        </div>
+        <span className={cx("w-fit rounded-md border px-3 py-1 text-xs", caseAccent[currentCase.id].line, caseAccent[currentCase.id].text)}>
+          {currentCase.tasks.length} задач
+        </span>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {currentCase.tasks.map((task, index) => (
+          <article key={task.title} className="rounded-md border border-stone-800 bg-stone-950/90 p-4">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span
+                  style={monoFont}
+                  className={cx(
+                    "grid h-8 w-8 place-items-center rounded-md border text-xs",
+                    caseAccent[currentCase.id].line,
+                    caseAccent[currentCase.id].text,
+                  )}
+                >
+                  {index + 1}
+                </span>
+                <h3 className="text-base font-semibold leading-6 text-stone-50">{task.title}</h3>
+              </div>
+              <span className="shrink-0 rounded-md border border-stone-700 px-2 py-1 text-xs text-stone-400">{task.kind}</span>
+            </div>
+            <p className="text-sm leading-6 text-stone-300">{task.detail}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function SummaryPanel({ currentCase, onOpenSuspect }: { currentCase: DetectiveCase; onOpenSuspect: (id: string) => void }) {
   return (
     <div className="grid gap-4 p-4 lg:p-6">
+      <TaskBoard currentCase={currentCase} />
+
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <section className="rounded-md border border-stone-800 bg-stone-950 p-4">
           <div className="mb-2 text-sm font-semibold text-stone-200">Что произошло</div>
