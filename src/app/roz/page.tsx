@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   Dices,
   Settings2,
@@ -20,7 +20,12 @@ import {
   X,
   RotateCcw,
   ArrowDown,
-  Sparkles
+  Sparkles,
+  Ticket,
+  Gavel,
+  Coins,
+  Trophy,
+  Target
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,6 +53,55 @@ interface ChatMessage {
   text: string
   timestamp: number
   badges?: string[]
+}
+
+type RozMode = 'giveaway' | 'lottery' | 'auction'
+type LotteryAutoMode = 'manual' | 'people' | 'tickets'
+
+interface LotteryTicket extends Participant {
+  id: string
+  number: number
+  price: number
+}
+
+interface LotteryParticipant extends Participant {
+  tickets: number
+  spent: number
+}
+
+interface AuctionBidder extends Participant {
+  bid: number
+  bids: number
+  lastBidAt: number
+}
+
+const getIdleStatus = (mode: RozMode) => {
+  if (mode === 'lottery') {
+    return 'Введите никнейм стримера, приз и команду покупки билета, затем начните продажу билетов'
+  }
+
+  if (mode === 'auction') {
+    return 'Введите никнейм стримера, предмет аукциона и команду ставки, затем начните аукцион'
+  }
+
+  return 'Введите никнейм стримера и ключевое слово, затем нажмите "Начать Отбор"'
+}
+
+const normalizeCommand = (value: string) => value.toLowerCase().trim().replace(/^[#!]/, '')
+
+const isKeywordMatch = (text: string, keyword: string) => (
+  normalizeCommand(text) === normalizeCommand(keyword)
+)
+
+const parseAuctionBid = (text: string, keyword: string) => {
+  const parts = text.toLowerCase().trim().split(/\s+/)
+  if (parts.length < 2 || normalizeCommand(parts[0]) !== normalizeCommand(keyword)) return null
+
+  const amountPart = parts.find(part => /^\d+/.test(part))
+  if (!amountPart) return null
+
+  const amount = Number.parseInt(amountPart, 10)
+  return Number.isFinite(amount) ? amount : null
 }
 
 /* ─── Mock Data ─── */
@@ -87,15 +141,28 @@ function getRandomMessage(): string {
 
 /* ─── Component ─── */
 export default function Home() {
+  const [activeMode, setActiveMode] = useState<RozMode>('giveaway')
   const [streamerName, setStreamerName] = useState('tiktokevelone888')
   const [keyword, setKeyword] = useState('розыгрыш')
+  const [prizeName, setPrizeName] = useState('Приз стримера')
+  const [ticketKeyword, setTicketKeyword] = useState('билет')
+  const [ticketPrice, setTicketPrice] = useState(100)
+  const [lotteryAutoMode, setLotteryAutoMode] = useState<LotteryAutoMode>('manual')
+  const [lotteryTarget, setLotteryTarget] = useState(20)
+  const [lotteryTickets, setLotteryTickets] = useState<LotteryTicket[]>([])
+  const [lotteryWinner, setLotteryWinner] = useState<LotteryTicket | null>(null)
+  const [auctionKeyword, setAuctionKeyword] = useState('ставка')
+  const [auctionMinBid, setAuctionMinBid] = useState(100)
+  const [auctionMinStep, setAuctionMinStep] = useState(10)
+  const [auctionBidders, setAuctionBidders] = useState<AuctionBidder[]>([])
+  const [auctionWinner, setAuctionWinner] = useState<AuctionBidder | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [totalMessages, setTotalMessages] = useState(0)
   const [connectionTime, setConnectionTime] = useState(0)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [winner, setWinner] = useState<Participant | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Введите никнейм стримера и ключевое слово, затем нажмите "Начать Отбор"')
+  const [statusMessage, setStatusMessage] = useState(getIdleStatus('giveaway'))
   const [rouletteOpen, setRouletteOpen] = useState(false)
   const [vaseOpen, setVaseOpen] = useState(false)
 
@@ -105,7 +172,7 @@ export default function Home() {
   const [vaseWinnerIdx, setVaseWinnerIdx] = useState<number | null>(null)
   const [vasePlayers, setVasePlayers] = useState<Participant[]>([])
 
-  const fetchAvatar = async (username: string) => {
+  const fetchAvatar = useCallback(async (username: string) => {
     try {
       const res = await fetch(`/api/twitch/user?username=${username}`)
       if (!res.ok) return null
@@ -114,7 +181,7 @@ export default function Home() {
     } catch (e) {
       return null
     }
-  }
+  }, [])
 
   const [spinOffset, setSpinOffset] = useState(0)
   const spinList = participants.length > 0 ? Array(40).fill(participants).flat() : []
@@ -122,9 +189,102 @@ export default function Home() {
   const chatRef = useRef<HTMLDivElement>(null)
   const userColorsRef = useRef<Map<string, string>>(new Map())
   const participantsSet = useRef<Set<string>>(new Set())
+  const lotteryTicketsRef = useRef<LotteryTicket[]>([])
+  const lotteryDrawnRef = useRef(false)
+  const auctionBiddersRef = useRef<Map<string, AuctionBidder>>(new Map())
+  const avatarRequestedRef = useRef<Set<string>>(new Set())
   const participantsRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const simulateRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const safeTicketPrice = Math.max(1, ticketPrice || 100)
+  const safeLotteryTarget = Math.max(1, lotteryTarget || 1)
+  const safeAuctionMinBid = Math.max(1, auctionMinBid || 100)
+  const safeAuctionMinStep = Math.max(1, auctionMinStep || 1)
+
+  const updateAvatar = useCallback((username: string, avatar: string) => {
+    const login = username.toLowerCase()
+    const update = <T extends Participant>(p: T): T => (
+      p.username.toLowerCase() === login ? { ...p, avatar } as T : p
+    )
+
+    setParticipants(prev => prev.map(update))
+    setLotteryTickets(prev => {
+      const next = prev.map(update)
+      lotteryTicketsRef.current = next
+      return next
+    })
+    setLotteryWinner(prev => prev ? update(prev) : prev)
+    setAuctionBidders(prev => prev.map(update))
+    const currentBidder = auctionBiddersRef.current.get(login)
+    if (currentBidder) {
+      auctionBiddersRef.current.set(login, update(currentBidder))
+    }
+    setAuctionWinner(prev => prev ? update(prev) : prev)
+    setVasePlayers(prev => prev.map(update))
+    setSpinWinner(prev => prev ? update(prev) : prev)
+    setWinner(prev => prev ? update(prev) : prev)
+  }, [])
+
+  const requestAvatar = useCallback((username: string) => {
+    const login = username.toLowerCase()
+    if (avatarRequestedRef.current.has(login)) return
+    avatarRequestedRef.current.add(login)
+
+    fetchAvatar(username).then(avatar => {
+      if (avatar) updateAvatar(username, avatar)
+    })
+  }, [fetchAvatar, updateAvatar])
+
+  const lotteryParticipants = useMemo<LotteryParticipant[]>(() => {
+    const grouped = new Map<string, LotteryParticipant>()
+
+    lotteryTickets.forEach(ticket => {
+      const login = ticket.username.toLowerCase()
+      const current = grouped.get(login)
+
+      if (current) {
+        grouped.set(login, {
+          ...current,
+          tickets: current.tickets + 1,
+          spent: current.spent + ticket.price,
+          avatar: current.avatar || ticket.avatar,
+        })
+      } else {
+        grouped.set(login, {
+          username: ticket.username,
+          color: ticket.color,
+          joinedAt: ticket.joinedAt,
+          avatar: ticket.avatar,
+          tickets: 1,
+          spent: ticket.price,
+        })
+      }
+    })
+
+    return Array.from(grouped.values()).sort((a, b) => b.tickets - a.tickets || a.joinedAt - b.joinedAt)
+  }, [lotteryTickets])
+
+  const topBidder = useMemo(() => (
+    auctionBidders.reduce<AuctionBidder | null>((best, bidder) => {
+      if (!best || bidder.bid > best.bid || (bidder.bid === best.bid && bidder.lastBidAt < best.lastBidAt)) {
+        return bidder
+      }
+
+      return best
+    }, null)
+  ), [auctionBidders])
+
+  const peopleCount = activeMode === 'giveaway'
+    ? participants.length
+    : activeMode === 'lottery'
+      ? lotteryParticipants.length
+      : auctionBidders.length
+
+  const activityCount = activeMode === 'lottery' ? lotteryTickets.length : totalMessages
+  const activityLabel = activeMode === 'giveaway' ? 'Сообщений' : activeMode === 'lottery' ? 'Билетов' : 'Ставок'
+  const sideTitle = activeMode === 'giveaway' ? 'Участники розыгрыша' : activeMode === 'lottery' ? 'Билеты лотереи' : 'Ставки аукциона'
+  const sideCount = activeMode === 'giveaway' ? participants.length : activeMode === 'lottery' ? lotteryTickets.length : auctionBidders.length
 
 
   /* ─── Timer ─── */
@@ -151,7 +311,7 @@ export default function Home() {
     if (participantsRef.current) {
       participantsRef.current.scrollTop = participantsRef.current.scrollHeight
     }
-  }, [participants])
+  }, [participants, lotteryTickets, auctionBidders])
 
   /* ─── Format time ─── */
   const formatTime = (seconds: number) => {
@@ -184,7 +344,13 @@ export default function Home() {
         if (line.startsWith('PING')) { ws.send('PONG :tmi.twitch.tv'); return }
         
         if (line.includes(':End of /NAMES list') || line.includes(' 376 ')) {
-          setStatusMessage(`Подключено к #${streamerName}. Ключевое слово: "${keyword}"`)
+          if (activeMode === 'lottery') {
+            setStatusMessage(`Подключено к #${streamerName}. Билет: "${ticketKeyword}" за ${safeTicketPrice} баллов`)
+          } else if (activeMode === 'auction') {
+            setStatusMessage(`Подключено к #${streamerName}. Ставка: "${auctionKeyword} ${safeAuctionMinBid}"`)
+          } else {
+            setStatusMessage(`Подключено к #${streamerName}. Ключевое слово: "${keyword}"`)
+          }
           return
         }
         
@@ -193,6 +359,7 @@ export default function Home() {
         const login = m[1].toLowerCase()
         const textRaw = m[2].trim()
         const text = textRaw.toLowerCase()
+        const now = Date.now()
         const currentKeyword = keyword.toLowerCase().trim()
         
         let userColor = userColorsRef.current.get(login)
@@ -201,25 +368,66 @@ export default function Home() {
           userColorsRef.current.set(login, userColor)
         }
 
-        if (text === currentKeyword) {
+        if (activeMode === 'giveaway' && isKeywordMatch(text, currentKeyword)) {
           if (!participantsSet.current.has(login)) {
             participantsSet.current.add(login)
             setTotalMessages(prev => prev + 1)
             const newUser: Participant = {
               username: m[1],
               color: userColor,
-              joinedAt: Date.now()
+              joinedAt: now
             }
             setParticipants(prev => [...prev, newUser])
-            fetchAvatar(m[1]).then(avatar => {
-              if (avatar) {
-                const update = (p: Participant) => p.username === m[1] ? { ...p, avatar } : p
-                setParticipants(prev => prev.map(update))
-                setVasePlayers(prev => prev.map(update))
-                setSpinWinner(prev => prev ? update(prev) : prev)
-                setWinner(prev => prev ? update(prev) : prev)
+            requestAvatar(m[1])
+          }
+        }
+
+        if (activeMode === 'lottery' && isKeywordMatch(textRaw, ticketKeyword)) {
+          const ticketNumber = lotteryTicketsRef.current.length + 1
+          const ticket: LotteryTicket = {
+            id: `${now}-${Math.random()}`,
+            number: ticketNumber,
+            username: m[1],
+            color: userColor,
+            joinedAt: now,
+            price: safeTicketPrice,
+          }
+          const nextTickets = [...lotteryTicketsRef.current, ticket]
+          lotteryTicketsRef.current = nextTickets
+          setLotteryTickets(nextTickets)
+          setTotalMessages(prev => prev + 1)
+          setStatusMessage(`${m[1]} купил билет #${ticketNumber} за ${safeTicketPrice} баллов`)
+          requestAvatar(m[1])
+        }
+
+        if (activeMode === 'auction') {
+          const bidAmount = parseAuctionBid(textRaw, auctionKeyword)
+
+          if (bidAmount !== null) {
+            const existing = auctionBiddersRef.current.get(login)
+            const minAllowed = existing ? existing.bid + safeAuctionMinStep : safeAuctionMinBid
+
+            if (bidAmount >= minAllowed) {
+              const nextBidder: AuctionBidder = {
+                username: m[1],
+                color: userColor,
+                joinedAt: existing?.joinedAt || now,
+                avatar: existing?.avatar,
+                bid: bidAmount,
+                bids: (existing?.bids || 0) + 1,
+                lastBidAt: now,
               }
-            })
+
+              auctionBiddersRef.current.set(login, nextBidder)
+              const nextBidders = Array.from(auctionBiddersRef.current.values())
+                .sort((a, b) => b.bid - a.bid || a.lastBidAt - b.lastBidAt)
+              setAuctionBidders(nextBidders)
+              setAuctionWinner(null)
+              setWinner(null)
+              setTotalMessages(prev => prev + 1)
+              setStatusMessage(`Новая ставка: ${m[1]} — ${bidAmount} баллов`)
+              requestAvatar(m[1])
+            }
           }
         }
 
@@ -237,7 +445,17 @@ export default function Home() {
     ws.onclose = () => {
       setStatusMessage('Отключено от чата.')
     }
-  }, [streamerName, keyword])
+  }, [
+    activeMode,
+    auctionKeyword,
+    keyword,
+    requestAvatar,
+    safeAuctionMinBid,
+    safeAuctionMinStep,
+    safeTicketPrice,
+    streamerName,
+    ticketKeyword,
+  ])
 
   const stopSimulation = useCallback(() => {
     if (wsRef.current) {
@@ -248,19 +466,39 @@ export default function Home() {
 
   /* ─── Connect / Disconnect ─── */
   const handleConnect = () => {
-    if (!streamerName.trim() || !keyword.trim()) {
-      setStatusMessage('Пожалуйста, введите никнейм стримера и ключевое слово')
+    const modeKeyword = activeMode === 'giveaway'
+      ? keyword
+      : activeMode === 'lottery'
+        ? ticketKeyword
+        : auctionKeyword
+
+    if (!streamerName.trim() || !modeKeyword.trim()) {
+      setStatusMessage('Пожалуйста, введите никнейм стримера и команду для текущего режима')
       return
     }
     setIsConnected(true)
     setParticipants([])
+    setLotteryTickets([])
+    setLotteryWinner(null)
+    lotteryTicketsRef.current = []
+    lotteryDrawnRef.current = false
+    setAuctionBidders([])
+    setAuctionWinner(null)
+    auctionBiddersRef.current.clear()
     setChatMessages([])
     userColorsRef.current.clear()
     participantsSet.current.clear()
+    avatarRequestedRef.current.clear()
     setTotalMessages(0)
     setConnectionTime(0)
     setWinner(null)
-    setStatusMessage(`Подключение к чату ${streamerName}... Ожидание сообщений с ключевым словом "${keyword}"`)
+    if (activeMode === 'lottery') {
+      setStatusMessage(`Подключение к чату ${streamerName}... Продажа билетов "${ticketKeyword}" за ${safeTicketPrice} баллов`)
+    } else if (activeMode === 'auction') {
+      setStatusMessage(`Подключение к чату ${streamerName}... Ожидание ставок "${auctionKeyword} ${safeAuctionMinBid}"`)
+    } else {
+      setStatusMessage(`Подключение к чату ${streamerName}... Ожидание сообщений с ключевым словом "${keyword}"`)
+    }
     startSimulation()
   }
 
@@ -268,7 +506,21 @@ export default function Home() {
     setIsConnected(false)
     setConnectionTime(0)
     stopSimulation()
-    setStatusMessage('Отключено. Введите никнейм стримера и ключевое слово, затем нажмите "Начать Отбор"')
+    setStatusMessage(`Отключено. ${getIdleStatus(activeMode)}`)
+  }
+
+  const handleModeChange = (mode: RozMode) => {
+    if (mode === activeMode) return
+
+    if (isConnected) {
+      stopSimulation()
+      setIsConnected(false)
+      setConnectionTime(0)
+    }
+
+    setActiveMode(mode)
+    setWinner(null)
+    setStatusMessage(getIdleStatus(mode))
   }
 
   /* ─── Roulette ─── */
@@ -349,6 +601,64 @@ export default function Home() {
     }
   }
 
+  const handleDrawLottery = useCallback(() => {
+    const pool = lotteryTicketsRef.current
+    if (pool.length === 0) return
+
+    const selected = pool[Math.floor(Math.random() * pool.length)]
+    lotteryDrawnRef.current = true
+    setLotteryWinner(selected)
+    setWinner(selected)
+    setStatusMessage(`Победитель лотереи: ${selected.username}. Приз: ${prizeName}`)
+  }, [prizeName])
+
+  const handleResetLottery = () => {
+    setLotteryTickets([])
+    lotteryTicketsRef.current = []
+    lotteryDrawnRef.current = false
+    setLotteryWinner(null)
+    setWinner(null)
+    setTotalMessages(0)
+    setStatusMessage('Лотерея сброшена. Можно продавать билеты заново.')
+  }
+
+  useEffect(() => {
+    if (activeMode !== 'lottery' || lotteryAutoMode === 'manual' || lotteryDrawnRef.current) return
+
+    const targetReached = lotteryAutoMode === 'people'
+      ? lotteryParticipants.length >= safeLotteryTarget
+      : lotteryTickets.length >= safeLotteryTarget
+
+    if (targetReached && lotteryTickets.length > 0) {
+      lotteryDrawnRef.current = true
+      handleDrawLottery()
+    }
+  }, [
+    activeMode,
+    handleDrawLottery,
+    lotteryAutoMode,
+    lotteryParticipants.length,
+    lotteryTickets.length,
+    safeLotteryTarget,
+  ])
+
+  const handleFinishAuction = () => {
+    if (!topBidder) return
+
+    setAuctionWinner(topBidder)
+    setWinner(topBidder)
+    setStatusMessage(`Аукцион завершен. Победитель: ${topBidder.username} со ставкой ${topBidder.bid} баллов`)
+  }
+
+  const handleResetAuction = () => {
+    setAuctionBidders([])
+    auctionBiddersRef.current.clear()
+    setAuctionWinner(null)
+    setWinner(null)
+    setTotalMessages(0)
+    setStatusMessage('Аукцион сброшен. Можно начинать новые ставки.')
+  }
+
 
 
   return (
@@ -377,12 +687,53 @@ export default function Home() {
 
       {/* ─── Main Content ─── */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+        <div className="mb-5 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-[#1e1e21]/70 p-1.5 backdrop-blur">
+          <button
+            type="button"
+            onClick={() => handleModeChange('giveaway')}
+            className={`flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 ${
+              activeMode === 'giveaway'
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-950/30'
+                : 'text-gray-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Gift className="h-4 w-4" />
+            Розыгрыш
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange('lottery')}
+            className={`flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 ${
+              activeMode === 'lottery'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-950/30'
+                : 'text-gray-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Ticket className="h-4 w-4" />
+            Лотерея
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange('auction')}
+            className={`flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 ${
+              activeMode === 'auction'
+                ? 'bg-amber-600 text-white shadow-lg shadow-amber-950/30'
+                : 'text-gray-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Gavel className="h-4 w-4" />
+            Аукцион
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* ─── Left: Control Panel ─── */}
           <section className="glass-panel p-5">
             <div className="flex items-center gap-2 mb-5">
               <Settings2 className="w-5 h-5 text-purple-400" />
-              <h2 className="text-lg font-semibold text-white">Управление розыгрышем</h2>
+              <h2 className="text-lg font-semibold text-white">
+                {activeMode === 'giveaway' ? 'Управление розыгрышем' : activeMode === 'lottery' ? 'Управление лотереей' : 'Управление аукционом'}
+              </h2>
             </div>
 
             {/* Streamer Name */}
@@ -403,23 +754,173 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Keyword */}
-            <div className="mb-5">
-              <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
-                <Hash className="w-3.5 h-3.5 text-purple-400" />
-                Ключевое слово для участия
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-sm font-medium">#</span>
-                <Input
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
-                  placeholder="Введите ключевое слово"
-                  disabled={isConnected}
-                  className="pl-8 bg-[#2a2a2a] border-[#333] text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20 rounded-lg h-11"
-                />
+            {activeMode === 'giveaway' && (
+              <div className="mb-5">
+                <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
+                  <Hash className="w-3.5 h-3.5 text-purple-400" />
+                  Ключевое слово для участия
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-sm font-medium">#</span>
+                  <Input
+                    value={keyword}
+                    onChange={(e) => setKeyword(e.target.value)}
+                    placeholder="Введите ключевое слово"
+                    disabled={isConnected}
+                    className="pl-8 bg-[#2a2a2a] border-[#333] text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20 rounded-lg h-11"
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {activeMode === 'lottery' && (
+              <div className="mb-5 space-y-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
+                    <Gift className="w-3.5 h-3.5 text-emerald-400" />
+                    Что разыгрываем
+                  </label>
+                  <Input
+                    value={prizeName}
+                    onChange={(e) => setPrizeName(e.target.value)}
+                    placeholder="Например: сабка, роль, мерч"
+                    disabled={isConnected}
+                    className="bg-[#2a2a2a] border-[#333] text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500/20 rounded-lg h-11"
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
+                    <Ticket className="w-3.5 h-3.5 text-emerald-400" />
+                    Команда покупки билета
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 text-sm font-medium">!</span>
+                    <Input
+                      value={ticketKeyword}
+                      onChange={(e) => setTicketKeyword(e.target.value)}
+                      placeholder="билет"
+                      disabled={isConnected}
+                      className="pl-8 bg-[#2a2a2a] border-[#333] text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500/20 rounded-lg h-11"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
+                      <Coins className="w-3.5 h-3.5 text-emerald-400" />
+                      Цена билета
+                    </label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={ticketPrice}
+                      onChange={(e) => setTicketPrice(Number.parseInt(e.target.value, 10) || 0)}
+                      disabled={isConnected}
+                      className="bg-[#2a2a2a] border-[#333] text-white focus:border-emerald-500 focus:ring-emerald-500/20 rounded-lg h-11"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
+                      <Target className="w-3.5 h-3.5 text-emerald-400" />
+                      Порог
+                    </label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={lotteryTarget}
+                      onChange={(e) => setLotteryTarget(Number.parseInt(e.target.value, 10) || 0)}
+                      disabled={isConnected || lotteryAutoMode === 'manual'}
+                      className="bg-[#2a2a2a] border-[#333] text-white disabled:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500/20 rounded-lg h-11"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
+                    <Trophy className="w-3.5 h-3.5 text-emerald-400" />
+                    Розыгрыш победителя
+                  </label>
+                  <select
+                    value={lotteryAutoMode}
+                    onChange={(e) => setLotteryAutoMode(e.target.value as LotteryAutoMode)}
+                    disabled={isConnected}
+                    className="h-11 w-full rounded-lg border border-[#333] bg-[#2a2a2a] px-3 text-sm text-white outline-none transition-colors focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:text-gray-500"
+                  >
+                    <option value="manual">Вручную</option>
+                    <option value="people">По количеству людей</option>
+                    <option value="tickets">По количеству билетов</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {activeMode === 'auction' && (
+              <div className="mb-5 space-y-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
+                    <Gift className="w-3.5 h-3.5 text-amber-400" />
+                    Предмет аукциона
+                  </label>
+                  <Input
+                    value={prizeName}
+                    onChange={(e) => setPrizeName(e.target.value)}
+                    placeholder="Например: игра с подписчиком"
+                    disabled={isConnected}
+                    className="bg-[#2a2a2a] border-[#333] text-white placeholder:text-gray-500 focus:border-amber-500 focus:ring-amber-500/20 rounded-lg h-11"
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
+                    <Gavel className="w-3.5 h-3.5 text-amber-400" />
+                    Команда ставки
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 text-sm font-medium">!</span>
+                    <Input
+                      value={auctionKeyword}
+                      onChange={(e) => setAuctionKeyword(e.target.value)}
+                      placeholder="ставка"
+                      disabled={isConnected}
+                      className="pl-8 bg-[#2a2a2a] border-[#333] text-white placeholder:text-gray-500 focus:border-amber-500 focus:ring-amber-500/20 rounded-lg h-11"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
+                      <Coins className="w-3.5 h-3.5 text-amber-400" />
+                      Мин. ставка
+                    </label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={auctionMinBid}
+                      onChange={(e) => setAuctionMinBid(Number.parseInt(e.target.value, 10) || 0)}
+                      disabled={isConnected}
+                      className="bg-[#2a2a2a] border-[#333] text-white focus:border-amber-500 focus:ring-amber-500/20 rounded-lg h-11"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
+                      <Target className="w-3.5 h-3.5 text-amber-400" />
+                      Шаг
+                    </label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={auctionMinStep}
+                      onChange={(e) => setAuctionMinStep(Number.parseInt(e.target.value, 10) || 0)}
+                      disabled={isConnected}
+                      className="bg-[#2a2a2a] border-[#333] text-white focus:border-amber-500 focus:ring-amber-500/20 rounded-lg h-11"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Connect/Disconnect buttons */}
             <div className="flex gap-3 mb-4">
@@ -429,7 +930,7 @@ export default function Home() {
                   className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl h-11 transition-all btn-pulse"
                 >
                   <Plug className="w-4 h-4 mr-2" />
-                  Начать Отбор
+                  {activeMode === 'giveaway' ? 'Начать Отбор' : activeMode === 'lottery' ? 'Начать продажу' : 'Начать аукцион'}
                 </Button>
               ) : (
                 <Button
@@ -456,7 +957,7 @@ export default function Home() {
                     <Users className="w-4 h-4 text-purple-400" />
                   </div>
                 </div>
-                <div className="text-xl font-bold text-white">{participants.length}</div>
+                <div className="text-xl font-bold text-white">{peopleCount}</div>
                 <div className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">Участников</div>
               </div>
               <div className="stat-card-item bg-[#2a2a2a] border border-[#333] rounded-xl p-3 text-center">
@@ -465,8 +966,8 @@ export default function Home() {
                     <MessageSquare className="w-4 h-4 text-purple-400" />
                   </div>
                 </div>
-                <div className="text-xl font-bold text-white">{totalMessages}</div>
-                <div className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">Сообщений</div>
+                <div className="text-xl font-bold text-white">{activityCount}</div>
+                <div className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">{activityLabel}</div>
               </div>
               <div className="stat-card-item bg-[#2a2a2a] border border-[#333] rounded-xl p-3 text-center">
                 <div className="flex items-center justify-center mb-1.5">
@@ -479,26 +980,70 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              <Button
-                onClick={handleStartRoulette}
-                disabled={!isConnected || participants.length < 2}
-                className="w-full bg-green-600 hover:bg-green-500 disabled:bg-[#2a2a2a] disabled:text-gray-500 text-white font-semibold rounded-xl h-11 transition-all"
-              >
-                <Play className="w-4 h-4 mr-2" />
-                Начать розыгрыш — Рулетка
-              </Button>
-              <Button
-                onClick={handleStartVase}
-                disabled={!isConnected || participants.length < 2}
-                className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-[#2a2a2a] disabled:text-gray-500 text-white font-semibold rounded-xl h-11 transition-all"
-              >
-                <Gift className="w-4 h-4 mr-2" />
-                Начать розыгрыш — Вазы
-              </Button>
+            {activeMode === 'giveaway' && (
+              <div className="space-y-3">
+                <Button
+                  onClick={handleStartRoulette}
+                  disabled={!isConnected || participants.length < 2}
+                  className="w-full bg-green-600 hover:bg-green-500 disabled:bg-[#2a2a2a] disabled:text-gray-500 text-white font-semibold rounded-xl h-11 transition-all"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Начать розыгрыш — Рулетка
+                </Button>
+                <Button
+                  onClick={handleStartVase}
+                  disabled={!isConnected || participants.length < 2}
+                  className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-[#2a2a2a] disabled:text-gray-500 text-white font-semibold rounded-xl h-11 transition-all"
+                >
+                  <Gift className="w-4 h-4 mr-2" />
+                  Начать розыгрыш — Вазы
+                </Button>
+              </div>
+            )}
 
-            </div>
+            {activeMode === 'lottery' && (
+              <div className="space-y-3">
+                <Button
+                  onClick={handleDrawLottery}
+                  disabled={lotteryTickets.length < 1}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-[#2a2a2a] disabled:text-gray-500 text-white font-semibold rounded-xl h-11 transition-all"
+                >
+                  <Ticket className="w-4 h-4 mr-2" />
+                  Разыграть лотерею
+                </Button>
+                <Button
+                  onClick={handleResetLottery}
+                  disabled={lotteryTickets.length < 1}
+                  variant="secondary"
+                  className="w-full bg-[#2a2a2a] hover:bg-[#333] disabled:text-gray-500 text-gray-300 border border-[#444] font-semibold rounded-xl h-11 transition-all"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Сбросить билеты
+                </Button>
+              </div>
+            )}
+
+            {activeMode === 'auction' && (
+              <div className="space-y-3">
+                <Button
+                  onClick={handleFinishAuction}
+                  disabled={!topBidder}
+                  className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-[#2a2a2a] disabled:text-gray-500 text-white font-semibold rounded-xl h-11 transition-all"
+                >
+                  <Gavel className="w-4 h-4 mr-2" />
+                  Завершить аукцион
+                </Button>
+                <Button
+                  onClick={handleResetAuction}
+                  disabled={auctionBidders.length < 1}
+                  variant="secondary"
+                  className="w-full bg-[#2a2a2a] hover:bg-[#333] disabled:text-gray-500 text-gray-300 border border-[#444] font-semibold rounded-xl h-11 transition-all"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Сбросить ставки
+                </Button>
+              </div>
+            )}
           </section>
 
           {/* ─── Center: Winner Chat ─── */}
@@ -550,9 +1095,9 @@ export default function Home() {
           <section className="glass-panel p-5 flex flex-col">
             <div className="flex items-center gap-2 mb-4">
               <List className="w-5 h-5 text-purple-400" />
-              <h2 className="text-lg font-semibold text-white">Участники розыгрыша</h2>
+              <h2 className="text-lg font-semibold text-white">{sideTitle}</h2>
               <Badge variant="secondary" className="ml-auto bg-purple-500/15 text-purple-400 border-purple-500/20 text-xs">
-                {participants.length}
+                {sideCount}
               </Badge>
             </div>
 
@@ -561,40 +1106,122 @@ export default function Home() {
               ref={participantsRef}
               className="flex-1 bg-[#1a1a1a] rounded-xl p-3 overflow-y-auto max-h-96 lg:max-h-[600px] min-h-[200px]"
             >
-              {participants.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-gray-500 py-12">
-                  <UserPlus className="w-10 h-10 mb-3 opacity-40" />
-                  <p className="text-sm text-center">Участники появятся здесь после написания ключевого слова в чате</p>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {participants.map((p, idx) => (
-                    <div
-                      key={p.username}
-                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors ${
-                        winner?.username === p.username
-                          ? 'bg-yellow-500/15 border border-yellow-500/30'
-                          : 'bg-[#222] hover:bg-[#2a2a2a] border border-transparent'
-                      }`}
-                    >
-                      <span className="text-[10px] text-gray-500 font-mono w-5 text-right">{idx + 1}</span>
+              {activeMode === 'giveaway' && (
+                participants.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-500 py-12">
+                    <UserPlus className="w-10 h-10 mb-3 opacity-40" />
+                    <p className="text-sm text-center">Участники появятся здесь после написания ключевого слова в чате</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {participants.map((p, idx) => (
                       <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 overflow-hidden"
-                        style={{ background: p.color }}
+                        key={p.username}
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors ${
+                          winner?.username === p.username
+                            ? 'bg-yellow-500/15 border border-yellow-500/30'
+                            : 'bg-[#222] hover:bg-[#2a2a2a] border border-transparent'
+                        }`}
                       >
-                        {p.avatar ? (
-                          <img src={p.avatar} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          p.username.charAt(0).toUpperCase()
+                        <span className="text-[10px] text-gray-500 font-mono w-5 text-right">{idx + 1}</span>
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 overflow-hidden"
+                          style={{ background: p.color }}
+                        >
+                          {p.avatar ? (
+                            <img src={p.avatar} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            p.username.charAt(0).toUpperCase()
+                          )}
+                        </div>
+                        <span className="text-sm font-medium text-gray-200 truncate">{p.username}</span>
+                        {winner?.username === p.username && (
+                          <Crown className="w-3.5 h-3.5 text-yellow-400 ml-auto shrink-0" />
                         )}
                       </div>
-                      <span className="text-sm font-medium text-gray-200 truncate">{p.username}</span>
-                      {winner?.username === p.username && (
-                        <Crown className="w-3.5 h-3.5 text-yellow-400 ml-auto shrink-0" />
-                      )}
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )
+              )}
+
+              {activeMode === 'lottery' && (
+                lotteryParticipants.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-500 py-12">
+                    <Ticket className="w-10 h-10 mb-3 opacity-40" />
+                    <p className="text-sm text-center">Билеты появятся здесь после покупки через чат</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {lotteryParticipants.map((p, idx) => (
+                      <div
+                        key={p.username}
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors ${
+                          lotteryWinner?.username === p.username
+                            ? 'bg-yellow-500/15 border border-yellow-500/30'
+                            : 'bg-[#222] hover:bg-[#2a2a2a] border border-transparent'
+                        }`}
+                      >
+                        <span className="text-[10px] text-gray-500 font-mono w-5 text-right">{idx + 1}</span>
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 overflow-hidden"
+                          style={{ background: p.color }}
+                        >
+                          {p.avatar ? (
+                            <img src={p.avatar} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            p.username.charAt(0).toUpperCase()
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-gray-200 truncate">{p.username}</div>
+                          <div className="text-[10px] text-gray-500">{p.spent} баллов</div>
+                        </div>
+                        <Badge className="bg-emerald-500/15 text-emerald-300 border-emerald-500/20 text-[10px]">
+                          x{p.tickets}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+
+              {activeMode === 'auction' && (
+                auctionBidders.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-500 py-12">
+                    <Gavel className="w-10 h-10 mb-3 opacity-40" />
+                    <p className="text-sm text-center">Ставки появятся здесь после сообщений в чате</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {auctionBidders.map((p, idx) => (
+                      <div
+                        key={p.username}
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors ${
+                          auctionWinner?.username === p.username || (!auctionWinner && topBidder?.username === p.username)
+                            ? 'bg-amber-500/15 border border-amber-500/30'
+                            : 'bg-[#222] hover:bg-[#2a2a2a] border border-transparent'
+                        }`}
+                      >
+                        <span className="text-[10px] text-gray-500 font-mono w-5 text-right">{idx + 1}</span>
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 overflow-hidden"
+                          style={{ background: p.color }}
+                        >
+                          {p.avatar ? (
+                            <img src={p.avatar} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            p.username.charAt(0).toUpperCase()
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-gray-200 truncate">{p.username}</div>
+                          <div className="text-[10px] text-gray-500">{p.bids} ставок</div>
+                        </div>
+                        <div className="text-sm font-bold text-amber-300">{p.bid}</div>
+                      </div>
+                    ))}
+                  </div>
+                )
               )}
             </div>
           </section>
