@@ -27,20 +27,13 @@ type Copy = {
   };
   article: {
     title: string;
-    languageCount: string;
     languageRu: string;
     languageEn: string;
     tabsLeftActive: string;
     tabsLeftIdle: string;
     tabsRight: string[];
     sourceLine: string;
-    editCode: string;
-    stableVersion: string;
-    disambiguation: string;
-    notConfuse: string;
     lead: string[];
-    sectionEdit: string;
-    sectionSource: string;
   };
   tocTitle: string;
   tocHide: string;
@@ -50,8 +43,6 @@ type Copy = {
     rows: [string, string][];
   };
   sections: SectionData[];
-  notesTitle: string;
-  notes: string[];
 };
 
 const copy: Record<Lang, Copy> = {
@@ -64,22 +55,15 @@ const copy: Record<Lang, Copy> = {
     },
     article: {
       title: "Habarhub (стример)",
-      languageCount: "2 языка",
       languageRu: "Русский",
       languageEn: "English",
       tabsLeftActive: "Статья",
       tabsLeftIdle: "Обсуждение",
       tabsRight: ["Читать", "Править", "Править код", "История", "Инструменты⌄"],
       sourceLine: "Материал из Википедии — свободной энциклопедии",
-      editCode: "[ править код ]",
-      stableVersion: "Стабильная версия, проверенная 21 мая 2026.",
-      disambiguation: "У этого термина существуют и другие значения, см. Habar.",
-      notConfuse: "Не следует путать с Habrahabr.",
-      sectionEdit: "править",
-      sectionSource: "править код",
       lead: [
-        "Habarhub — русскоязычный стример и автор интернет-контента, известный ночными разговорными эфирами, спокойной манерой общения и вниманием к историям зрителей. Основную известность получил благодаря прямым трансляциям, где игровые сессии совмещаются с обсуждением сообщений из чата, старых интернет-страниц и зрительских историй[1].",
-        "Внутри сообщества канал часто описывают как место между игровым стримом, открытым чатом и личным дневником в прямом эфире. Для эфиров Habarhub характерны приглушенный свет, минималистичный оверлей, длинные паузы и неспешный темп разговора[2].",
+        "Habarhub — русскоязычный стример и автор интернет-контента, известный ночными разговорными эфирами, спокойной манерой общения и вниманием к историям зрителей. Основную известность получил благодаря прямым трансляциям, где игровые сессии совмещаются с обсуждением сообщений из чата, старых интернет-страниц и зрительских историй.",
+        "Внутри сообщества канал часто описывают как место между игровым стримом, открытым чатом и личным дневником в прямом эфире. Для эфиров Habarhub характерны приглушенный свет, минималистичный оверлей, длинные паузы и неспешный темп разговора.",
       ],
     },
     tocTitle: "Содержание",
@@ -91,7 +75,6 @@ const copy: Record<Lang, Copy> = {
       { id: "streams", label: "Формат эфиров", children: [] },
       { id: "community", label: "Сообщество", children: [] },
       { id: "style", label: "Стиль и образ", children: [] },
-      { id: "notes", label: "Примечания", children: [] },
     ],
     infobox: {
       subtitle: "англ. Habarhub",
@@ -112,7 +95,7 @@ const copy: Record<Lang, Copy> = {
         title: "Биография",
         subtitles: ["Личная жизнь"],
         paragraphs: [
-          "Подробные биографические сведения о Habarhub в открытых источниках ограничены. Сам автор редко обсуждает личную жизнь и предпочитает отделять публичный образ от повседневности. В ранних описаниях канала он представлял себя как человека, который «включает эфир, когда город уже спит»[3].",
+          "Подробные биографические сведения о Habarhub в открытых источниках ограничены. Сам автор редко обсуждает личную жизнь и предпочитает отделять публичный образ от повседневности. В ранних описаниях канала он представлял себя как человека, который «включает эфир, когда город уже спит».",
           "Такой образ стал частью узнаваемости канала: спокойный голос, неспешный чат и длинные паузы между темами. Зрители часто воспринимают трансляции не как шоу, а как фоновое присутствие.",
         ],
       },
@@ -150,12 +133,6 @@ const copy: Record<Lang, Copy> = {
         ],
       },
     ],
-    notesTitle: "Примечания",
-    notes: [
-      "Описание формата основано на публичных материалах канала и пересказах зрителей.",
-      "Упоминания визуального стиля встречаются в обсуждениях фанатского сообщества.",
-      "Ранняя формулировка из описания канала, сохраненного в пользовательских заметках.",
-    ],
   },
   en: {
     header: {
@@ -166,22 +143,15 @@ const copy: Record<Lang, Copy> = {
     },
     article: {
       title: "Habarhub (streamer)",
-      languageCount: "2 languages",
       languageRu: "Русский",
       languageEn: "English",
       tabsLeftActive: "Article",
       tabsLeftIdle: "Talk",
       tabsRight: ["Read", "Edit", "Edit source", "History", "Tools⌄"],
       sourceLine: "From Wikipedia, the free encyclopedia",
-      editCode: "[ edit source ]",
-      stableVersion: "Stable version, reviewed on May 21, 2026.",
-      disambiguation: "For other uses of this term, see Habar.",
-      notConfuse: "Not to be confused with Habrahabr.",
-      sectionEdit: "edit",
-      sectionSource: "source",
       lead: [
-        "Habarhub is a Russian-speaking streamer and online content author known for late-night talk streams, a calm speaking style, and attention to viewer stories. The channel became known for live sessions that combine gameplay with discussions of chat messages, old web pages, and viewer-submitted stories[1].",
-        "Inside the community, the channel is often described as something between a gaming stream, an open chat, and a personal live diary. Habarhub streams are typically marked by dim lighting, a minimal overlay, long pauses, and a slow conversational pace[2].",
+        "Habarhub is a Russian-speaking streamer and online content author known for late-night talk streams, a calm speaking style, and attention to viewer stories. The channel became known for live sessions that combine gameplay with discussions of chat messages, old web pages, and viewer-submitted stories.",
+        "Inside the community, the channel is often described as something between a gaming stream, an open chat, and a personal live diary. Habarhub streams are typically marked by dim lighting, a minimal overlay, long pauses, and a slow conversational pace.",
       ],
     },
     tocTitle: "Contents",
@@ -193,7 +163,6 @@ const copy: Record<Lang, Copy> = {
       { id: "streams", label: "Stream format", children: [] },
       { id: "community", label: "Community", children: [] },
       { id: "style", label: "Style and image", children: [] },
-      { id: "notes", label: "Notes", children: [] },
     ],
     infobox: {
       subtitle: "eng. Habarhub",
@@ -214,7 +183,7 @@ const copy: Record<Lang, Copy> = {
         title: "Biography",
         subtitles: ["Personal life"],
         paragraphs: [
-          "Detailed biographical information about Habarhub in open sources is limited. The creator rarely discusses personal life and prefers to separate the public persona from everyday life. Early channel descriptions framed him as someone who “starts a stream when the city is already asleep”[3].",
+          "Detailed biographical information about Habarhub in open sources is limited. The creator rarely discusses personal life and prefers to separate the public persona from everyday life. Early channel descriptions framed him as someone who starts a stream when the city is already asleep.",
           "This image became a key part of the channel identity: a calm voice, unhurried chat, and long pauses between topics. Viewers often describe the broadcasts not as a show, but as ambient presence.",
         ],
       },
@@ -240,7 +209,7 @@ const copy: Record<Lang, Copy> = {
         title: "Community",
         paragraphs: [
           "The Habarhub community is known for attention to detail. Viewers keep notes from older streams, collect timestamps, and debate which stories were real and which became part of the channel folklore.",
-          "Fan chats often refer to “night episodes” after which users found deleted posts, matching nicknames, or old profiles of people involved in discussions. Habarhub usually avoids confirming such findings directly.",
+          "Fan chats often refer to night episodes after which users found deleted posts, matching nicknames, or old profiles of people involved in discussions. Habarhub usually avoids confirming such findings directly.",
         ],
       },
       {
@@ -248,15 +217,9 @@ const copy: Record<Lang, Copy> = {
         title: "Style and image",
         paragraphs: [
           "The public image of Habarhub is built on calmness and distance. He rarely raises his voice, avoids aggressive editing, and does not turn personal viewer stories into jokes. This approach became a main distinction from more dynamic streaming formats.",
-          "Viewer descriptions repeatedly use words like “night”, “quiet”, “strangely cozy”, and “as if not for everyone”. That ambiguity sustains long-term interest in the channel and its archives.",
+          "Viewer descriptions repeatedly use words like night, quiet, strangely cozy, and as if not for everyone. That ambiguity sustains long-term interest in the channel and its archives.",
         ],
       },
-    ],
-    notesTitle: "Notes",
-    notes: [
-      "The format description is based on public channel materials and viewer retellings.",
-      "References to visual style appear in fan community discussions.",
-      "The early phrasing is taken from channel descriptions preserved in user notes.",
     ],
   },
 };
@@ -277,24 +240,9 @@ export default function DetectiveClient() {
             <ArticleHeader t={t} lang={lang} onSwitch={setLang} />
 
             <div className="pt-3">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <p className="text-[13px]">{t.article.sourceLine}</p>
-                <span className="hidden text-[13px] text-[#54595d] sm:inline">
-                  {t.article.editCode}
-                </span>
-              </div>
-
-              <div className="mb-4 flex items-center gap-2 text-[#54595d]">
-                <span className="grid h-5 w-5 place-items-center rounded-full bg-[#72777d] text-[12px] font-bold text-white">
-                  i
-                </span>
-                <span>{t.article.stableVersion}</span>
-              </div>
+              <p className="mb-3 text-[13px]">{t.article.sourceLine}</p>
 
               <Infobox t={t} />
-
-              <p className="mb-2 pl-6 italic">{t.article.disambiguation}</p>
-              <p className="mb-3 pl-6 italic">{t.article.notConfuse}</p>
 
               {t.article.lead.map((text) => (
                 <p className="mb-3 text-[16px] leading-[1.62]" key={text}>
@@ -303,38 +251,29 @@ export default function DetectiveClient() {
               ))}
 
               {t.sections.map((section) => (
-                <Section
-                  key={section.id}
-                  id={section.id}
-                  title={section.title}
-                  editLabel={t.article.sectionEdit}
-                  sourceLabel={t.article.sectionSource}
-                >
-                  {section.subtitles?.map((subtitle) => (
-                    <h3 className="text-[18px] font-semibold" key={`${section.id}-${subtitle}`}>
-                      {subtitle}
-                    </h3>
-                  ))}
-                  {section.paragraphs.map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
-                  ))}
+                <Section key={section.id} id={section.id} title={section.title}>
+                  {section.subtitles ? (
+                    <>
+                      {section.subtitles.map((subtitle, index) => (
+                        <div key={`${section.id}-${subtitle}`}>
+                          <h3
+                            id={`${section.id}-${slug(subtitle)}`}
+                            className="mb-2 text-[18px] font-semibold"
+                          >
+                            {subtitle}
+                          </h3>
+                          {section.paragraphs[index] ? <p>{section.paragraphs[index]}</p> : null}
+                        </div>
+                      ))}
+                      {section.paragraphs.slice(section.subtitles.length).map((paragraph) => (
+                        <p key={paragraph}>{paragraph}</p>
+                      ))}
+                    </>
+                  ) : (
+                    section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)
+                  )}
                 </Section>
               ))}
-
-              <Section
-                id="notes"
-                title={t.notesTitle}
-                editLabel={t.article.sectionEdit}
-                sourceLabel={t.article.sectionSource}
-              >
-                <ol className="list-decimal space-y-1 pl-6 text-[13px]">
-                  {t.notes.map((note) => (
-                    <li key={note}>
-                      {note} <span className="text-[#54595d]">↑</span>
-                    </li>
-                  ))}
-                </ol>
-              </Section>
             </div>
           </article>
         </div>
@@ -404,12 +343,16 @@ function LeftContents({ t }: { t: Copy }) {
         <ul className="space-y-2">
           {t.toc.map((item) => (
             <li key={item.id}>
-              <span className="font-medium text-[#202122]">{item.label}</span>
+              <a className="font-medium text-[#202122] hover:text-[#36c] hover:underline" href={`#${item.id}`}>
+                {item.label}
+              </a>
               {item.children.length > 0 ? (
                 <ul className="mt-2 space-y-2 pl-4 text-[#54595d]">
                   {item.children.map((child) => (
                     <li key={child}>
-                      <span>{child}</span>
+                      <a className="hover:text-[#36c] hover:underline" href={`#${item.id}-${slug(child)}`}>
+                        {child}
+                      </a>
                     </li>
                   ))}
                 </ul>
@@ -437,27 +380,22 @@ function ArticleHeader({
         <h1 className="font-serif text-[31px] font-normal leading-[1.25] text-[#202122]">
           {t.article.title}
         </h1>
-        <div className="mt-1 text-right">
-          <div className="whitespace-nowrap text-[14px] font-semibold text-[#202122]">
-            文 {t.article.languageCount}
-          </div>
-          <div className="flex justify-end gap-2 text-[12px]">
-            <button
-              type="button"
-              onClick={() => onSwitch("ru")}
-              className={lang === "ru" ? "font-semibold text-[#202122]" : "text-[#54595d]"}
-            >
-              {t.article.languageRu}
-            </button>
-            <span className="text-[#54595d]">·</span>
-            <button
-              type="button"
-              onClick={() => onSwitch("en")}
-              className={lang === "en" ? "font-semibold text-[#202122]" : "text-[#54595d]"}
-            >
-              {t.article.languageEn}
-            </button>
-          </div>
+        <div className="mt-1 flex items-center gap-2 text-[12px]">
+          <button
+            type="button"
+            onClick={() => onSwitch("ru")}
+            className={lang === "ru" ? "font-semibold text-[#202122]" : "text-[#54595d]"}
+          >
+            {t.article.languageRu}
+          </button>
+          <span className="text-[#54595d]">·</span>
+          <button
+            type="button"
+            onClick={() => onSwitch("en")}
+            className={lang === "en" ? "font-semibold text-[#202122]" : "text-[#54595d]"}
+          >
+            {t.article.languageEn}
+          </button>
         </div>
       </div>
 
@@ -519,25 +457,26 @@ function Infobox({ t }: { t: Copy }) {
 function Section({
   id,
   title,
-  editLabel,
-  sourceLabel,
   children,
 }: {
   id: string;
   title: string;
-  editLabel: string;
-  sourceLabel: string;
   children: ReactNode;
 }) {
   return (
     <section id={id} className="mt-7">
       <h2 className="mb-3 border-b border-[#a2a9b1] font-serif text-[28px] font-normal leading-[1.3]">
-        {title}{" "}
-        <span className="align-middle font-sans text-[13px] text-[#54595d]">
-          [{` ${editLabel} `}] [{` ${sourceLabel} `}]
-        </span>
+        {title}
       </h2>
       <div className="space-y-4 text-[16px] leading-[1.62]">{children}</div>
     </section>
   );
+}
+
+function slug(value: string) {
+  return value
+    .toLowerCase()
+    .replaceAll(" ", "-")
+    .replaceAll("ё", "е")
+    .replace(/[^\p{Letter}\p{Number}-]/gu, "");
 }
