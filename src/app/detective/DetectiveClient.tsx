@@ -59,7 +59,7 @@ const copy: Record<Lang, Copy> = {
       languageEn: "English",
       tabsLeftActive: "Статья",
       tabsLeftIdle: "Обсуждение",
-      tabsRight: ["Читать", "Править", "Править код", "История", "Инструменты⌄"],
+      tabsRight: ["Читать", "Править", "История", "Инструменты⌄"],
       sourceLine: "Материал из Википедии — свободной энциклопедии",
       lead: [
         "Habarhub — русскоязычный стример и автор интернет-контента, известный ночными разговорными эфирами, спокойной манерой общения и вниманием к историям зрителей. Основную известность получил благодаря прямым трансляциям, где игровые сессии совмещаются с обсуждением сообщений из чата, старых интернет-страниц и зрительских историй.",
@@ -147,7 +147,7 @@ const copy: Record<Lang, Copy> = {
       languageEn: "English",
       tabsLeftActive: "Article",
       tabsLeftIdle: "Talk",
-      tabsRight: ["Read", "Edit", "Edit source", "History", "Tools⌄"],
+      tabsRight: ["Read", "Edit", "History", "Tools⌄"],
       sourceLine: "From Wikipedia, the free encyclopedia",
       lead: [
         "Habarhub is a Russian-speaking streamer and online content author known for late-night talk streams, a calm speaking style, and attention to viewer stories. The channel became known for live sessions that combine gameplay with discussions of chat messages, old web pages, and viewer-submitted stories.",
