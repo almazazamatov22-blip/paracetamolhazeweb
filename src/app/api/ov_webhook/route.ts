@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import * as crypto from 'crypto';
+import { getSupabaseServerKey, getSupabaseUrl } from '@/lib/supabase-env';
+import { addAuctionBid, addLotteryEntry, normalizeRozState } from '@/lib/roz-state';
 
 export const runtime = 'nodejs';
 
@@ -94,12 +96,15 @@ export async function POST(req: NextRequest) {
     const streamerId = event.broadcaster_user_id || event.broadcaster_id;
     const twitchRewardId = event.reward.id;
     const userName = event.user_name || event.user_login;
+    const userLogin = event.user_login || userName;
     const userMessage = event.user_input || "";
     const userId = event.user_id;
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const supabaseUrl = getSupabaseUrl();
+    const supabaseKey = getSupabaseServerKey();
+    if (!supabaseUrl || !supabaseKey) return NextResponse.json({ ok: true });
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { data: configs } = await supabase
       .from('overlay_configs')
@@ -110,7 +115,18 @@ export async function POST(req: NextRequest) {
     if (!config) return NextResponse.json({ ok: true });
 
     const allSettings: any = config.settings || {};
-    const assets: any = config.assets || {};
+    let assets: any = config.assets || {};
+    let appToken: string | null = null;
+    let userAvatar: string | null = null;
+    let assetsChanged = false;
+    let settingsChanged = false;
+
+    const loadUserAvatar = async () => {
+      if (userAvatar) return userAvatar;
+      appToken = appToken || await getAppToken();
+      userAvatar = await getUserAvatar(userId, appToken) || `https://avatar.t.61.gd/a/${userName}?size=100`;
+      return userAvatar;
+    };
 
     let type: string | null = null;
     if (allSettings.fate?.reward_id === twitchRewardId) type = 'fate';
@@ -118,13 +134,12 @@ export async function POST(req: NextRequest) {
 
     if (type) {
       const typeSettings = allSettings[type] || {};
-      const appToken = await getAppToken();
-      const userAvatar = await getUserAvatar(userId, appToken) || `https://avatar.t.61.gd/a/${userName}?size=100`;
+      const avatar = await loadUserAvatar();
 
       let payload: any = {
         triggerId: event.id || Math.random().toString(36).substring(7),
         userName,
-        userAvatar,
+        userAvatar: avatar,
         timestamp: Date.now(),
         type
       };
@@ -142,8 +157,46 @@ export async function POST(req: NextRequest) {
         payload.result = Math.floor(Math.random() * (max - min + 1)) + min;
       }
 
+      assets = { ...assets, last_trigger: payload };
+      assetsChanged = true;
+    }
+
+    let rozState = normalizeRozState(allSettings.roz);
+    const redemptionInput = {
+      redemptionId: event.id || Math.random().toString(36).substring(7),
+      userId,
+      userLogin,
+      userName,
+      userInput: userMessage,
+      rewardId: twitchRewardId,
+      rewardName: event.reward?.title || '',
+      rewardCost: Number(event.reward?.cost) || 0,
+      redeemedAt: event.redeemed_at,
+      userAvatar: null as string | null,
+    };
+
+    if (rozState.lottery_reward_id === twitchRewardId) {
+      redemptionInput.userAvatar = await loadUserAvatar();
+      const result = addLotteryEntry(rozState, redemptionInput);
+      rozState = result.state;
+      settingsChanged = settingsChanged || result.changed;
+    }
+
+    if (rozState.auction_reward_id === twitchRewardId) {
+      redemptionInput.userAvatar = redemptionInput.userAvatar || await loadUserAvatar();
+      const result = addAuctionBid(rozState, redemptionInput);
+      rozState = result.state;
+      settingsChanged = settingsChanged || result.changed;
+    }
+
+    if (settingsChanged) {
+      allSettings.roz = rozState;
+    }
+
+    if (assetsChanged || settingsChanged) {
       await supabase.from('overlay_configs').update({
-        assets: { ...assets, last_trigger: payload },
+        settings: allSettings,
+        assets,
         updated_at: new Date().toISOString()
       }).eq('user_id', streamerId);
     }

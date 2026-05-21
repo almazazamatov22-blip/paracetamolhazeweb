@@ -75,13 +75,76 @@ interface AuctionBidder extends Participant {
   lastBidAt: number
 }
 
+interface TwitchAuthUser {
+  id: string
+  login: string
+  display_name: string
+  profile_image_url?: string
+}
+
+interface TwitchReward {
+  id: string
+  title: string
+  cost: number
+  userInputRequired: boolean
+  isEnabled: boolean
+  isPaused: boolean
+  isInStock: boolean
+}
+
+interface RozServerEntry {
+  id: string
+  redemption_id: string
+  user_id: string
+  username: string
+  login: string
+  avatar?: string | null
+  color: string
+  number: number
+  price: number
+  reward_id: string
+  reward_name: string
+  created_at: string
+}
+
+interface RozServerBid {
+  id: string
+  redemption_id: string
+  user_id: string
+  username: string
+  login: string
+  avatar?: string | null
+  color: string
+  bid: number
+  cost: number
+  reward_id: string
+  reward_name: string
+  user_input: string
+  created_at: string
+}
+
+interface RozServerState {
+  lottery_reward_id: string
+  lottery_reward_name: string
+  auction_reward_id: string
+  auction_reward_name: string
+  lottery_prize: string
+  auction_prize: string
+  lottery_auto_mode: LotteryAutoMode
+  lottery_target: number
+  lottery_entries: RozServerEntry[]
+  auction_bids: RozServerBid[]
+  lottery_winner: RozServerEntry | null
+  auction_winner: RozServerBid | null
+}
+
 const getIdleStatus = (mode: RozMode) => {
   if (mode === 'lottery') {
-    return 'Введите никнейм стримера, приз и команду покупки билета, затем начните продажу билетов'
+    return 'Войдите через Twitch, выберите награду канала для билета и начните продажу'
   }
 
   if (mode === 'auction') {
-    return 'Введите никнейм стримера, предмет аукциона и команду ставки, затем начните аукцион'
+    return 'Войдите через Twitch, выберите награду канала для ставки и начните аукцион'
   }
 
   return 'Введите никнейм стримера и ключевое слово, затем нажмите "Начать Отбор"'
@@ -156,6 +219,12 @@ export default function Home() {
   const [auctionMinStep, setAuctionMinStep] = useState(10)
   const [auctionBidders, setAuctionBidders] = useState<AuctionBidder[]>([])
   const [auctionWinner, setAuctionWinner] = useState<AuctionBidder | null>(null)
+  const [authUser, setAuthUser] = useState<TwitchAuthUser | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [rewardsLoading, setRewardsLoading] = useState(false)
+  const [twitchRewards, setTwitchRewards] = useState<TwitchReward[]>([])
+  const [selectedLotteryRewardId, setSelectedLotteryRewardId] = useState('')
+  const [selectedAuctionRewardId, setSelectedAuctionRewardId] = useState('')
   const [isConnected, setIsConnected] = useState(false)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [totalMessages, setTotalMessages] = useState(0)
@@ -201,6 +270,8 @@ export default function Home() {
   const safeLotteryTarget = Math.max(1, lotteryTarget || 1)
   const safeAuctionMinBid = Math.max(1, auctionMinBid || 100)
   const safeAuctionMinStep = Math.max(1, auctionMinStep || 1)
+  const selectedLotteryReward = twitchRewards.find(reward => reward.id === selectedLotteryRewardId) || null
+  const selectedAuctionReward = twitchRewards.find(reward => reward.id === selectedAuctionRewardId) || null
 
   const updateAvatar = useCallback((username: string, avatar: string) => {
     const login = username.toLowerCase()
@@ -235,6 +306,155 @@ export default function Home() {
       if (avatar) updateAvatar(username, avatar)
     })
   }, [fetchAvatar, updateAvatar])
+
+  const syncRozState = useCallback((state: RozServerState) => {
+    setSelectedLotteryRewardId(state.lottery_reward_id || '')
+    setSelectedAuctionRewardId(state.auction_reward_id || '')
+    setPrizeName(activeMode === 'auction'
+      ? state.auction_prize || 'Приз стримера'
+      : state.lottery_prize || 'Приз стримера'
+    )
+    setLotteryAutoMode(state.lottery_auto_mode || 'manual')
+    setLotteryTarget(state.lottery_target || 20)
+
+    const tickets = (state.lottery_entries || []).map((entry, index) => ({
+      id: entry.id || entry.redemption_id,
+      number: entry.number || index + 1,
+      username: entry.username,
+      color: entry.color || getRandomColor(),
+      joinedAt: Date.parse(entry.created_at) || Date.now(),
+      avatar: entry.avatar || undefined,
+      price: entry.price || 1,
+    }))
+    lotteryTicketsRef.current = tickets
+    setLotteryTickets(tickets)
+
+    const winnerTicket = state.lottery_winner
+      ? tickets.find(ticket => ticket.id === state.lottery_winner?.id) || {
+        id: state.lottery_winner.id,
+        number: state.lottery_winner.number || 1,
+        username: state.lottery_winner.username,
+        color: state.lottery_winner.color || getRandomColor(),
+        joinedAt: Date.parse(state.lottery_winner.created_at) || Date.now(),
+        avatar: state.lottery_winner.avatar || undefined,
+        price: state.lottery_winner.price || 1,
+      }
+      : null
+    setLotteryWinner(winnerTicket)
+
+    const biddersMap = new Map<string, AuctionBidder>()
+    ;(state.auction_bids || []).forEach((bid) => {
+      const login = (bid.login || bid.username).toLowerCase()
+      const createdAt = Date.parse(bid.created_at) || Date.now()
+      const current = biddersMap.get(login)
+      if (!current || bid.bid > current.bid || (bid.bid === current.bid && createdAt < current.lastBidAt)) {
+        biddersMap.set(login, {
+          username: bid.username,
+          color: bid.color || getRandomColor(),
+          joinedAt: current?.joinedAt || createdAt,
+          avatar: bid.avatar || current?.avatar || undefined,
+          bid: bid.bid,
+          bids: (current?.bids || 0) + 1,
+          lastBidAt: createdAt,
+        })
+      } else {
+        biddersMap.set(login, {
+          ...current,
+          bids: current.bids + 1,
+          avatar: current.avatar || bid.avatar || undefined,
+        })
+      }
+    })
+    const bidders = Array.from(biddersMap.values()).sort((a, b) => b.bid - a.bid || a.lastBidAt - b.lastBidAt)
+    auctionBiddersRef.current = new Map(bidders.map(bidder => [bidder.username.toLowerCase(), bidder]))
+    setAuctionBidders(bidders)
+
+    const winnerBidder = state.auction_winner
+      ? bidders.find(bidder => bidder.username.toLowerCase() === state.auction_winner?.username.toLowerCase()) || {
+        username: state.auction_winner.username,
+        color: state.auction_winner.color || getRandomColor(),
+        joinedAt: Date.parse(state.auction_winner.created_at) || Date.now(),
+        avatar: state.auction_winner.avatar || undefined,
+        bid: state.auction_winner.bid,
+        bids: 1,
+        lastBidAt: Date.parse(state.auction_winner.created_at) || Date.now(),
+      }
+      : null
+    setAuctionWinner(winnerBidder)
+
+    if (activeMode === 'lottery' && winnerTicket) setWinner(winnerTicket)
+    if (activeMode === 'auction' && winnerBidder) setWinner(winnerBidder)
+    if (activeMode === 'lottery') setTotalMessages(tickets.length)
+    if (activeMode === 'auction') setTotalMessages(state.auction_bids?.length || 0)
+  }, [activeMode])
+
+  const fetchRozState = useCallback(async () => {
+    const res = await fetch('/api/roz/state', { cache: 'no-store' })
+    if (!res.ok) {
+      if (res.status === 401) setAuthUser(null)
+      return null
+    }
+
+    const data = await res.json()
+    setAuthUser(data.user || null)
+    if (data.state) syncRozState(data.state)
+    return data.state as RozServerState
+  }, [syncRozState])
+
+  const fetchRewards = useCallback(async () => {
+    setRewardsLoading(true)
+    try {
+      const res = await fetch('/api/roz/rewards', { cache: 'no-store' })
+      if (!res.ok) {
+        if (res.status === 401) setAuthUser(null)
+        return
+      }
+
+      const data = await res.json()
+      setTwitchRewards(Array.isArray(data) ? data : [])
+    } finally {
+      setRewardsLoading(false)
+    }
+  }, [])
+
+  const saveRozState = useCallback(async (action = 'save') => {
+    const lotteryReward = twitchRewards.find(reward => reward.id === selectedLotteryRewardId)
+    const auctionReward = twitchRewards.find(reward => reward.id === selectedAuctionRewardId)
+    const res = await fetch('/api/roz/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action,
+        settings: {
+          lottery_reward_id: selectedLotteryRewardId,
+          lottery_reward_name: lotteryReward?.title || '',
+          auction_reward_id: selectedAuctionRewardId,
+          auction_reward_name: auctionReward?.title || '',
+          lottery_prize: prizeName,
+          auction_prize: prizeName,
+          lottery_auto_mode: lotteryAutoMode,
+          lottery_target: safeLotteryTarget,
+        },
+      }),
+    })
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || 'Не удалось сохранить настройки')
+    }
+
+    const data = await res.json()
+    if (data.state) syncRozState(data.state)
+    return data.state as RozServerState
+  }, [
+    lotteryAutoMode,
+    prizeName,
+    safeLotteryTarget,
+    selectedAuctionRewardId,
+    selectedLotteryRewardId,
+    syncRozState,
+    twitchRewards,
+  ])
 
   const lotteryParticipants = useMemo<LotteryParticipant[]>(() => {
     const grouped = new Map<string, LotteryParticipant>()
@@ -312,6 +532,41 @@ export default function Home() {
       participantsRef.current.scrollTop = participantsRef.current.scrollHeight
     }
   }, [participants, lotteryTickets, auctionBidders])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadTwitchSetup = async () => {
+      setAuthLoading(true)
+      try {
+        await fetchRozState()
+        if (!cancelled) await fetchRewards()
+      } finally {
+        if (!cancelled) setAuthLoading(false)
+      }
+    }
+
+    loadTwitchSetup()
+    return () => { cancelled = true }
+  }, [fetchRewards, fetchRozState])
+
+  useEffect(() => {
+    if (!authUser || activeMode === 'giveaway' || !isConnected) return
+
+    const interval = setInterval(() => {
+      fetchRozState()
+    }, 2500)
+
+    return () => clearInterval(interval)
+  }, [activeMode, authUser, fetchRozState, isConnected])
+
+  useEffect(() => {
+    if (selectedLotteryReward?.cost) setTicketPrice(selectedLotteryReward.cost)
+  }, [selectedLotteryReward?.cost])
+
+  useEffect(() => {
+    if (selectedAuctionReward?.cost) setAuctionMinBid(selectedAuctionReward.cost)
+  }, [selectedAuctionReward?.cost])
 
   /* ─── Format time ─── */
   const formatTime = (seconds: number) => {
@@ -465,47 +720,82 @@ export default function Home() {
   }, [])
 
   /* ─── Connect / Disconnect ─── */
-  const handleConnect = () => {
-    const modeKeyword = activeMode === 'giveaway'
-      ? keyword
-      : activeMode === 'lottery'
-        ? ticketKeyword
-        : auctionKeyword
-
-    if (!streamerName.trim() || !modeKeyword.trim()) {
-      setStatusMessage('Пожалуйста, введите никнейм стримера и команду для текущего режима')
+  const handleConnect = async () => {
+    if (!streamerName.trim()) {
+      setStatusMessage('Пожалуйста, введите никнейм стримера')
       return
     }
+
+    if (activeMode === 'giveaway' && !keyword.trim()) {
+      setStatusMessage('Пожалуйста, введите ключевое слово для розыгрыша')
+      return
+    }
+
+    if (activeMode === 'lottery' && !selectedLotteryRewardId) {
+      setStatusMessage('Выберите Twitch-награду, покупка которой будет выдавать билет лотереи')
+      return
+    }
+
+    if (activeMode === 'auction' && !selectedAuctionRewardId) {
+      setStatusMessage('Выберите Twitch-награду, покупка которой будет считаться ставкой')
+      return
+    }
+
+    if (activeMode !== 'giveaway' && !authUser) {
+      window.location.href = '/auth/twitch?source=roz'
+      return
+    }
+
     setIsConnected(true)
-    setParticipants([])
-    setLotteryTickets([])
-    setLotteryWinner(null)
-    lotteryTicketsRef.current = []
-    lotteryDrawnRef.current = false
-    setAuctionBidders([])
-    setAuctionWinner(null)
-    auctionBiddersRef.current.clear()
-    setChatMessages([])
-    userColorsRef.current.clear()
-    participantsSet.current.clear()
-    avatarRequestedRef.current.clear()
-    setTotalMessages(0)
+    if (activeMode === 'giveaway') {
+      setParticipants([])
+      setChatMessages([])
+      userColorsRef.current.clear()
+      participantsSet.current.clear()
+      avatarRequestedRef.current.clear()
+      setTotalMessages(0)
+    }
     setConnectionTime(0)
     setWinner(null)
+
     if (activeMode === 'lottery') {
-      setStatusMessage(`Подключение к чату ${streamerName}... Продажа билетов "${ticketKeyword}" за ${safeTicketPrice} баллов`)
+      try {
+        await saveRozState('save')
+        const subRes = await fetch('/api/roz/subscribe', { method: 'POST' })
+        if (!subRes.ok) {
+          const data = await subRes.json().catch(() => ({}))
+          throw new Error(data.error || 'Не удалось подключить Twitch EventSub')
+        }
+        setStatusMessage(`Лотерея активна. Билет выдается за покупку награды "${selectedLotteryReward?.title}" (${selectedLotteryReward?.cost || safeTicketPrice} баллов канала)`)
+      } catch (error: any) {
+        setIsConnected(false)
+        setStatusMessage(error.message || 'Не удалось запустить лотерею')
+      }
+      return
     } else if (activeMode === 'auction') {
-      setStatusMessage(`Подключение к чату ${streamerName}... Ожидание ставок "${auctionKeyword} ${safeAuctionMinBid}"`)
-    } else {
-      setStatusMessage(`Подключение к чату ${streamerName}... Ожидание сообщений с ключевым словом "${keyword}"`)
+      try {
+        await saveRozState('save')
+        const subRes = await fetch('/api/roz/subscribe', { method: 'POST' })
+        if (!subRes.ok) {
+          const data = await subRes.json().catch(() => ({}))
+          throw new Error(data.error || 'Не удалось подключить Twitch EventSub')
+        }
+        setStatusMessage(`Аукцион активен. Ставки идут через покупку награды "${selectedAuctionReward?.title}"`)
+      } catch (error: any) {
+        setIsConnected(false)
+        setStatusMessage(error.message || 'Не удалось запустить аукцион')
+      }
+      return
     }
+
+    setStatusMessage(`Подключение к чату ${streamerName}... Ожидание сообщений с ключевым словом "${keyword}"`)
     startSimulation()
   }
 
   const handleDisconnect = () => {
     setIsConnected(false)
     setConnectionTime(0)
-    stopSimulation()
+    if (activeMode === 'giveaway') stopSimulation()
     setStatusMessage(`Отключено. ${getIdleStatus(activeMode)}`)
   }
 
@@ -601,25 +891,36 @@ export default function Home() {
     }
   }
 
-  const handleDrawLottery = useCallback(() => {
+  const handleDrawLottery = useCallback(async () => {
     const pool = lotteryTicketsRef.current
     if (pool.length === 0) return
 
-    const selected = pool[Math.floor(Math.random() * pool.length)]
     lotteryDrawnRef.current = true
-    setLotteryWinner(selected)
-    setWinner(selected)
-    setStatusMessage(`Победитель лотереи: ${selected.username}. Приз: ${prizeName}`)
-  }, [prizeName])
+    try {
+      const state = await saveRozState('drawLottery')
+      const selected = state?.lottery_winner
+      if (selected) {
+        setStatusMessage(`Победитель лотереи: ${selected.username}. Приз: ${prizeName}`)
+      }
+    } catch (error: any) {
+      lotteryDrawnRef.current = false
+      setStatusMessage(error.message || 'Не удалось разыграть лотерею')
+    }
+  }, [prizeName, saveRozState])
 
-  const handleResetLottery = () => {
-    setLotteryTickets([])
-    lotteryTicketsRef.current = []
-    lotteryDrawnRef.current = false
-    setLotteryWinner(null)
-    setWinner(null)
-    setTotalMessages(0)
-    setStatusMessage('Лотерея сброшена. Можно продавать билеты заново.')
+  const handleResetLottery = async () => {
+    try {
+      await saveRozState('resetLottery')
+      setLotteryTickets([])
+      lotteryTicketsRef.current = []
+      lotteryDrawnRef.current = false
+      setLotteryWinner(null)
+      setWinner(null)
+      setTotalMessages(0)
+      setStatusMessage('Лотерея сброшена. Новые билеты будут приходить только через покупку выбранной Twitch-награды.')
+    } catch (error: any) {
+      setStatusMessage(error.message || 'Не удалось сбросить лотерею')
+    }
   }
 
   useEffect(() => {
@@ -642,21 +943,32 @@ export default function Home() {
     safeLotteryTarget,
   ])
 
-  const handleFinishAuction = () => {
+  const handleFinishAuction = async () => {
     if (!topBidder) return
 
-    setAuctionWinner(topBidder)
-    setWinner(topBidder)
-    setStatusMessage(`Аукцион завершен. Победитель: ${topBidder.username} со ставкой ${topBidder.bid} баллов`)
+    try {
+      const state = await saveRozState('finishAuction')
+      const selected = state?.auction_winner
+      if (selected) {
+        setStatusMessage(`Аукцион завершен. Победитель: ${selected.username} со ставкой ${selected.bid} баллов`)
+      }
+    } catch (error: any) {
+      setStatusMessage(error.message || 'Не удалось завершить аукцион')
+    }
   }
 
-  const handleResetAuction = () => {
-    setAuctionBidders([])
-    auctionBiddersRef.current.clear()
-    setAuctionWinner(null)
-    setWinner(null)
-    setTotalMessages(0)
-    setStatusMessage('Аукцион сброшен. Можно начинать новые ставки.')
+  const handleResetAuction = async () => {
+    try {
+      await saveRozState('resetAuction')
+      setAuctionBidders([])
+      auctionBiddersRef.current.clear()
+      setAuctionWinner(null)
+      setWinner(null)
+      setTotalMessages(0)
+      setStatusMessage('Аукцион сброшен. Новые ставки будут приходить только через покупку выбранной Twitch-награды.')
+    } catch (error: any) {
+      setStatusMessage(error.message || 'Не удалось сбросить аукцион')
+    }
   }
 
 
@@ -754,6 +1066,36 @@ export default function Home() {
               </div>
             </div>
 
+            {activeMode !== 'giveaway' && (
+              <div className="mb-5 rounded-lg border border-[#333] bg-[#242424] p-3">
+                {authLoading ? (
+                  <div className="text-xs text-gray-400">Проверяю Twitch-авторизацию...</div>
+                ) : authUser ? (
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 overflow-hidden rounded-full bg-purple-500/20">
+                      {authUser.profile_image_url ? (
+                        <img src={authUser.profile_image_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <User className="m-2 h-4 w-4 text-purple-300" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-white">{authUser.display_name}</div>
+                      <div className="truncate text-[11px] text-gray-500">Channel Points подключены через Twitch</div>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => { window.location.href = '/auth/twitch?source=roz' }}
+                    className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl h-10"
+                  >
+                    <Plug className="w-4 h-4 mr-2" />
+                    Войти через Twitch
+                  </Button>
+                )}
+              </div>
+            )}
+
             {activeMode === 'giveaway' && (
               <div className="mb-5">
                 <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
@@ -792,18 +1134,21 @@ export default function Home() {
                 <div>
                   <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
                     <Ticket className="w-3.5 h-3.5 text-emerald-400" />
-                    Команда покупки билета
+                    Награда Twitch для билета
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 text-sm font-medium">!</span>
-                    <Input
-                      value={ticketKeyword}
-                      onChange={(e) => setTicketKeyword(e.target.value)}
-                      placeholder="билет"
-                      disabled={isConnected}
-                      className="pl-8 bg-[#2a2a2a] border-[#333] text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500/20 rounded-lg h-11"
-                    />
-                  </div>
+                  <select
+                    value={selectedLotteryRewardId}
+                    onChange={(e) => setSelectedLotteryRewardId(e.target.value)}
+                    disabled={isConnected || rewardsLoading || !authUser}
+                    className="h-11 w-full rounded-lg border border-[#333] bg-[#2a2a2a] px-3 text-sm text-white outline-none transition-colors focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:text-gray-500"
+                  >
+                    <option value="">{rewardsLoading ? 'Загружаю награды...' : 'Выберите награду канала'}</option>
+                    {twitchRewards.map(reward => (
+                      <option key={reward.id} value={reward.id}>
+                        {reward.title} · {reward.cost} баллов
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -816,8 +1161,8 @@ export default function Home() {
                       type="number"
                       min={1}
                       value={ticketPrice}
-                      onChange={(e) => setTicketPrice(Number.parseInt(e.target.value, 10) || 0)}
-                      disabled={isConnected}
+                      readOnly
+                      disabled
                       className="bg-[#2a2a2a] border-[#333] text-white focus:border-emerald-500 focus:ring-emerald-500/20 rounded-lg h-11"
                     />
                   </div>
@@ -875,48 +1220,46 @@ export default function Home() {
                 <div>
                   <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
                     <Gavel className="w-3.5 h-3.5 text-amber-400" />
-                    Команда ставки
+                    Награда Twitch для ставки
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 text-sm font-medium">!</span>
-                    <Input
-                      value={auctionKeyword}
-                      onChange={(e) => setAuctionKeyword(e.target.value)}
-                      placeholder="ставка"
-                      disabled={isConnected}
-                      className="pl-8 bg-[#2a2a2a] border-[#333] text-white placeholder:text-gray-500 focus:border-amber-500 focus:ring-amber-500/20 rounded-lg h-11"
-                    />
-                  </div>
+                  <select
+                    value={selectedAuctionRewardId}
+                    onChange={(e) => setSelectedAuctionRewardId(e.target.value)}
+                    disabled={isConnected || rewardsLoading || !authUser}
+                    className="h-11 w-full rounded-lg border border-[#333] bg-[#2a2a2a] px-3 text-sm text-white outline-none transition-colors focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 disabled:text-gray-500"
+                  >
+                    <option value="">{rewardsLoading ? 'Загружаю награды...' : 'Выберите награду канала'}</option>
+                    {twitchRewards.map(reward => (
+                      <option key={reward.id} value={reward.id}>
+                        {reward.title} · {reward.cost} баллов{reward.userInputRequired ? ' · ввод ставки' : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
                       <Coins className="w-3.5 h-3.5 text-amber-400" />
-                      Мин. ставка
+                      Цена участия
                     </label>
                     <Input
                       type="number"
                       min={1}
                       value={auctionMinBid}
-                      onChange={(e) => setAuctionMinBid(Number.parseInt(e.target.value, 10) || 0)}
-                      disabled={isConnected}
+                      readOnly
+                      disabled
                       className="bg-[#2a2a2a] border-[#333] text-white focus:border-amber-500 focus:ring-amber-500/20 rounded-lg h-11"
                     />
                   </div>
                   <div>
                     <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
                       <Target className="w-3.5 h-3.5 text-amber-400" />
-                      Шаг
+                      Текущий лидер
                     </label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={auctionMinStep}
-                      onChange={(e) => setAuctionMinStep(Number.parseInt(e.target.value, 10) || 0)}
-                      disabled={isConnected}
-                      className="bg-[#2a2a2a] border-[#333] text-white focus:border-amber-500 focus:ring-amber-500/20 rounded-lg h-11"
-                    />
+                    <div className="flex h-11 items-center rounded-lg border border-[#333] bg-[#2a2a2a] px-3 text-sm font-semibold text-amber-300">
+                      {topBidder ? topBidder.bid : 0}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1148,7 +1491,7 @@ export default function Home() {
                 lotteryParticipants.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-gray-500 py-12">
                     <Ticket className="w-10 h-10 mb-3 opacity-40" />
-                    <p className="text-sm text-center">Билеты появятся здесь после покупки через чат</p>
+                    <p className="text-sm text-center">Билеты появятся здесь после покупки выбранной Twitch-награды</p>
                   </div>
                 ) : (
                   <div className="space-y-1.5">
@@ -1189,7 +1532,7 @@ export default function Home() {
                 auctionBidders.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-gray-500 py-12">
                     <Gavel className="w-10 h-10 mb-3 opacity-40" />
-                    <p className="text-sm text-center">Ставки появятся здесь после сообщений в чате</p>
+                    <p className="text-sm text-center">Ставки появятся здесь после покупки выбранной Twitch-награды</p>
                   </div>
                 ) : (
                   <div className="space-y-1.5">

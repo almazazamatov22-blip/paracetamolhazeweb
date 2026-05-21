@@ -17,6 +17,7 @@ function targetUrl(baseUrl: string, source: string | null, error?: string) {
   if (source === 'emojino') path = '/emojino';
   if (source === 'poker') path = '/poker';
   if (source === 'kinoquiz') path = '/kinoquiz';
+  if (source === 'roz') path = '/roz';
   if (source === 'overlays') path = '/overlays/dashboard';
   if (source === 'bred' || source === 'trueorfalse' || source === 'trueorfasle') path = '/bred';
 
@@ -24,7 +25,7 @@ function targetUrl(baseUrl: string, source: string | null, error?: string) {
 }
 
 function shouldRegisterRealtimeHooks(source: string | null): boolean {
-  return source === '67' || source === null || source === '';
+  return source === '67' || source === 'roz' || source === null || source === '';
 }
 
 async function fetchJson(
@@ -72,7 +73,8 @@ export async function GET(request: NextRequest) {
   }
 
   const redirectUri = `${baseUrl}${request.nextUrl.pathname}`;
-  const needs67Bootstrap = shouldRegisterRealtimeHooks(source);
+  const needsRealtimeHooks = shouldRegisterRealtimeHooks(source);
+  const needs67UserSync = source === '67' || source === null || source === '';
 
   try {
     const tokenResult = await fetchJson('https://id.twitch.tv/oauth2/token', {
@@ -94,7 +96,7 @@ export async function GET(request: NextRequest) {
     const data = tokenResult.data;
 
     let user: any = null;
-    if (needs67Bootstrap) {
+    if (needsRealtimeHooks) {
       const userResult = await fetchJson(
         'https://api.twitch.tv/helix/users',
         {
@@ -108,7 +110,7 @@ export async function GET(request: NextRequest) {
       user = userResult.data?.data?.[0] ?? null;
     }
     
-    if (needs67Bootstrap && user?.id) {
+    if (needsRealtimeHooks && user?.id) {
       const userId = user.id;
 
       try {
@@ -159,7 +161,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (needs67Bootstrap && user) {
+    if (needs67UserSync && user) {
       const { supabase } = await import('@/lib/supabase');
       const { error: syncError } = await supabase
         .from('game_67_users')
