@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 type Lang = "ru" | "en";
+type CallStage = "ringing" | "connected";
 
 type TocItem = {
   id: string;
@@ -44,6 +45,14 @@ type Copy = {
     rows: [string, string][];
   };
   sections: SectionData[];
+  call: {
+    title: string;
+    subtitle: string;
+    accept: string;
+    decline: string;
+    connected: string;
+    autoplayBlocked: string;
+  };
 };
 
 const copy: Record<Lang, Copy> = {
@@ -64,7 +73,7 @@ const copy: Record<Lang, Copy> = {
       sourceLine: "Материал из Википедии — свободной энциклопедии",
       lead: [
         "Habarhub — русскоязычный стример и автор канала HabarHub (YouTube: @VagabovDmitrii). В открытом описании Twitch указаны регулярные эфиры в 19:00 МСК и форматы: шоу, фильмы, реакции, игры, IRL, интерактив.",
-        "В рамках этого досье на /detective рассматривается сюжетная версия событий: 21 мая 2026 года автор пропал из сети. Ниже собраны публичные факты о канале и хронология исчезновения как часть расследования.",
+        "Основные публичные сведения собраны из описаний Twitch и YouTube-канала.",
       ],
     },
     tocTitle: "Содержание",
@@ -126,8 +135,8 @@ const copy: Record<Lang, Copy> = {
         id: "investigation",
         title: "Версии и зацепки",
         paragraphs: [
-          "Основная версия: автор сознательно прекратил эфиры, оставив аудиторию без объяснений. Альтернативная версия: канал остался в сети, но доступ к публикациям потерян. Для проверки в кейсе анализируются интервалы активности, архив эфиров и поведение связанных аккаунтов.",
-          "Ключевая зацепка досье — повторяющееся время 19:00 МСК. Игроку предлагается сопоставлять время публикаций и паузы в активности между Twitch, YouTube и Telegram, чтобы найти первую точку расхождения.",
+          "Внутри сценария рассматриваются две основные версии: автор пропал без объяснений или автора могли убить. Вторая версия остается только гипотезой расследования и требует подтверждения цифровыми уликами.",
+          "Для проверки сравнивают интервалы активности и временные метки публикаций на Twitch, YouTube и в Telegram, с отдельным вниманием к регулярному слоту 19:00 МСК.",
         ],
       },
       {
@@ -135,10 +144,18 @@ const copy: Record<Lang, Copy> = {
         title: "Реакция сообщества",
         paragraphs: [
           "Зрители разделились на две группы: часть считает исчезновение запланированной паузой, часть настаивает, что последний эфир отличался по ритму и тону от обычных включений. Внутри сообщества сохраняется активный сбор заметок по датам и времени.",
-          "В этой версии страницы все блоки собраны как стартовое досье для расследования. Подтвержденные публичные данные отделены от сюжетной линии, чтобы игрок мог работать с фактами и гипотезами отдельно.",
+          "Сообщество продолжает сверять архивы, таймкоды и редкие следы активности, пытаясь восстановить полную цепочку событий по минутам.",
         ],
       },
     ],
+    call: {
+      title: "Входящий звонок",
+      subtitle: "Неизвестный номер",
+      accept: "Принять",
+      decline: "Отклонить",
+      connected: "Соединение установлено. Слушайте код.",
+      autoplayBlocked: "Браузер мог заблокировать автозвук. Нажмите «Принять» для воспроизведения.",
+    },
   },
   en: {
     header: {
@@ -157,7 +174,7 @@ const copy: Record<Lang, Copy> = {
       sourceLine: "From Wikipedia, the free encyclopedia",
       lead: [
         "Habarhub is a Russian-speaking streamer and creator behind the HabarHub channel (YouTube: @VagabovDmitrii). The public Twitch description lists regular streams at 19:00 MSK and formats such as shows, films, reactions, games, IRL, and interactive sessions.",
-        "Within this /detective page, the disappearance on May 21, 2026 is presented as a case narrative. Public profile facts are listed together with the storyline timeline for investigation gameplay.",
+        "The public profile facts below are based on the open channel descriptions.",
       ],
     },
     tocTitle: "Contents",
@@ -219,8 +236,8 @@ const copy: Record<Lang, Copy> = {
         id: "investigation",
         title: "Theories and leads",
         paragraphs: [
-          "Primary theory: a deliberate shutdown with no public explanation. Alternative theory: account access changed while channels stayed visible. The case proposes checking activity intervals, archived sessions, and related account behavior.",
-          "The main lead is the repeated 19:00 MSK slot. Players compare publication timing across Twitch, YouTube, and Telegram to locate the first objective break in pattern.",
+          "Inside the case narrative, two core theories are tracked: the creator disappeared voluntarily, or the creator may have been killed. The second theory remains an unverified investigation hypothesis.",
+          "The timeline review compares Twitch, YouTube, and Telegram activity windows, with special focus on the recurring 19:00 MSK slot.",
         ],
       },
       {
@@ -228,19 +245,127 @@ const copy: Record<Lang, Copy> = {
         title: "Community response",
         paragraphs: [
           "Viewers split into two camps: one sees a planned pause, while another claims the final stream had a different pace and tone than normal sessions. The community keeps building a shared timeline by date and time.",
-          "On this page, verified public profile data is intentionally separated from the case narrative, so the investigation can work with facts and hypotheses independently.",
+          "Community members continue cross-checking archives, timestamps, and weak activity traces to rebuild the exact sequence minute by minute.",
         ],
       },
     ],
+    call: {
+      title: "Incoming Call",
+      subtitle: "Unknown Number",
+      accept: "Accept",
+      decline: "Decline",
+      connected: "Connected. Listen to the code.",
+      autoplayBlocked: "Autoplay may be blocked by the browser. Press Accept to play audio.",
+    },
   },
 };
 
+const TARGET_HOUR = 19;
+const TARGET_MINUTE = 0;
+
 export default function DetectiveClient() {
   const [lang, setLang] = useState<Lang>("ru");
+  const [isCallOpen, setIsCallOpen] = useState(false);
+  const [callStage, setCallStage] = useState<CallStage>("ringing");
+  const [callError, setCallError] = useState<string | null>(null);
   const t = copy[lang];
+
+  const ringAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const lastCallKeyRef = useRef<string>("");
+
+  useEffect(() => {
+    const checkTime = () => {
+      const now = new Date();
+      if (now.getHours() !== TARGET_HOUR || now.getMinutes() !== TARGET_MINUTE) {
+        return;
+      }
+
+      const dayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${TARGET_HOUR}-${TARGET_MINUTE}`;
+      if (lastCallKeyRef.current === dayKey) {
+        return;
+      }
+
+      lastCallKeyRef.current = dayKey;
+      setCallStage("ringing");
+      setCallError(null);
+      setIsCallOpen(true);
+    };
+
+    checkTime();
+    const timer = window.setInterval(checkTime, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!isCallOpen || callStage !== "ringing") {
+      return;
+    }
+
+    const ring = ringAudioRef.current;
+    if (!ring) {
+      return;
+    }
+
+    ring.loop = true;
+    ring.currentTime = 0;
+    ring.play().catch(() => setCallError(t.call.autoplayBlocked));
+
+    return () => {
+      ring.pause();
+      ring.currentTime = 0;
+    };
+  }, [isCallOpen, callStage, t.call.autoplayBlocked]);
+
+  const stopRingtone = () => {
+    const ring = ringAudioRef.current;
+    if (!ring) {
+      return;
+    }
+    ring.pause();
+    ring.currentTime = 0;
+  };
+
+  const closeCall = () => {
+    stopRingtone();
+    const voice = voiceAudioRef.current;
+    if (voice) {
+      voice.pause();
+      voice.currentTime = 0;
+    }
+    setCallStage("ringing");
+    setCallError(null);
+    setIsCallOpen(false);
+  };
+
+  const acceptCall = () => {
+    stopRingtone();
+    setCallStage("connected");
+    setCallError(null);
+
+    const voice = voiceAudioRef.current;
+    if (!voice) {
+      return;
+    }
+    voice.currentTime = 0;
+    voice.play().catch(() => setCallError(t.call.autoplayBlocked));
+  };
 
   return (
     <main className="min-h-screen w-full bg-white font-sans text-[14px] leading-[1.58] text-[#202122]">
+      <audio ref={ringAudioRef} src="/detective/ringtone.mp3" preload="auto" />
+      <audio ref={voiceAudioRef} src="/detective/code-voice.mp3" preload="auto" onEnded={closeCall} />
+
+      {isCallOpen ? (
+        <IncomingCallModal
+          t={t}
+          stage={callStage}
+          error={callError}
+          onAccept={acceptCall}
+          onDecline={closeCall}
+        />
+      ) : null}
+
       <div className="min-h-screen w-full bg-white">
         <SiteHeader t={t} />
 
@@ -257,7 +382,7 @@ export default function DetectiveClient() {
 
               {t.article.lead.map((text) => (
                 <p className="mb-3 text-[16px] leading-[1.62]" key={text}>
-                  {text}
+                  {highlightTime(text)}
                 </p>
               ))}
 
@@ -270,15 +395,15 @@ export default function DetectiveClient() {
                           <h3 id={`${section.id}-${slug(subtitle)}`} className="mb-2 text-[18px] font-semibold">
                             {subtitle}
                           </h3>
-                          {section.paragraphs[index] ? <p>{section.paragraphs[index]}</p> : null}
+                          {section.paragraphs[index] ? <p>{highlightTime(section.paragraphs[index])}</p> : null}
                         </div>
                       ))}
                       {section.paragraphs.slice(section.subtitles.length).map((paragraph) => (
-                        <p key={paragraph}>{paragraph}</p>
+                        <p key={paragraph}>{highlightTime(paragraph)}</p>
                       ))}
                     </>
                   ) : (
-                    section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)
+                    section.paragraphs.map((paragraph) => <p key={paragraph}>{highlightTime(paragraph)}</p>)
                   )}
                 </Section>
               ))}
@@ -287,6 +412,58 @@ export default function DetectiveClient() {
         </div>
       </div>
     </main>
+  );
+}
+
+function IncomingCallModal({
+  t,
+  stage,
+  error,
+  onAccept,
+  onDecline,
+}: {
+  t: Copy;
+  stage: CallStage;
+  error: string | null;
+  onAccept: () => void;
+  onDecline: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-[420px] rounded-md border border-[#a2a9b1] bg-white p-4 shadow-2xl">
+        <div className="mb-2 text-center text-[22px] font-semibold">{t.call.title}</div>
+        <div className="mb-4 text-center text-[16px] text-[#54595d]">{t.call.subtitle}</div>
+
+        <img
+          src="/detective/call-buttons.avif"
+          alt={t.call.title}
+          className="mb-4 h-auto w-full rounded-sm border border-[#eaecf0]"
+        />
+
+        {stage === "connected" ? (
+          <p className="mb-4 text-center text-[14px] text-[#202122]">{t.call.connected}</p>
+        ) : null}
+
+        {error ? <p className="mb-4 text-center text-[13px] text-[#b32424]">{error}</p> : null}
+
+        <div className="flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={onAccept}
+            className="rounded-md bg-[#2ea043] px-5 py-2 text-[14px] font-semibold text-white hover:bg-[#25883a]"
+          >
+            {t.call.accept}
+          </button>
+          <button
+            type="button"
+            onClick={onDecline}
+            className="rounded-md bg-[#d1242f] px-5 py-2 text-[14px] font-semibold text-white hover:bg-[#b11e27]"
+          >
+            {t.call.decline}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -440,7 +617,7 @@ function Infobox({ t, lang }: { t: Copy; lang: Lang }) {
         {t.infobox.rows.map(([term, value]) => (
           <div className="contents" key={term}>
             <dt className="font-bold">{term}</dt>
-            <dd>{value}</dd>
+            <dd>{highlightTime(value)}</dd>
           </div>
         ))}
       </dl>
@@ -462,6 +639,25 @@ function Section({
       <h2 className="mb-3 border-b border-[#a2a9b1] font-serif text-[28px] font-normal leading-[1.3]">{title}</h2>
       <div className="space-y-4 text-[16px] leading-[1.62]">{children}</div>
     </section>
+  );
+}
+
+function highlightTime(text: string) {
+  const marker = "19:00";
+  if (!text.includes(marker)) {
+    return text;
+  }
+
+  const parts = text.split(marker);
+  return (
+    <>
+      {parts.map((part, index) => (
+        <span key={`${part}-${index}`}>
+          {part}
+          {index < parts.length - 1 ? <strong>{marker}</strong> : null}
+        </span>
+      ))}
+    </>
   );
 }
 
