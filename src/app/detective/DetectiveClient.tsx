@@ -1,178 +1,279 @@
 import type { ReactNode } from "react";
 
-const facts = [
-  ["Псевдоним", "Habarhub"],
-  ["Род деятельности", "стример, автор разговорных эфиров"],
-  ["Основные темы", "ночные трансляции, истории зрителей, игры"],
-  ["Язык", "русский"],
-  ["Платформы", "Twitch, YouTube, Telegram"],
-  ["Активность", "с 2020-х годов"],
-  ["Сообщество", "Habar Chat"],
-];
-
 const contents = [
   "Биография",
   "Карьера",
-  "Эфиры",
-  "Образ и стиль",
+  "Формат эфиров",
   "Сообщество",
-  "См. также",
+  "Стиль и образ",
+  "Примечания",
+];
+
+const infoRows = [
+  ["Псевдоним", "Habarhub"],
+  ["Родился", "данные не раскрываются"],
+  ["Гражданство", "Россия"],
+  ["Род деятельности", "стример, видеоблогер"],
+  ["Годы активности", "с 2020-х годов"],
+  ["Платформы", "Twitch, YouTube, Telegram"],
+  ["Жанр", "разговорные эфиры, игры"],
+  ["Сообщество", "Habar Chat"],
 ];
 
 export default function DetectiveClient() {
   return (
-    <main className="min-h-screen bg-[#dfe5ee] text-[#202122]">
-      <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-8">
-        <article className="min-w-0 border-t-4 border-[#3366cc] bg-[#fffdf7] px-5 py-6 shadow-sm ring-1 ring-[#a2a9b1]/45 sm:px-8">
-          <header className="border-b border-[#a2a9b1] bg-[#f6f8fb] px-4 py-4">
-            <h1 className="font-serif text-4xl font-normal leading-tight text-[#101418]">Habarhub</h1>
-            <p className="mt-2 text-sm text-[#54595d]">Материал из свободной энциклопедии</p>
-          </header>
+    <main className="min-h-screen bg-white px-3 pb-10 pt-3 font-sans text-[14px] leading-[1.58] text-[#202122]">
+      <header>
+        <div className="flex items-start justify-between gap-4 border-b border-[#a2a9b1]">
+          <h1 className="font-serif text-[31px] font-normal leading-[1.25]">Habarhub (стример)</h1>
+          <button className="mt-1 hidden items-center gap-1 text-[13px] font-semibold text-[#36c] sm:flex" type="button">
+            文 1 язык⌄
+          </button>
+        </div>
 
-          <p className="mt-5 text-[15px] leading-7">
-            <b>Habarhub</b> — русскоязычный стример и автор интернет-контента, известный ночными
-            разговорными эфирами, спокойной манерой общения и вниманием к историям зрителей. В
-            сообществе его канал часто описывают как место между игровым стримом, открытым чатом и
-            личным дневником в прямом эфире.
-          </p>
-
-          <p className="mt-4 text-[15px] leading-7">
-            Основная аудитория Habarhub сформировалась вокруг длинных трансляций, где игровые
-            сессии перемежаются обсуждением новостей, пользовательских сообщений, личных историй и
-            небольших импровизированных рубрик. В отличие от более шумных развлекательных каналов,
-            его эфиры строятся на паузах, живой реакции и ощущении камерной беседы.
-          </p>
-
-          <nav className="mt-6 w-full max-w-xs border border-[#a2a9b1] bg-[#f8f9fa] p-4">
-            <div className="text-center text-sm font-semibold">Содержание</div>
-            <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-[#0645ad]">
-              {contents.map((item) => (
-                <li key={item}>
-                  <a className="hover:underline" href={`#${item.toLowerCase().replaceAll(" ", "-")}`}>
-                    {item}
-                  </a>
-                </li>
-              ))}
-            </ol>
+        <div className="flex flex-wrap items-end justify-between gap-x-5 border-b border-[#a2a9b1] text-[14px]">
+          <nav className="flex gap-4">
+            <a className="border-b-2 border-[#202122] py-2 text-[#202122]" href="#">
+              Статья
+            </a>
+            <a className="py-2 text-[#36c]" href="#">
+              Обсуждение
+            </a>
           </nav>
+          <nav className="flex flex-wrap gap-4">
+            <a className="border-b-2 border-[#202122] py-2 text-[#202122]" href="#">
+              Читать
+            </a>
+            <a className="py-2 text-[#36c]" href="#">
+              Править
+            </a>
+            <a className="py-2 text-[#36c]" href="#">
+              Править код
+            </a>
+            <a className="py-2 text-[#36c]" href="#">
+              История
+            </a>
+            <a className="py-2 text-[#202122]" href="#">
+              Инструменты⌄
+            </a>
+          </nav>
+        </div>
+      </header>
 
-          <Section title="Биография">
-            <p>
-              Подробные биографические сведения о Habarhub в открытых источниках ограничены. Сам
-              автор редко обсуждает личную жизнь и предпочитает отделять публичный образ от
-              повседневности. В ранних описаниях канала он представлял себя как человека, который
-              «включает эфир, когда город уже спит».
-            </p>
-            <p>
-              Такой образ стал частью узнаваемости канала: приглушенный свет, спокойный голос,
-              неспешный чат и длинные паузы между темами. Зрители часто воспринимают трансляции не
-              как шоу, а как фоновое присутствие.
-            </p>
-          </Section>
+      <article className="pt-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-[13px]">Материал из Википедии — свободной энциклопедии</p>
+          <a className="hidden text-[13px] text-[#36c] hover:underline sm:inline" href="#">
+            [ править код ]
+          </a>
+        </div>
 
-          <Section title="Карьера">
-            <p>
-              Канал Habarhub начал расти благодаря регулярным поздним эфирам и нарезкам моментов,
-              которые зрители выкладывали как короткие ролики. Наибольший отклик получали выпуски,
-              где стример разбирал странные сообщения, старые интернет-страницы, локальные мемы и
-              истории подписчиков.
-            </p>
-            <p>
-              Со временем вокруг канала появились постоянные рубрики: чтение писем, спокойные
-              игровые прохождения, обсуждение цифровой культуры и реакции на архивные видеозаписи.
-              При этом сам Habarhub обычно избегает жесткой сетки и сохраняет ощущение
-              незапланированного разговора.
-            </p>
-          </Section>
+        <div className="mb-4 flex items-center gap-2 text-[14px] text-[#54595d]">
+          <span className="grid h-5 w-5 place-items-center rounded-full bg-[#72777d] text-[12px] font-bold text-white">i</span>
+          <span>
+            <a className="text-[#36c] hover:underline" href="#">
+              Стабильная версия
+            </a>
+            , проверенная 21 мая 2026.
+          </span>
+        </div>
 
-          <Section title="Эфиры">
-            <p>
-              Типичный эфир Habarhub длится несколько часов и строится вокруг свободного
-              переключения между игрой, чатом и историями зрителей. В описаниях трансляций часто
-              используются короткие названия без подробного объяснения темы, что поддерживает
-              ощущение закрытого клуба для постоянной аудитории.
-            </p>
-            <p>
-              Важную роль играет чат. Зрители не только реагируют на происходящее, но и подбрасывают
-              темы, ссылки, скриншоты и старые записи. Из-за этого отдельные эфиры позже
-              пересказываются как коллективные интернет-расследования, хотя сам канал остается
-              развлекательным.
-            </p>
-          </Section>
+        <Infobox />
 
-          <Section title="Образ и стиль">
-            <p>
-              Визуальный стиль Habarhub минималистичен: темная сцена, небольшая камера, аккуратный
-              оверлей и отсутствие агрессивной графики. Манера речи спокойная, иногда ироничная,
-              без резких переходов и демонстративной актерской подачи.
-            </p>
-            <p>
-              Поклонники отмечают, что именно сдержанность отличает Habarhub от многих стримеров.
-              Он редко повышает голос, не пытается постоянно удерживать темп и часто оставляет в
-              эфире тишину, если она соответствует моменту.
-            </p>
-          </Section>
+        <p className="mb-2 pl-6 italic">
+          У этого термина существуют и другие значения, см.{" "}
+          <a className="text-[#36c] hover:underline" href="#">
+            Habar
+          </a>
+          .
+        </p>
+        <p className="mb-3 pl-6 italic">
+          Не следует путать с{" "}
+          <a className="text-[#36c] hover:underline" href="#">
+            Habrahabr
+          </a>
+          .
+        </p>
 
-          <Section title="Сообщество">
-            <p>
-              Сообщество канала известно под неформальным названием <b>Habar Chat</b>. В него входят
-              зрители, модераторы, авторы нарезок и участники небольших фанатских обсуждений.
-              Внутренние шутки сообщества обычно строятся вокруг ночного времени, старых ссылок,
-              случайных находок и фраз, сказанных на эфирах без явного контекста.
-            </p>
-            <p>
-              Участники сообщества часто сохраняют фрагменты трансляций, составляют списки тем и
-              помогают восстанавливать потерянные моменты из эфиров. Благодаря этому вокруг канала
-              сложился архивный слой, который существует отдельно от официальных публикаций.
-            </p>
-          </Section>
+        <p className="mb-3 max-w-[980px] text-[16px] leading-[1.62]">
+          <b>Habarhub</b> — русскоязычный{" "}
+          <WikiLink>стример</WikiLink> и автор интернет-контента, известный ночными разговорными
+          эфирами, спокойной манерой общения и вниманием к историям зрителей. Основную известность
+          получил благодаря прямым трансляциям, где игровые сессии совмещаются с обсуждением
+          сообщений из чата, старых интернет-страниц и зрительских историй<Ref>1</Ref>.
+        </p>
 
-          <Section title="См. также">
-            <ul className="list-disc space-y-1 pl-6 text-[15px] leading-7">
-              <li>Стриминг</li>
-              <li>Русскоязычный Twitch</li>
-              <li>Интернет-сообщества</li>
-              <li>Летсплей</li>
-            </ul>
-          </Section>
+        <p className="mb-3 max-w-[980px] text-[16px] leading-[1.62]">
+          Внутри сообщества канал часто описывают как место между игровым стримом, открытым чатом и
+          личным дневником в прямом эфире. Для эфиров Habarhub характерны приглушенный свет,
+          минималистичный оверлей, длинные паузы и неспешный темп разговора<Ref>2</Ref>.
+        </p>
 
-          <footer className="mt-8 border-t border-[#a2a9b1] pt-4 text-xs leading-6 text-[#54595d]">
-            Эта страница оформлена как энциклопедическая справка внутри сайта. Текст можно расширять
-            биографией, ссылками на платформы и подтвержденными фактами.
-          </footer>
-        </article>
-
-        <aside className="h-fit border border-[#7d8ca3] bg-[#fffdf7] text-sm shadow-sm">
-          <div className="border-b border-[#7d8ca3] bg-[#d8e3f3] px-4 py-3 text-center font-semibold">
-            Habarhub
-          </div>
-          <div className="grid place-items-center bg-[#eef3f9] px-4 py-6">
-            <div className="grid h-36 w-36 place-items-center border border-[#a2a9b1] bg-white font-serif text-5xl text-[#54595d]">
-              HH
-            </div>
-            <p className="mt-3 text-xs text-[#54595d]">условное изображение</p>
-          </div>
-          <dl>
-            {facts.map(([label, value]) => (
-              <div key={label} className="grid grid-cols-[116px_1fr] border-t border-[#eaecf0]">
-                <dt className="bg-[#f8f9fa] px-3 py-2 font-semibold text-[#202122]">{label}</dt>
-                <dd className="px-3 py-2 leading-6 text-[#202122]">{value}</dd>
-              </div>
+        <nav className="my-5 w-[260px] border border-[#a2a9b1] bg-[#f8f9fa] p-3 text-[14px]">
+          <div className="mb-2 text-center font-semibold">Содержание</div>
+          <ol className="list-decimal space-y-1 pl-6">
+            {contents.map((item) => (
+              <li key={item}>
+                <a className="text-[#36c] hover:underline" href={`#${slug(item)}`}>
+                  {item}
+                </a>
+              </li>
             ))}
-          </dl>
-        </aside>
-      </div>
+          </ol>
+        </nav>
+
+        <Section title="Биография">
+          <p>
+            Подробные биографические сведения о Habarhub в открытых источниках ограничены. Сам автор
+            редко обсуждает личную жизнь и предпочитает отделять публичный образ от повседневности.
+            В ранних описаниях канала он представлял себя как человека, который «включает эфир, когда
+            город уже спит»<Ref>3</Ref>.
+          </p>
+          <p>
+            Такой образ стал частью узнаваемости канала: спокойный голос, неспешный чат и длинные
+            паузы между темами. Зрители часто воспринимают трансляции не как шоу, а как фоновое
+            присутствие.
+          </p>
+        </Section>
+
+        <Section title="Карьера">
+          <p>
+            Канал Habarhub начал расти благодаря регулярным поздним эфирам и нарезкам моментов,
+            которые зрители публиковали как короткие ролики. Наибольший отклик получали выпуски, где
+            стример разбирал странные сообщения, локальные мемы и истории подписчиков.
+          </p>
+          <p>
+            Со временем вокруг канала появились постоянные рубрики: чтение писем, спокойные игровые
+            прохождения, обсуждение цифровой культуры и реакции на архивные видеозаписи. При этом
+            Habarhub обычно избегает жесткой сетки и сохраняет ощущение незапланированного разговора.
+          </p>
+        </Section>
+
+        <Section title="Формат эфиров">
+          <p>
+            Типичный эфир длится несколько часов и строится вокруг свободного переключения между
+            игрой, чатом и историями зрителей. В описаниях трансляций часто используются короткие
+            названия без подробного объяснения темы, что поддерживает ощущение закрытого клуба для
+            постоянной аудитории.
+          </p>
+          <p>
+            Важную роль играет чат. Зрители не только реагируют на происходящее, но и подбрасывают
+            темы, ссылки, скриншоты и старые записи. Из-за этого отдельные эфиры позже
+            пересказываются как коллективные интернет-обсуждения.
+          </p>
+        </Section>
+
+        <Section title="Сообщество">
+          <p>
+            Сообщество канала известно под неформальным названием <b>Habar Chat</b>. В него входят
+            зрители, модераторы, авторы нарезок и участники небольших фанатских обсуждений.
+            Внутренние шутки сообщества обычно строятся вокруг ночного времени, старых ссылок и
+            фраз, сказанных на эфирах без явного контекста.
+          </p>
+          <p>
+            Участники сообщества часто сохраняют фрагменты трансляций, составляют списки тем и
+            помогают восстанавливать потерянные моменты из эфиров. Благодаря этому вокруг канала
+            сложился архивный слой, который существует отдельно от официальных публикаций.
+          </p>
+        </Section>
+
+        <Section title="Стиль и образ">
+          <p>
+            Визуальный стиль Habarhub минималистичен: темная сцена, небольшая камера, аккуратный
+            оверлей и отсутствие агрессивной графики. Манера речи спокойная, иногда ироничная, без
+            резких переходов и демонстративной актерской подачи.
+          </p>
+        </Section>
+
+        <Section title="Примечания">
+          <ol className="list-decimal space-y-1 pl-6 text-[14px]">
+            <li>Описание канала Habarhub в открытых публикациях сообщества.</li>
+            <li>Архивные нарезки ночных трансляций.</li>
+            <li>Материалы фанатских обсуждений Habar Chat.</li>
+          </ol>
+        </Section>
+      </article>
     </main>
+  );
+}
+
+function Infobox() {
+  return (
+    <aside className="mb-4 w-full border border-[#a2a9b1] bg-[#f8f9fa] p-2 text-[14px] leading-[1.35] md:float-right md:ml-5 md:w-[333px]">
+      <div className="bg-[#cfe3ff] py-1 text-center text-[17px] font-bold">Habarhub</div>
+      <div className="pb-2 pt-1 text-center text-[13px]">
+        англ. <i>Habarhub</i>
+      </div>
+      <div className="mx-auto mb-2 grid h-[358px] w-[274px] place-items-center overflow-hidden bg-[#1b1b1b]">
+        <div className="relative h-full w-full bg-[radial-gradient(circle_at_50%_28%,#4d4a45_0,#201b1a_28%,#0e0e10_70%)]">
+          <div className="absolute left-1/2 top-16 h-24 w-24 -translate-x-1/2 rounded-full bg-[#d8c0aa]" />
+          <div className="absolute left-1/2 top-10 h-16 w-32 -translate-x-1/2 rounded-[45%] bg-[#2f241f]" />
+          <div className="absolute left-1/2 top-40 h-48 w-48 -translate-x-1/2 rounded-t-[46px] bg-[#d7b24b]" />
+          <div className="absolute left-1/2 top-[112px] h-3 w-24 -translate-x-1/2 rounded-full bg-[#f4e6d7]" />
+          <div className="absolute left-1/2 top-[122px] h-10 w-28 -translate-x-1/2 rounded-b-[50%] border-b-2 border-[#3b3330]" />
+          <div className="absolute bottom-5 left-0 right-0 text-center text-[26px] font-bold tracking-[0.08em] text-white/85">
+            HH
+          </div>
+        </div>
+      </div>
+      <table className="w-full border-separate border-spacing-y-1">
+        <tbody>
+          {infoRows.map(([label, value]) => (
+            <tr key={label} className="align-top">
+              <th className="w-[114px] pr-2 text-left font-bold">{label}</th>
+              <td>
+                {value.includes(",") ? (
+                  value.split(", ").map((part, index) => (
+                    <span key={part}>
+                      {index > 0 ? ", " : ""}
+                      <WikiLink>{part}</WikiLink>
+                    </span>
+                  ))
+                ) : (
+                  value
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </aside>
   );
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section id={title.toLowerCase().replaceAll(" ", "-")} className="mt-7">
-      <h2 className="border-b border-[#a2a9b1] pb-1 font-serif text-2xl font-normal text-[#101418]">
+    <section id={slug(title)} className="clear-none mt-6 max-w-[980px]">
+      <h2 className="mb-2 border-b border-[#a2a9b1] pb-1 font-serif text-[28px] font-normal leading-[1.3]">
         {title}
+        <span className="ml-3 align-middle font-sans text-[13px]">
+          [ <a className="text-[#36c] hover:underline" href="#">править</a> |{" "}
+          <a className="text-[#36c] hover:underline" href="#">править код</a> ]
+        </span>
       </h2>
-      <div className="mt-3 space-y-4 text-[15px] leading-7">{children}</div>
+      <div className="space-y-4 text-[16px] leading-[1.62]">{children}</div>
     </section>
   );
+}
+
+function WikiLink({ children }: { children: ReactNode }) {
+  return (
+    <a className="text-[#36c] hover:underline" href="#">
+      {children}
+    </a>
+  );
+}
+
+function Ref({ children }: { children: ReactNode }) {
+  return (
+    <sup className="whitespace-nowrap text-[12px]">
+      <a className="text-[#36c] hover:underline" href="#">
+        [{children}]
+      </a>
+    </sup>
+  );
+}
+
+function slug(value: string) {
+  return value.toLowerCase().replaceAll(" ", "-");
 }
