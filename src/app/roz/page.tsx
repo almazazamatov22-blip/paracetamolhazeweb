@@ -202,6 +202,17 @@ function getRandomMessage(): string {
   return CHAT_MESSAGES[Math.floor(Math.random() * CHAT_MESSAGES.length)]
 }
 
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 8000) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 /* ─── Component ─── */
 export default function Home() {
   const [activeMode, setActiveMode] = useState<RozMode>('giveaway')
@@ -221,6 +232,7 @@ export default function Home() {
   const [auctionWinner, setAuctionWinner] = useState<AuctionBidder | null>(null)
   const [authUser, setAuthUser] = useState<TwitchAuthUser | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [authError, setAuthError] = useState('')
   const [rewardsLoading, setRewardsLoading] = useState(false)
   const [twitchRewards, setTwitchRewards] = useState<TwitchReward[]>([])
   const [selectedLotteryRewardId, setSelectedLotteryRewardId] = useState('')
@@ -389,29 +401,46 @@ export default function Home() {
   }, [activeMode])
 
   const fetchRozState = useCallback(async () => {
-    const res = await fetch('/api/roz/state', { cache: 'no-store' })
-    if (!res.ok) {
-      if (res.status === 401) setAuthUser(null)
+    try {
+      const res = await fetchWithTimeout('/api/roz/state', { cache: 'no-store' })
+      if (!res.ok) {
+        if (res.status === 401) {
+          setAuthUser(null)
+          setAuthError('')
+        } else {
+          setAuthError('Не удалось проверить Twitch-авторизацию')
+        }
+        return null
+      }
+
+      const data = await res.json()
+      setAuthUser(data.user || null)
+      setAuthError('')
+      if (data.state) syncRozState(data.state)
+      return data.state as RozServerState
+    } catch (error) {
+      setAuthUser(null)
+      setAuthError('Проверка Twitch-авторизации не ответила. Обновите страницу или войдите заново.')
       return null
     }
-
-    const data = await res.json()
-    setAuthUser(data.user || null)
-    if (data.state) syncRozState(data.state)
-    return data.state as RozServerState
   }, [syncRozState])
 
   const fetchRewards = useCallback(async () => {
     setRewardsLoading(true)
     try {
-      const res = await fetch('/api/roz/rewards', { cache: 'no-store' })
+      const res = await fetchWithTimeout('/api/roz/rewards', { cache: 'no-store' })
       if (!res.ok) {
         if (res.status === 401) setAuthUser(null)
+        if (res.status === 403) {
+          setAuthError('Для наград за баллы нужен канал Twitch с Channel Points: affiliate или partner.')
+        }
         return
       }
 
       const data = await res.json()
       setTwitchRewards(Array.isArray(data) ? data : [])
+    } catch (error) {
+      setAuthError('Не удалось загрузить награды Twitch. Попробуйте обновить страницу.')
     } finally {
       setRewardsLoading(false)
     }
@@ -1071,27 +1100,41 @@ export default function Home() {
                 {authLoading ? (
                   <div className="text-xs text-gray-400">Проверяю Twitch-авторизацию...</div>
                 ) : authUser ? (
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 overflow-hidden rounded-full bg-purple-500/20">
-                      {authUser.profile_image_url ? (
-                        <img src={authUser.profile_image_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <User className="m-2 h-4 w-4 text-purple-300" />
-                      )}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 overflow-hidden rounded-full bg-purple-500/20">
+                        {authUser.profile_image_url ? (
+                          <img src={authUser.profile_image_url} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <User className="m-2 h-4 w-4 text-purple-300" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-white">{authUser.display_name}</div>
+                        <div className="truncate text-[11px] text-gray-500">Channel Points подключены через Twitch</div>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-white">{authUser.display_name}</div>
-                      <div className="truncate text-[11px] text-gray-500">Channel Points подключены через Twitch</div>
-                    </div>
+                    {authError && (
+                      <div className="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber-200">
+                        {authError}
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <Button
-                    onClick={() => { window.location.href = '/auth/twitch?source=roz' }}
-                    className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl h-10"
-                  >
-                    <Plug className="w-4 h-4 mr-2" />
-                    Войти через Twitch
-                  </Button>
+                  <div className="space-y-2">
+                    {authError && (
+                      <div className="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber-200">
+                        {authError}
+                      </div>
+                    )}
+                    <Button
+                      onClick={() => { window.location.href = '/auth/twitch?source=roz' }}
+                      className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl h-10"
+                    >
+                      <Plug className="w-4 h-4 mr-2" />
+                      Войти через Twitch
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
@@ -1149,6 +1192,11 @@ export default function Home() {
                       </option>
                     ))}
                   </select>
+                  {authUser && !rewardsLoading && twitchRewards.length === 0 && (
+                    <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber-200">
+                      Награды не найдены. Для билетов нужен канал Twitch с доступными Channel Points наградами.
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -1235,6 +1283,11 @@ export default function Home() {
                       </option>
                     ))}
                   </select>
+                  {authUser && !rewardsLoading && twitchRewards.length === 0 && (
+                    <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber-200">
+                      Награды не найдены. Для ставок нужен канал Twitch с доступными Channel Points наградами.
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
