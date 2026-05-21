@@ -20,7 +20,6 @@ import {
   Radio,
   Search,
   Send,
-  ShieldAlert,
   Terminal,
 } from "lucide-react";
 import type { CSSProperties, FormEvent } from "react";
@@ -171,7 +170,7 @@ function buildInitialChat(currentCase: DetectiveCase) {
       [
         {
           from: "npc" as const,
-          text: `Я на связи. Только без публичных обвинений. Спрашивайте конкретно: время, файл, доступ или переписка.`,
+          text: `Я отвечу, но только по делу. Если у вас есть конкретное время, файл или сообщение - спрашивайте про него.`,
           time: "сейчас",
         },
       ],
@@ -229,6 +228,28 @@ function matchTerminalEvidence(currentCase: DetectiveCase, input: string, unlock
 function findAnswerRule(suspect: Suspect, question: string) {
   const normalized = normalize(question);
   return suspect.answers.find((rule) => rule.keywords.some((keyword) => normalized.includes(normalize(keyword))));
+}
+
+function fallbackAnswer(suspect: Suspect, question: string) {
+  const normalized = normalize(question);
+
+  if (normalized.includes("спал") || normalized.includes("алиби") || normalized.includes("где")) {
+    return `Мое алиби такое: ${suspect.alibi}. Если у вас есть время, которое с этим не бьется, назовите его.`;
+  }
+
+  if (normalized.includes("правда") || normalized.includes("врешь") || normalized.includes("лож")) {
+    return `Я понимаю, как это выглядит, но общий вопрос ничего не доказывает. Покажите конкретную улику, и я отвечу по ней.`;
+  }
+
+  if (normalized.includes("зачем") || normalized.includes("мотив")) {
+    return `Вы сейчас спрашиваете про мотив. Мой видимый мотив уже все обсуждают: ${suspect.publicMotive}. Но это еще не доказательство действия.`;
+  }
+
+  if (normalized.includes("знал") || normalized.includes("видел")) {
+    return `Я мог что-то видеть, но без точного файла или времени я не хочу додумывать. Спросите про конкретный лог, сообщение или запись.`;
+  }
+
+  return `По этому вопросу я не могу ответить точно. Сформулируйте его через факт: время, файл, сообщение, доступ или деньги.`;
 }
 
 export default function DetectiveClient() {
@@ -323,20 +344,10 @@ export default function DetectiveClient() {
     ].slice(0, 7));
   }
 
-  function runQuickSearch(query: string) {
-    if (!currentCase) return;
-
-    const found = matchTerminalEvidence(currentCase, query, unlocked);
-    setTerminalInput("");
-
-    if (found) {
-      revealEvidence(found, "Вы проверили первый понятный след.");
-      return;
-    }
-
+  function prepareSearch(query: string) {
+    setTerminalInput(query);
     setTerminalLog((current) => [
-      `Пока ничего не найдено: ${query}`,
-      "Попробуйте выбрать одну из кнопок ниже или ввести название источника: стрим, донаты, Discord, видео, кошелек.",
+      `Направление выбрано: ${query}. Теперь нажмите поиск или уточните запрос своими словами.`,
       ...current,
     ].slice(0, 5));
   }
@@ -353,8 +364,7 @@ export default function DetectiveClient() {
     const answer =
       rule && newPressure >= 70 && rule.pressed
         ? rule.pressed
-        : rule?.answer ??
-          `Я не понимаю, к чему вы ведете. Если есть файл, лог или время - покажите это, а не делайте выводы из слухов.`;
+        : rule?.answer ?? fallbackAnswer(selectedSuspect, clean);
     const time = nowTime();
 
     setPressure((current) => ({ ...current, [selectedSuspect.id]: newPressure }));
@@ -429,7 +439,7 @@ export default function DetectiveClient() {
             </button>
             <div className="min-w-0">
               <div style={monoFont} className="text-xs uppercase text-[#777164]">
-                закрытый раздел / /detective
+                дело
               </div>
               <h1 className="truncate text-2xl font-black text-[#20251f] sm:text-3xl">{currentCase.menuTitle}</h1>
               <p className="truncate text-sm text-[#686256]">{currentCase.connectedTo}</p>
@@ -499,7 +509,7 @@ export default function DetectiveClient() {
                 visibleEvidence={visibleEvidence}
                 unlocked={unlocked}
                 onSelectEvidence={setSelectedEvidenceId}
-                onSearch={runQuickSearch}
+                onPrepareSearch={prepareSearch}
               />
             )}
 
@@ -539,7 +549,7 @@ export default function DetectiveClient() {
               terminalLog={terminalLog}
               onInputChange={setTerminalInput}
               onRunTerminal={runTerminal}
-              onQuickSearch={runQuickSearch}
+              onPrepareSearch={prepareSearch}
               onGoEvidence={() => setActiveTab("evidence")}
               onGoPeople={() => setActiveTab("network")}
             />
@@ -605,7 +615,7 @@ function NextActionCard({
   terminalLog,
   onInputChange,
   onRunTerminal,
-  onQuickSearch,
+  onPrepareSearch,
   onGoEvidence,
   onGoPeople,
 }: {
@@ -616,7 +626,7 @@ function NextActionCard({
   terminalLog: string[];
   onInputChange: (value: string) => void;
   onRunTerminal: (event: FormEvent<HTMLFormElement>) => void;
-  onQuickSearch: (hint: string) => void;
+  onPrepareSearch: (hint: string) => void;
   onGoEvidence: () => void;
   onGoPeople: () => void;
 }) {
@@ -633,11 +643,12 @@ function NextActionCard({
 
       {!hasEvidence && (
         <div className="mt-4 grid gap-2">
+          <p className="text-xs leading-5 text-[#777164]">Кнопки только подставляют направление в поиск. Улику нужно найти запросом.</p>
           {starterActions[currentCase.id].map((action) => (
             <button
               key={action.label}
               type="button"
-              onClick={() => onQuickSearch(action.hint)}
+              onClick={() => onPrepareSearch(action.hint)}
               className="flex min-h-12 items-center justify-between gap-3 rounded-md border border-[#d8d5ca] bg-[#fbfbf8] px-3 text-left text-sm font-semibold text-[#20251f] transition hover:border-[#9f9a8e] hover:bg-[#f1efe7]"
             >
               <span>{action.label}</span>
@@ -707,17 +718,17 @@ function SimpleEvidencePanel({
   visibleEvidence,
   unlocked,
   onSelectEvidence,
-  onSearch,
+  onPrepareSearch,
 }: {
   currentCase: DetectiveCase;
   selectedEvidence?: Evidence;
   visibleEvidence: Evidence[];
   unlocked: string[];
   onSelectEvidence: (id: string) => void;
-  onSearch: (hint: string) => void;
+  onPrepareSearch: (hint: string) => void;
 }) {
   if (!selectedEvidence) {
-    return <EmptyEvidencePanel currentCase={currentCase} onUseTip={onSearch} />;
+    return <EmptyEvidencePanel currentCase={currentCase} onUseTip={onPrepareSearch} />;
   }
 
   return (
@@ -911,25 +922,9 @@ function SimplePeoplePanel({
 function CaseMenu({ onOpenCase }: { onOpenCase: (nextCase: DetectiveCase) => void }) {
   return (
     <main style={detectiveFont} className="min-h-screen bg-[#f4f4f2] text-[#20251f]">
-      <section className="mx-auto grid min-h-screen w-full max-w-[1360px] grid-rows-[auto_minmax(0,1fr)_auto] gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      <section className="mx-auto grid min-h-screen w-full max-w-[1360px] grid-rows-[auto_minmax(0,1fr)] gap-6 px-4 py-6 sm:px-6 lg:px-8">
         <header className="rounded-md border border-[#dedbd2] bg-white p-5 shadow-sm lg:p-8">
-          <div className="inline-flex items-center gap-2 rounded-md border border-[#d8d5ca] bg-[#fbfbf8] px-3 py-2 text-sm text-[#5d584f]">
-            <span className="grid h-6 w-6 place-items-center rounded-md bg-[#20251f] text-white">
-              <ShieldAlert className="h-3.5 w-3.5" />
-            </span>
-            Закрытый раздел. В главное меню сайта не добавлен.
-          </div>
           <h1 className="mt-6 max-w-4xl text-4xl font-black leading-none text-[#20251f] sm:text-6xl">Выберите дело</h1>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-[#5d584f] sm:text-lg">
-            Внутри все начинается с короткого описания. Затем вы нажимаете понятный первый след, открываете улики и проверяете людей. Без сложных команд и лишнего шума.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            {["0% на старте", "3 дела", "улики открываются по шагам", "/detective"].map((item) => (
-              <span key={item} className="rounded-md border border-[#dedbd2] bg-[#f6f5f0] px-3 py-2 text-sm font-semibold text-[#5d584f]">
-                {item}
-              </span>
-            ))}
-          </div>
         </header>
 
         <div className="grid content-center gap-4 lg:grid-cols-3">
@@ -952,7 +947,6 @@ function CaseMenu({ onOpenCase }: { onOpenCase: (nextCase: DetectiveCase) => voi
                   <SmallFact label="сложность" value={item.difficulty} />
                   <SmallFact label="подозреваемые" value={`${item.suspects.length}`} />
                   <SmallFact label="улики" value={`${item.evidence.length}`} />
-                  <SmallFact label="формат" value={item.mood} wide />
                 </div>
 
                 <button
@@ -967,36 +961,48 @@ function CaseMenu({ onOpenCase }: { onOpenCase: (nextCase: DetectiveCase) => voi
             </article>
           ))}
         </div>
-
-        <footer className="border-t border-[#dedbd2] pt-4 text-sm text-[#777164]">
-          Доступ напрямую: /detective. Страница закрыта от индексации и не размещена на главной.
-        </footer>
       </section>
     </main>
   );
 }
 
 function CaseSignalArt({ currentCase }: { currentCase: DetectiveCase }) {
-  const label = currentCase.id === "habarhub" ? "HABAR" : currentCase.id === "keanu" ? "K-09" : "D-22";
-
   return (
     <div className="relative overflow-hidden bg-[#f6f5f0]">
       <svg viewBox="0 0 720 360" className="h-full w-full" role="img" aria-label={`Обложка дела ${currentCase.menuTitle}`}>
         <rect width="720" height="360" fill="#f6f5f0" />
         <path d="M0 72H720M0 144H720M0 216H720M0 288H720M90 0V360M180 0V360M270 0V360M360 0V360M450 0V360M540 0V360M630 0V360" stroke="#dedbd2" strokeWidth="1" />
-        <rect x="48" y="42" width="250" height="138" fill="#ffffff" stroke="#d8d5ca" strokeWidth="2" />
-        <rect x="430" y="58" width="210" height="128" fill="#ffffff" stroke="#d8d5ca" strokeWidth="2" />
-        <path d="M72 244C118 202 142 282 190 238C238 194 276 266 320 224C362 184 404 260 452 218C500 176 544 244 622 206" fill="none" stroke="#6f7f4e" strokeWidth="5" strokeLinecap="round" />
-        <path d="M96 86H236M96 118H188M96 150H252" stroke="#20251f" strokeOpacity="0.72" strokeWidth="9" strokeLinecap="round" />
-        <path d="M456 96H594M456 132H562M456 164H616" stroke="#b56f5a" strokeOpacity="0.82" strokeWidth="8" strokeLinecap="round" />
-        <circle cx="362" cy="112" r="34" fill="none" stroke="#6f7f4e" strokeOpacity="0.75" strokeWidth="3" />
-        <path d="M362 78V146M328 112H396" stroke="#6f7f4e" strokeOpacity="0.75" strokeWidth="3" />
-        <text x="48" y="316" fill="#20251f" fontSize="44" fontFamily="Segoe UI, Arial, sans-serif" fontWeight="700">
-          {label}
-        </text>
-        <text x="48" y="340" fill="#686256" fontSize="18" fontFamily="Segoe UI, Arial, sans-serif">
-          расследование
-        </text>
+        {currentCase.id === "habarhub" && (
+          <>
+            <rect x="92" y="74" width="310" height="174" rx="8" fill="#ffffff" stroke="#d8d5ca" strokeWidth="2" />
+            <rect x="120" y="104" width="174" height="96" rx="6" fill="#20251f" />
+            <circle cx="334" cy="130" r="18" fill="#b56f5a" />
+            <path d="M128 224H372" stroke="#6f7f4e" strokeWidth="10" strokeLinecap="round" />
+            <path d="M456 104H604M456 138H572M456 172H620M456 206H548" stroke="#20251f" strokeOpacity="0.45" strokeWidth="10" strokeLinecap="round" />
+            <path d="M110 286C154 250 190 310 234 274C280 236 318 298 364 260C410 222 458 286 610 238" fill="none" stroke="#6f7f4e" strokeWidth="5" strokeLinecap="round" />
+          </>
+        )}
+        {currentCase.id === "keanu" && (
+          <>
+            <rect x="118" y="58" width="270" height="190" rx="8" fill="#ffffff" stroke="#d8d5ca" strokeWidth="2" />
+            <circle cx="253" cy="138" r="48" fill="#e5d8cf" stroke="#b56f5a" strokeWidth="3" />
+            <path d="M226 132C238 120 270 120 282 132M228 166C246 180 264 180 282 166" stroke="#20251f" strokeWidth="6" strokeLinecap="round" fill="none" />
+            <path d="M430 86H610M430 124H550M430 162H592M430 200H526" stroke="#6f7f4e" strokeWidth="10" strokeLinecap="round" />
+            <path d="M144 280H616" stroke="#d8d5ca" strokeWidth="4" strokeLinecap="round" />
+            <path d="M170 280C222 236 270 318 324 270C378 222 438 310 496 260C538 224 574 244 622 224" fill="none" stroke="#b56f5a" strokeWidth="5" strokeLinecap="round" />
+          </>
+        )}
+        {currentCase.id === "donk" && (
+          <>
+            <rect x="104" y="64" width="512" height="220" rx="8" fill="#ffffff" stroke="#d8d5ca" strokeWidth="2" />
+            <path d="M152 120H312M152 162H258M152 204H348" stroke="#20251f" strokeOpacity="0.5" strokeWidth="10" strokeLinecap="round" />
+            <circle cx="500" cy="170" r="70" fill="none" stroke="#6f7f4e" strokeWidth="4" />
+            <path d="M500 86V254M416 170H584" stroke="#6f7f4e" strokeWidth="4" strokeLinecap="round" />
+            <circle cx="500" cy="170" r="18" fill="#b56f5a" />
+            <path d="M166 266C222 226 274 306 332 262C386 220 438 296 496 248" fill="none" stroke="#6f7f4e" strokeWidth="5" strokeLinecap="round" />
+            <path d="M144 84L188 40M594 276L638 320" stroke="#d8d5ca" strokeWidth="5" strokeLinecap="round" />
+          </>
+        )}
       </svg>
     </div>
   );
@@ -1235,7 +1241,7 @@ function EmptyEvidencePanel({ currentCase, onUseTip }: { currentCase: DetectiveC
         </div>
         <h2 className="text-3xl font-black leading-tight text-[#20251f]">Улик пока нет</h2>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[#5d584f]">
-          Это нормально. Начните с одного простого действия ниже, и первая улика откроется автоматически.
+          Это нормально. Выберите направление, уточните запрос и запустите поиск.
         </p>
         <div className="mt-6 grid gap-2 sm:grid-cols-3">
           {starterActions[currentCase.id].map((action) => (
@@ -1378,22 +1384,12 @@ function TimelinePanel({ currentCase }: { currentCase: DetectiveCase }) {
     <div className="p-4 lg:p-6">
       <div className="grid gap-3">
         {currentCase.timeline.map((item) => (
-          <div key={`${item.time}-${item.source}`} className="grid gap-3 rounded-md border border-[#e5e1d8] bg-[#fbfbf8] p-4 sm:grid-cols-[90px_120px_minmax(0,1fr)_110px] sm:items-center">
+          <div key={`${item.time}-${item.source}`} className="grid gap-3 rounded-md border border-[#e5e1d8] bg-[#fbfbf8] p-4 sm:grid-cols-[90px_120px_minmax(0,1fr)] sm:items-center">
             <div style={monoFont} className="text-lg font-semibold text-[#20251f]">
               {item.time}
             </div>
             <div className="text-xs font-semibold uppercase text-[#8b867b]">{item.source}</div>
             <div className="text-sm leading-6 text-[#5d584f]">{item.event}</div>
-            <div
-              className={cx(
-                "justify-self-start rounded-md border px-2 py-1 text-xs uppercase sm:justify-self-end",
-                item.confidence === "high" && "border-[#cdd8c1] bg-[#eef2e8] text-[#4f6638]",
-                item.confidence === "medium" && "border-[#e5dcc5] bg-[#fbf6e8] text-[#6f5b2e]",
-                item.confidence === "low" && "border-[#dfc8bc] bg-[#fbf1ed] text-[#7c3f2e]",
-              )}
-            >
-              {item.confidence === "high" ? "высокая" : item.confidence === "medium" ? "средняя" : "низкая"}
-            </div>
           </div>
         ))}
       </div>
