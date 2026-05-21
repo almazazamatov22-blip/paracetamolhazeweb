@@ -131,6 +131,24 @@ const caseAccent: Record<DetectiveCaseId, { line: string; soft: string; text: st
   },
 };
 
+const starterActions: Record<DetectiveCaseId, Array<{ label: string; hint: string }>> = {
+  habarhub: [
+    { label: "Посмотреть последние минуты стрима", hint: "архив стрима" },
+    { label: "Проверить донаты", hint: "лог донатов" },
+    { label: "Найти удаленные сообщения", hint: "восстановить dm" },
+  ],
+  keanu: [
+    { label: "Проверить само видео", hint: "метаданные кадра" },
+    { label: "Посмотреть страницу сбора", hint: "кошелек фонда" },
+    { label: "Найти, откуда пришла ссылка", hint: "cdn лог" },
+  ],
+  donk: [
+    { label: "Проверить архив с демками", hint: "hash dem" },
+    { label: "Найти путь файла", hint: "steam trade" },
+    { label: "Проверить вредный лаунчер", hint: "scan launcher" },
+  ],
+};
+
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
 }
@@ -252,9 +270,7 @@ export default function DetectiveClient() {
     setTerminalInput("");
     setTerminalLog([
       `Дело открыто: ${nextCase.title}`,
-      "Индексация выключена: раздел доступен только по прямому адресу",
-      "Архив пуст: сначала доступно только описание события.",
-      `Первые направления: ${nextCase.terminalTips.join(", ")}`,
+      "Сначала доступно только описание. Выберите первый след в блоке справа.",
     ]);
     setChat(buildInitialChat(nextCase));
     setPressure(buildPressure(nextCase));
@@ -305,6 +321,24 @@ export default function DetectiveClient() {
       "Ищите по связке: источник + объект. Например: 'лог донатов', 'cdn лог', 'hash dem'.",
       ...current,
     ].slice(0, 7));
+  }
+
+  function runQuickSearch(query: string) {
+    if (!currentCase) return;
+
+    const found = matchTerminalEvidence(currentCase, query, unlocked);
+    setTerminalInput("");
+
+    if (found) {
+      revealEvidence(found, "Вы проверили первый понятный след.");
+      return;
+    }
+
+    setTerminalLog((current) => [
+      `Пока ничего не найдено: ${query}`,
+      "Попробуйте выбрать одну из кнопок ниже или ввести название источника: стрим, донаты, Discord, видео, кошелек.",
+      ...current,
+    ].slice(0, 5));
   }
 
   function sendQuestion(event: FormEvent<HTMLFormElement>) {
@@ -381,381 +415,537 @@ export default function DetectiveClient() {
   }
 
   return (
-    <main style={detectiveFont} className="min-h-screen bg-[#090808] text-stone-100">
-      <div className="border-b border-white/10 bg-[#090808]">
-        <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 px-4 py-5 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
+    <main style={detectiveFont} className="min-h-screen bg-[#f4f4f2] text-[#20251f]">
+      <header className="border-b border-[#dedbd2] bg-[#fbfbf8]">
+        <div className="mx-auto flex w-full max-w-[1360px] flex-col gap-5 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               onClick={() => setCaseId(null)}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/20 bg-white/[0.06] text-stone-100 hover:border-white/60"
-              aria-label="Вернуться к архиву дел"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-[#cfcac0] bg-white text-[#20251f] transition hover:border-[#8b867b]"
+              aria-label="Вернуться к выбору дел"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#acdb26] bg-[#acdb26] text-black">
-              <ShieldAlert className="h-5 w-5" />
-            </div>
             <div className="min-w-0">
-              <div style={monoFont} className="text-xs uppercase text-[#acdb26]">
-                закрытый раздел / не индексируется
+              <div style={monoFont} className="text-xs uppercase text-[#777164]">
+                закрытый раздел / /detective
               </div>
-              <h1 className="truncate text-3xl font-black text-stone-50">{currentCase.title}</h1>
-              <p className="truncate text-sm text-stone-400">Связано с: {currentCase.connectedTo}</p>
+              <h1 className="truncate text-2xl font-black text-[#20251f] sm:text-3xl">{currentCase.menuTitle}</h1>
+              <p className="truncate text-sm text-[#686256]">{currentCase.connectedTo}</p>
             </div>
           </div>
 
-          <CaseStatusCards
-            currentCase={currentCase}
-            foundCount={visibleEvidence.length}
-            totalCount={currentCase.evidence.length}
-            progress={progress}
-          />
+          <div className="min-w-[260px] rounded-md border border-[#d8d5ca] bg-white p-3">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-semibold text-[#3c413a]">Открыто улик</span>
+              <span style={monoFont} className="font-semibold text-[#20251f]">
+                {visibleEvidence.length}/{currentCase.evidence.length}
+              </span>
+            </div>
+            <div className="mt-2 h-2 rounded-full bg-[#e9e6dc]">
+              <div className="h-full rounded-full bg-[#6f7f4e]" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div className="bg-[#acdb26] text-black">
-        <div style={monoFont} className="mx-auto flex w-full max-w-[1680px] flex-wrap items-center justify-between gap-3 px-4 py-3 text-xs font-bold uppercase sm:px-6">
-          <span>старт архива: 0%</span>
-          <span>улики появляются только после поиска</span>
-          <span>вход только через /detective</span>
-        </div>
-      </div>
+      <div className="mx-auto grid w-full max-w-[1360px] gap-5 px-4 py-5 sm:px-6">
+        <InvestigationSteps foundCount={visibleEvidence.length} suspectSelected={Boolean(selectedSuspect)} />
 
-      <div
-        className={cx(
-          "mx-auto grid w-full max-w-[1680px] gap-4 px-4 py-4 sm:px-6",
-          selectedSuspect ? "xl:grid-cols-[310px_minmax(0,1fr)_390px]" : "xl:grid-cols-[310px_minmax(0,1fr)]",
-        )}
-      >
-        <aside className="space-y-4">
-          <section className="rounded-md border border-white/10 bg-white/[0.06] p-4">
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-stone-200">
-              <FolderOpen className="h-4 w-4" />
-              Паспорт дела
-            </div>
-            <p className="text-sm leading-6 text-stone-300">{currentCase.description}</p>
-            <div className="mt-4 h-2 rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-[#acdb26]" style={{ width: `${progress}%` }} />
-            </div>
-            <p className="mt-3 text-xs leading-5 text-stone-500">
-              Сейчас архив начинается с нуля. Процент растет только после найденных цифровых следов.
-            </p>
-          </section>
-
-          <section className="rounded-md border border-[#acdb26]/60 bg-[#acdb26] p-4 text-black">
-            <div className="mb-3 flex items-center gap-2 text-sm font-black">
-              <ListChecks className="h-4 w-4" />
-              План расследования
-            </div>
-            <div className="grid gap-2">
-              {currentCase.tasks.slice(0, 4).map((task, index) => (
-                <div key={task.title} className="flex gap-2 text-sm leading-5 text-black/80">
-                  <span style={monoFont} className="mt-0.5 text-xs font-black text-black">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span>{task.title}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <nav className="grid gap-2">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cx(
-                    "flex min-h-11 items-center justify-between rounded-md border px-3 text-left text-sm transition",
-                    activeTab === tab.id
-                      ? "border-[#acdb26] bg-[#acdb26] text-black"
-                      : "border-white/10 bg-white/[0.06] text-stone-300 hover:border-white/35",
-                  )}
-                >
-                  <span className="flex items-center gap-2">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <section className="min-w-0 rounded-md border border-[#dedbd2] bg-white shadow-sm">
+            <nav className="grid border-b border-[#e5e1d8] bg-[#fbfbf8] p-2 sm:grid-cols-4">
+              {[
+                { id: "summary" as TabId, label: "Описание", icon: FileText },
+                { id: "evidence" as TabId, label: "Улики", icon: Fingerprint },
+                { id: "network" as TabId, label: "Люди", icon: MessageSquare },
+                { id: "timeline" as TabId, label: "Время", icon: Clock },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={cx(
+                      "flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition",
+                      activeTab === tab.id ? "bg-[#20251f] text-white" : "text-[#686256] hover:bg-[#eeeae1] hover:text-[#20251f]",
+                    )}
+                  >
                     <Icon className="h-4 w-4" />
                     {tab.label}
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
+                  </button>
+                );
+              })}
+            </nav>
 
-          <section className="rounded-md border border-white/10 bg-white/[0.06] p-4">
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-stone-200">
-              <Terminal className="h-4 w-4" />
-              Поиск по уликам
-            </div>
-            <form onSubmit={runTerminal} className="flex gap-2">
-              <input
-                value={terminalInput}
-                onChange={(event) => setTerminalInput(event.target.value)}
-                className="min-h-10 min-w-0 flex-1 rounded-md border border-white/10 bg-black px-3 text-sm text-stone-100 outline-none focus:border-[#acdb26]"
-                placeholder="например: лог донатов"
+            {activeTab === "summary" && (
+              <SummaryPanel
+                currentCase={currentCase}
+                foundCount={visibleEvidence.length}
+                onOpenSuspect={(id) => {
+                  setSelectedSuspectId(id);
+                  setTheory((current) => ({ ...current, suspect: current.suspect || id }));
+                  setActiveTab("network");
+                }}
               />
-              <button
-                type="submit"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[#acdb26] bg-[#acdb26] text-black hover:bg-lime-200"
-                aria-label="Запустить поиск"
-              >
-                <Search className="h-4 w-4" />
-              </button>
-            </form>
-            <div style={monoFont} className="mt-3 grid gap-2 text-xs text-stone-400">
-              {terminalLog.map((line, index) => (
-                <div key={`${line}-${index}`} className="border-l border-stone-700 pl-2">
-                  {line}
-                </div>
-              ))}
-            </div>
-          </section>
+            )}
 
-          <section className="rounded-md border border-white/10 bg-white/[0.06] p-4">
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-stone-200">
-              <Lock className="h-4 w-4" />
-              Первые следы
-            </div>
-            <div className="grid gap-2">
-              {currentCase.terminalTips.map((tip) => (
-                <button
-                  key={tip}
-                  type="button"
-                  onClick={() => setTerminalInput(tip)}
-                  className="flex items-center justify-between gap-3 rounded-md border border-[#acdb26]/30 bg-black px-3 py-2 text-left text-xs text-[#d9ff6a] hover:border-[#acdb26]"
-                >
-                  <span className="truncate">{tip}</span>
-                  <Search className="h-3.5 w-3.5 shrink-0" />
-                </button>
-              ))}
-              <div className="mt-3 border-t border-white/10 pt-3">
-                {lockedEvidence.length === 0 && <p className="text-sm text-stone-500">Все артефакты по делу восстановлены.</p>}
-                {lockedEvidence.length > 0 && (
-                  <div className="grid gap-2">
-                    {lockedEvidence.map((item, index) => (
-                      <div key={item.id} className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/60 px-3 py-2 text-left text-xs text-stone-500">
-                        <span>Скрытый артефакт {String(index + 1).padStart(2, "0")}</span>
-                        <Lock className="h-3.5 w-3.5 shrink-0" />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        </aside>
+            {activeTab === "evidence" && (
+              <SimpleEvidencePanel
+                currentCase={currentCase}
+                selectedEvidence={selectedEvidence}
+                visibleEvidence={visibleEvidence}
+                unlocked={unlocked}
+                onSelectEvidence={setSelectedEvidenceId}
+                onSearch={runQuickSearch}
+              />
+            )}
 
-        <section className="min-w-0 rounded-md border border-white/10 bg-[#10110f]">
-          {activeTab === "summary" && (
-            <SummaryPanel
-              currentCase={currentCase}
-              foundCount={visibleEvidence.length}
-              onOpenSuspect={(id) => {
-                setSelectedSuspectId(id);
-                setTheory((current) => ({ ...current, suspect: current.suspect || id }));
-                setActiveTab("network");
-              }}
-            />
-          )}
-
-          {activeTab === "evidence" && (
-            selectedEvidence ? (
-              <div className="grid min-h-[720px] gap-0 lg:grid-cols-[380px_minmax(0,1fr)]">
-                <div className="max-h-[780px] overflow-auto border-b border-stone-800 lg:border-b-0 lg:border-r">
-                  {visibleEvidence.map((item) => {
-                    const Icon = kindIcon[item.kind];
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setSelectedEvidenceId(item.id)}
-                        className={cx(
-                          "block w-full border-b border-stone-800 p-4 text-left transition",
-                          selectedEvidence.id === item.id ? "bg-[#acdb26] text-black" : "bg-[#10110f] text-stone-200 hover:bg-stone-950",
-                        )}
-                      >
-                        <div className="mb-2 flex items-center justify-between gap-3">
-                          <span className="flex min-w-0 items-center gap-2">
-                            <Icon className="h-4 w-4 shrink-0" />
-                            <span className="truncate font-medium">{item.title}</span>
-                          </span>
-                          <span style={monoFont} className="text-xs opacity-60">
-                            {item.reliability}%
-                          </span>
-                        </div>
-                        <div className="text-sm leading-5 opacity-75">{item.summary}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <EvidenceDetail item={selectedEvidence} recovered={selectedEvidence.status === "locked" && unlocked.includes(selectedEvidence.id)} />
-              </div>
-            ) : (
-              <EmptyEvidencePanel currentCase={currentCase} onUseTip={setTerminalInput} />
-            )
-          )}
-
-          {activeTab === "messages" && (
-            visibleEvidence.length > 0 ? <MessagesPanel currentCase={currentCase} /> : <LockedStartPanel title="Переписки закрыты" text="Сначала найдите первую цифровую улику через поиск. После этого откроются чаты, голосовые и утечки по делу." />
-          )}
-
-          {activeTab === "timeline" && (
-            visibleEvidence.length > 0 ? <TimelinePanel currentCase={currentCase} /> : <LockedStartPanel title="Линия времени пуста" text="Пока есть только описание события. Таймлайн соберется после первой найденной улики или запроса по времени." />
-          )}
-
-          {activeTab === "network" && (
-            selectedSuspect ? (
-              <NetworkPanel
+            {activeTab === "network" && (
+              <SimplePeoplePanel
                 currentCase={currentCase}
                 selectedSuspect={selectedSuspect}
                 selectedSuspectId={selectedSuspectId}
                 pressure={pressure}
+                chat={chat}
+                question={question}
                 visibleEvidence={visibleEvidence}
-                theory={theory}
-                theoryResult={theoryResult}
-                onSelectSuspect={setSelectedSuspectId}
-                onSetTheory={setTheory}
-                onToggleTheoryEvidence={toggleTheoryEvidence}
-                onSubmitTheory={submitTheory}
+                onSelectSuspect={(id) => {
+                  setSelectedSuspectId(id);
+                  setTheory((current) => ({ ...current, suspect: current.suspect || id }));
+                }}
+                onQuestionChange={setQuestion}
+                onSubmitQuestion={sendQuestion}
               />
-            ) : (
-              <LockedStartPanel title="Связи еще не построены" text="Подозреваемые не показываются заранее. Откройте первую улику, затем возвращайтесь к карте связей и допросам." />
-            )
+            )}
+
+            {activeTab === "timeline" && (
+              visibleEvidence.length > 0 ? (
+                <TimelinePanel currentCase={currentCase} />
+              ) : (
+                <LockedStartPanel title="Линия времени появится после первой улики" text="Сначала откройте любой первый след. После этого здесь будет проще сравнить минуты, действия и алиби." />
+              )
+            )}
+          </section>
+
+          <aside className="space-y-4">
+            <NextActionCard
+              currentCase={currentCase}
+              visibleEvidence={visibleEvidence}
+              lockedCount={lockedEvidence.length}
+              terminalInput={terminalInput}
+              terminalLog={terminalLog}
+              onInputChange={setTerminalInput}
+              onRunTerminal={runTerminal}
+              onQuickSearch={runQuickSearch}
+              onGoEvidence={() => setActiveTab("evidence")}
+              onGoPeople={() => setActiveTab("network")}
+            />
+
+            <section className="rounded-md border border-[#dedbd2] bg-white p-4 shadow-sm">
+              <div className="mb-2 text-sm font-bold text-[#20251f]">Как играть</div>
+              <ol className="grid gap-2 text-sm leading-6 text-[#5d584f]">
+                <li>1. Прочитайте, что случилось.</li>
+                <li>2. Нажмите один из первых следов.</li>
+                <li>3. Откройте улику и проверьте, кому она противоречит.</li>
+                <li>4. Переходите к людям и задавайте вопросы по конкретным фактам.</li>
+              </ol>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function InvestigationSteps({ foundCount, suspectSelected }: { foundCount: number; suspectSelected: boolean }) {
+  const steps = [
+    { title: "Понять событие", detail: "Прочитать короткое описание.", done: true },
+    { title: "Открыть первую улику", detail: "Нажать один понятный след.", done: foundCount > 0 },
+    { title: "Проверить людей", detail: "Сравнить слова с фактами.", done: suspectSelected },
+    { title: "Собрать версию", detail: "Выбрать мотив и доказательства.", done: foundCount >= 3 },
+  ];
+
+  return (
+    <section className="grid gap-2 md:grid-cols-4">
+      {steps.map((step, index) => (
+        <article
+          key={step.title}
+          className={cx(
+            "rounded-md border p-4 shadow-sm",
+            step.done ? "border-[#6f7f4e]/35 bg-[#eef2e8]" : "border-[#dedbd2] bg-white",
           )}
-        </section>
+        >
+          <div className="mb-3 flex items-center gap-3">
+            <span
+              style={monoFont}
+              className={cx(
+                "grid h-8 w-8 place-items-center rounded-full text-xs font-bold",
+                step.done ? "bg-[#6f7f4e] text-white" : "bg-[#e9e6dc] text-[#5d584f]",
+              )}
+            >
+              {index + 1}
+            </span>
+            <div className="font-bold text-[#20251f]">{step.title}</div>
+          </div>
+          <p className="text-sm leading-5 text-[#686256]">{step.detail}</p>
+        </article>
+      ))}
+    </section>
+  );
+}
 
-        {selectedSuspect && (
-          <aside className="rounded-md border border-stone-800 bg-[#10110f]">
-            <div className="border-b border-stone-800 p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-stone-200">
-                <MessageSquare className="h-4 w-4" />
-                Канал допроса
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {currentCase.suspects.map((suspect) => (
-                  <button
-                    key={suspect.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedSuspectId(suspect.id);
-                      setTheory((current) => ({ ...current, suspect: current.suspect || suspect.id }));
-                    }}
-                    className={cx(
-                      "rounded-md border px-3 py-2 text-left text-xs transition",
-                      selectedSuspectId === suspect.id
-                        ? colorClasses[suspect.color]
-                        : "border-stone-800 bg-stone-950 text-stone-400 hover:border-stone-600",
-                    )}
-                  >
-                    <div className="truncate font-medium">{suspect.name}</div>
-                    <div style={monoFont} className="opacity-70">
-                      стресс {pressure[suspect.id] ?? suspect.stress}%
-                    </div>
-                  </button>
-                ))}
-              </div>
+function NextActionCard({
+  currentCase,
+  visibleEvidence,
+  lockedCount,
+  terminalInput,
+  terminalLog,
+  onInputChange,
+  onRunTerminal,
+  onQuickSearch,
+  onGoEvidence,
+  onGoPeople,
+}: {
+  currentCase: DetectiveCase;
+  visibleEvidence: Evidence[];
+  lockedCount: number;
+  terminalInput: string;
+  terminalLog: string[];
+  onInputChange: (value: string) => void;
+  onRunTerminal: (event: FormEvent<HTMLFormElement>) => void;
+  onQuickSearch: (hint: string) => void;
+  onGoEvidence: () => void;
+  onGoPeople: () => void;
+}) {
+  const hasEvidence = visibleEvidence.length > 0;
+
+  return (
+    <section className="rounded-md border border-[#dedbd2] bg-white p-4 shadow-sm">
+      <div className="mb-2 text-sm font-bold text-[#20251f]">Что сделать сейчас</div>
+      <p className="text-sm leading-6 text-[#686256]">
+        {hasEvidence
+          ? "У вас уже есть первые материалы. Откройте улику или переходите к людям, чтобы проверить алиби."
+          : "Начните с одного простого действия. Никаких команд знать не нужно."}
+      </p>
+
+      {!hasEvidence && (
+        <div className="mt-4 grid gap-2">
+          {starterActions[currentCase.id].map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              onClick={() => onQuickSearch(action.hint)}
+              className="flex min-h-12 items-center justify-between gap-3 rounded-md border border-[#d8d5ca] bg-[#fbfbf8] px-3 text-left text-sm font-semibold text-[#20251f] transition hover:border-[#9f9a8e] hover:bg-[#f1efe7]"
+            >
+              <span>{action.label}</span>
+              <Search className="h-4 w-4 text-[#6f7f4e]" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {hasEvidence && (
+        <div className="mt-4 grid gap-2">
+          <button
+            type="button"
+            onClick={onGoEvidence}
+            className="min-h-11 rounded-md bg-[#20251f] px-4 text-sm font-semibold text-white transition hover:bg-[#343b33]"
+          >
+            Открыть найденные улики
+          </button>
+          <button
+            type="button"
+            onClick={onGoPeople}
+            className="min-h-11 rounded-md border border-[#d8d5ca] bg-white px-4 text-sm font-semibold text-[#20251f] transition hover:bg-[#f1efe7]"
+          >
+            Проверить людей
+          </button>
+        </div>
+      )}
+
+      <form onSubmit={onRunTerminal} className="mt-4 flex gap-2">
+        <input
+          value={terminalInput}
+          onChange={(event) => onInputChange(event.target.value)}
+          className="min-h-11 min-w-0 flex-1 rounded-md border border-[#d8d5ca] bg-[#fbfbf8] px-3 text-sm text-[#20251f] outline-none focus:border-[#6f7f4e]"
+          placeholder="или введите свой поиск"
+        />
+        <button
+          type="submit"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-[#6f7f4e] text-white transition hover:bg-[#5d6b42]"
+          aria-label="Искать"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+      </form>
+
+      <div className="mt-4 rounded-md bg-[#f6f5f0] p-3 text-sm text-[#686256]">
+        <div className="font-semibold text-[#20251f]">Состояние дела</div>
+        <div className="mt-1">Найдено: {visibleEvidence.length}</div>
+        <div>Еще скрыто: {lockedCount}</div>
+      </div>
+
+      {terminalLog.length > 0 && (
+        <div className="mt-3 grid gap-2 text-xs leading-5 text-[#686256]">
+          {terminalLog.slice(0, 2).map((line, index) => (
+            <div key={`${line}-${index}`} className="rounded-md border border-[#e5e1d8] bg-[#fbfbf8] p-2">
+              {line}
             </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
-            <div className="max-h-[560px] min-h-[420px] overflow-auto p-4">
-              <div className="mb-4 flex items-center gap-3">
-                <div className="grid h-11 w-11 place-items-center rounded-md border border-stone-700 bg-stone-950 text-sm font-semibold">
-                  {selectedSuspect.avatar}
+function SimpleEvidencePanel({
+  currentCase,
+  selectedEvidence,
+  visibleEvidence,
+  unlocked,
+  onSelectEvidence,
+  onSearch,
+}: {
+  currentCase: DetectiveCase;
+  selectedEvidence?: Evidence;
+  visibleEvidence: Evidence[];
+  unlocked: string[];
+  onSelectEvidence: (id: string) => void;
+  onSearch: (hint: string) => void;
+}) {
+  if (!selectedEvidence) {
+    return <EmptyEvidencePanel currentCase={currentCase} onUseTip={onSearch} />;
+  }
+
+  return (
+    <div className="grid min-h-[640px] gap-0 lg:grid-cols-[340px_minmax(0,1fr)]">
+      <div className="border-b border-[#e5e1d8] bg-[#fbfbf8] lg:border-b-0 lg:border-r">
+        <div className="border-b border-[#e5e1d8] p-4">
+          <div className="text-sm font-bold text-[#20251f]">Найденные улики</div>
+          <p className="mt-1 text-sm leading-5 text-[#686256]">Открывайте по одной и смотрите, кому она противоречит.</p>
+        </div>
+        {visibleEvidence.map((item) => {
+          const Icon = kindIcon[item.kind];
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onSelectEvidence(item.id)}
+              className={cx(
+                "block w-full border-b border-[#e5e1d8] p-4 text-left transition",
+                selectedEvidence.id === item.id ? "bg-[#eef2e8]" : "bg-white hover:bg-[#f6f5f0]",
+              )}
+            >
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#20251f]">
+                <Icon className="h-4 w-4 text-[#6f7f4e]" />
+                <span>{item.title}</span>
+              </div>
+              <p className="mt-2 text-sm leading-5 text-[#686256]">{item.summary}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      <SimpleEvidenceDetail item={selectedEvidence} recovered={selectedEvidence.status === "locked" && unlocked.includes(selectedEvidence.id)} />
+    </div>
+  );
+}
+
+function SimpleEvidenceDetail({ item, recovered }: { item: Evidence; recovered: boolean }) {
+  const Icon = kindIcon[item.kind];
+  const displayStatus = recovered ? "recovered" : item.status;
+
+  return (
+    <article className="p-5 lg:p-7">
+      <div className="mb-5 flex flex-col gap-3 border-b border-[#e5e1d8] pb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-sm text-[#686256]">
+            <Icon className="h-4 w-4" />
+            {kindLabel[item.kind]} / {item.source}
+          </div>
+          <h2 className="text-2xl font-black text-[#20251f]">{item.title}</h2>
+        </div>
+        <span className="w-fit rounded-md bg-[#f1efe7] px-3 py-2 text-xs font-semibold uppercase text-[#5d584f]">
+          {statusLabel[displayStatus]}
+        </span>
+      </div>
+
+      <div className="grid gap-4">
+        <section className="rounded-md border border-[#e5e1d8] bg-[#fbfbf8] p-4">
+          <div className="mb-2 text-sm font-bold text-[#20251f]">Что в улике</div>
+          <p className="leading-7 text-[#4e4a42]">{item.body}</p>
+        </section>
+        <section className="rounded-md border border-[#dfc8bc] bg-[#fbf1ed] p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#7c3f2e]">
+            <AlertTriangle className="h-4 w-4" />
+            На что обратить внимание
+          </div>
+          <p className="leading-7 text-[#5c3b32]">{item.contradiction}</p>
+        </section>
+      </div>
+    </article>
+  );
+}
+
+function SimplePeoplePanel({
+  currentCase,
+  selectedSuspect,
+  selectedSuspectId,
+  pressure,
+  chat,
+  question,
+  visibleEvidence,
+  onSelectSuspect,
+  onQuestionChange,
+  onSubmitQuestion,
+}: {
+  currentCase: DetectiveCase;
+  selectedSuspect?: Suspect;
+  selectedSuspectId: string;
+  pressure: Record<string, number>;
+  chat: Record<string, NpcMessage[]>;
+  question: string;
+  visibleEvidence: Evidence[];
+  onSelectSuspect: (id: string) => void;
+  onQuestionChange: (value: string) => void;
+  onSubmitQuestion: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  if (visibleEvidence.length === 0) {
+    return (
+      <LockedStartPanel
+        title="Люди откроются после первой улики"
+        text="Так проще: сначала факт, потом вопросы. Откройте любой первый след, и здесь появятся подозреваемые."
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-7">
+      <section>
+        <div className="mb-3 text-sm font-bold text-[#20251f]">Кого проверить</div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {currentCase.suspects.map((suspect) => (
+            <button
+              key={suspect.id}
+              type="button"
+              onClick={() => onSelectSuspect(suspect.id)}
+              className={cx(
+                "rounded-md border p-4 text-left transition",
+                selectedSuspectId === suspect.id ? "border-[#6f7f4e] bg-[#eef2e8]" : "border-[#e5e1d8] bg-[#fbfbf8] hover:bg-[#f6f5f0]",
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-md bg-[#20251f] text-sm font-bold text-white">
+                  {suspect.avatar}
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate font-semibold">{selectedSuspect.name}</div>
-                  <div style={monoFont} className="truncate text-xs text-stone-500">
-                    {selectedSuspect.username}
+                  <div className="truncate font-bold text-[#20251f]">{suspect.name}</div>
+                  <div style={monoFont} className="truncate text-xs text-[#777164]">
+                    {suspect.username}
                   </div>
                 </div>
               </div>
+              <p className="mt-3 text-sm leading-6 text-[#5d584f]">{suspect.role}</p>
+              <div className="mt-3 text-xs font-semibold uppercase text-[#8b867b]">Что проверить</div>
+              <p className="mt-1 text-sm leading-6 text-[#5d584f]">{suspect.alibi}</p>
+            </button>
+          ))}
+        </div>
+      </section>
 
+      <aside className="rounded-md border border-[#e5e1d8] bg-[#fbfbf8]">
+        {selectedSuspect ? (
+          <>
+            <div className="border-b border-[#e5e1d8] p-4">
+              <div className="font-bold text-[#20251f]">{selectedSuspect.name}</div>
+              <div className="mt-1 text-sm text-[#686256]">{selectedSuspect.publicMotive}</div>
+              <div className="mt-3 h-2 rounded-full bg-[#e9e6dc]">
+                <div className="h-full rounded-full bg-[#b56f5a]" style={{ width: `${pressure[selectedSuspect.id] ?? selectedSuspect.stress}%` }} />
+              </div>
+            </div>
+            <div className="max-h-[360px] overflow-auto p-4">
               <div className="grid gap-3">
                 {(chat[selectedSuspectId] ?? []).map((message, index) => (
                   <div
                     key={`${selectedSuspectId}-${message.time}-${index}`}
                     className={cx(
-                      "max-w-[92%] rounded-md border p-3 text-sm leading-6",
-                      message.from === "player"
-                        ? "ml-auto border-stone-600 bg-stone-100 text-stone-950"
-                        : "border-stone-800 bg-stone-950 text-stone-300",
+                      "rounded-md border p-3 text-sm leading-6",
+                      message.from === "player" ? "border-[#d8d5ca] bg-white" : "border-[#e5e1d8] bg-[#f6f5f0]",
                     )}
                   >
-                    <div style={monoFont} className="mb-1 text-[10px] uppercase opacity-50">
-                      {message.from === "player" ? "детектив" : selectedSuspect.username} / {message.time}
+                    <div style={monoFont} className="mb-1 text-[10px] uppercase text-[#8b867b]">
+                      {message.from === "player" ? "детектив" : selectedSuspect.username}
                     </div>
                     {message.text}
                   </div>
                 ))}
               </div>
             </div>
-
-            <form onSubmit={sendQuestion} className="border-t border-stone-800 p-4">
+            <form onSubmit={onSubmitQuestion} className="border-t border-[#e5e1d8] p-4">
               <textarea
                 value={question}
-                onChange={(event) => setQuestion(event.target.value)}
-                className="min-h-24 w-full resize-none rounded-md border border-stone-800 bg-stone-950 p-3 text-sm leading-6 text-stone-100 outline-none focus:border-stone-400"
-                placeholder="Задайте вопрос по конкретной улике"
+                onChange={(event) => onQuestionChange(event.target.value)}
+                className="min-h-24 w-full resize-none rounded-md border border-[#d8d5ca] bg-white p-3 text-sm leading-6 text-[#20251f] outline-none focus:border-[#6f7f4e]"
+                placeholder="Спросить по факту из улики"
               />
               <button
                 type="submit"
-                className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-stone-100 bg-stone-100 px-4 text-sm font-medium text-stone-950 hover:bg-white"
+                className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[#20251f] px-4 text-sm font-semibold text-white transition hover:bg-[#343b33]"
               >
                 <Send className="h-4 w-4" />
-                Отправить вопрос
+                Отправить
               </button>
             </form>
-          </aside>
+          </>
+        ) : (
+          <div className="p-4 text-sm leading-6 text-[#686256]">Выберите человека слева, чтобы задать вопросы.</div>
         )}
-      </div>
-    </main>
+      </aside>
+    </div>
   );
 }
 
 function CaseMenu({ onOpenCase }: { onOpenCase: (nextCase: DetectiveCase) => void }) {
   return (
-    <main style={detectiveFont} className="min-h-screen bg-[#090808] text-stone-100">
-      <section className="mx-auto grid min-h-screen w-full max-w-[1500px] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-7 px-4 py-6 sm:px-6 lg:px-8">
-        <header className="mx-auto max-w-5xl pt-4 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.06] px-4 py-2 text-sm text-stone-200">
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-[#acdb26] text-black">
+    <main style={detectiveFont} className="min-h-screen bg-[#f4f4f2] text-[#20251f]">
+      <section className="mx-auto grid min-h-screen w-full max-w-[1360px] grid-rows-[auto_minmax(0,1fr)_auto] gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <header className="rounded-md border border-[#dedbd2] bg-white p-5 shadow-sm lg:p-8">
+          <div className="inline-flex items-center gap-2 rounded-md border border-[#d8d5ca] bg-[#fbfbf8] px-3 py-2 text-sm text-[#5d584f]">
+            <span className="grid h-6 w-6 place-items-center rounded-md bg-[#20251f] text-white">
               <ShieldAlert className="h-3.5 w-3.5" />
             </span>
-              Закрытый раздел. В главное меню сайта не добавлен.
+            Закрытый раздел. В главное меню сайта не добавлен.
           </div>
-          <h1 className="mt-8 text-5xl font-black leading-none text-white sm:text-7xl">Архив расследований</h1>
-          <p className="mx-auto mt-5 max-w-3xl text-base leading-7 text-stone-300 sm:text-lg">
-            Выберите дело. Внутри сначала будет только описание события, а улики, переписки и подозреваемые появятся после ваших поисковых действий. Все три сюжета вымышлены; публичные имена используются как контекст ARG, а не как обвинение реальных людей.
+          <h1 className="mt-6 max-w-4xl text-4xl font-black leading-none text-[#20251f] sm:text-6xl">Выберите дело</h1>
+          <p className="mt-4 max-w-3xl text-base leading-7 text-[#5d584f] sm:text-lg">
+            Внутри все начинается с короткого описания. Затем вы нажимаете понятный первый след, открываете улики и проверяете людей. Без сложных команд и лишнего шума.
           </p>
-        </header>
-
-        <div className="bg-[#acdb26] text-black">
-          <div style={monoFont} className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-8 gap-y-2 px-4 py-3 text-xs font-bold uppercase">
-            <span>3 дела</span>
-            <span>0% стартовый прогресс</span>
-            <span>улики скрыты</span>
-            <span>адрес: /detective</span>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {["0% на старте", "3 дела", "улики открываются по шагам", "/detective"].map((item) => (
+              <span key={item} className="rounded-md border border-[#dedbd2] bg-[#f6f5f0] px-3 py-2 text-sm font-semibold text-[#5d584f]">
+                {item}
+              </span>
+            ))}
           </div>
-        </div>
+        </header>
 
         <div className="grid content-center gap-4 lg:grid-cols-3">
           {detectiveCases.map((item) => (
             <article
               key={item.id}
-              className={cx(
-                "group grid min-h-[600px] grid-rows-[220px_auto] overflow-hidden rounded-md border border-white bg-white text-black shadow-2xl shadow-black/30 transition hover:-translate-y-1",
-              )}
+              className="group grid min-h-[560px] grid-rows-[180px_auto] overflow-hidden rounded-md border border-[#dedbd2] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
               <CaseSignalArt currentCase={item} />
               <div className="grid gap-4 p-5">
                 <div>
-                  <div className="mb-3 inline-flex rounded-full border border-black bg-black px-3 py-1 text-xs font-bold text-white">
+                  <div className="mb-3 inline-flex rounded-md border border-[#d8d5ca] bg-[#fbfbf8] px-3 py-1 text-xs font-bold text-[#5d584f]">
                     {item.connectedTo}
                   </div>
-                  <h2 className="text-3xl font-black leading-none text-black">{item.menuTitle}</h2>
-                  <p className="mt-3 text-sm leading-6 text-black/70">{item.description}</p>
+                  <h2 className="text-2xl font-black leading-tight text-[#20251f]">{item.menuTitle}</h2>
+                  <p className="mt-3 text-sm leading-6 text-[#5d584f]">{item.description}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -768,7 +958,7 @@ function CaseMenu({ onOpenCase }: { onOpenCase: (nextCase: DetectiveCase) => voi
                 <button
                   type="button"
                   onClick={() => onOpenCase(item)}
-                  className="mt-auto inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-black bg-black px-4 text-sm font-black text-white transition hover:bg-[#acdb26] hover:text-black"
+                  className="mt-auto inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-[#20251f] px-4 text-sm font-bold text-white transition hover:bg-[#343b33]"
                 >
                   <FolderOpen className="h-4 w-4" />
                   Открыть дело
@@ -778,7 +968,7 @@ function CaseMenu({ onOpenCase }: { onOpenCase: (nextCase: DetectiveCase) => voi
           ))}
         </div>
 
-        <footer className="border-t border-white/10 pt-4 text-sm text-stone-500">
+        <footer className="border-t border-[#dedbd2] pt-4 text-sm text-[#777164]">
           Доступ напрямую: /detective. Страница закрыта от индексации и не размещена на главной.
         </footer>
       </section>
@@ -787,29 +977,27 @@ function CaseMenu({ onOpenCase }: { onOpenCase: (nextCase: DetectiveCase) => voi
 }
 
 function CaseSignalArt({ currentCase }: { currentCase: DetectiveCase }) {
-  const accent = caseAccent[currentCase.id].svg;
   const label = currentCase.id === "habarhub" ? "HABAR" : currentCase.id === "keanu" ? "K-09" : "D-22";
 
   return (
-    <div className="relative overflow-hidden bg-[#0a0b0a]">
+    <div className="relative overflow-hidden bg-[#f6f5f0]">
       <svg viewBox="0 0 720 360" className="h-full w-full" role="img" aria-label={`Обложка дела ${currentCase.menuTitle}`}>
-        <rect width="720" height="360" fill="#0a0b0a" />
-        <path d="M0 72H720M0 144H720M0 216H720M0 288H720M90 0V360M180 0V360M270 0V360M360 0V360M450 0V360M540 0V360M630 0V360" stroke="#292824" strokeWidth="1" />
-        <rect x="46" y="42" width="226" height="138" fill="none" stroke={accent} strokeOpacity="0.65" strokeWidth="2" />
-        <rect x="448" y="58" width="210" height="128" fill="none" stroke="#f5f5f4" strokeOpacity="0.16" strokeWidth="2" />
-        <path d="M72 244C118 202 142 282 190 238C238 194 276 266 320 224C362 184 404 260 452 218C500 176 544 244 622 206" fill="none" stroke={accent} strokeWidth="5" strokeLinecap="round" />
-        <path d="M96 86H218M96 118H176M96 150H234" stroke="#f5f5f4" strokeOpacity="0.72" strokeWidth="9" strokeLinecap="round" />
-        <path d="M474 96H612M474 132H580M474 164H635" stroke={accent} strokeOpacity="0.82" strokeWidth="8" strokeLinecap="round" />
-        <circle cx="362" cy="112" r="34" fill="none" stroke={accent} strokeOpacity="0.7" strokeWidth="3" />
-        <path d="M362 78V146M328 112H396" stroke={accent} strokeOpacity="0.7" strokeWidth="3" />
-        <text x="48" y="316" fill="#f5f5f4" fontSize="44" fontFamily="Segoe UI, Arial, sans-serif" fontWeight="700">
+        <rect width="720" height="360" fill="#f6f5f0" />
+        <path d="M0 72H720M0 144H720M0 216H720M0 288H720M90 0V360M180 0V360M270 0V360M360 0V360M450 0V360M540 0V360M630 0V360" stroke="#dedbd2" strokeWidth="1" />
+        <rect x="48" y="42" width="250" height="138" fill="#ffffff" stroke="#d8d5ca" strokeWidth="2" />
+        <rect x="430" y="58" width="210" height="128" fill="#ffffff" stroke="#d8d5ca" strokeWidth="2" />
+        <path d="M72 244C118 202 142 282 190 238C238 194 276 266 320 224C362 184 404 260 452 218C500 176 544 244 622 206" fill="none" stroke="#6f7f4e" strokeWidth="5" strokeLinecap="round" />
+        <path d="M96 86H236M96 118H188M96 150H252" stroke="#20251f" strokeOpacity="0.72" strokeWidth="9" strokeLinecap="round" />
+        <path d="M456 96H594M456 132H562M456 164H616" stroke="#b56f5a" strokeOpacity="0.82" strokeWidth="8" strokeLinecap="round" />
+        <circle cx="362" cy="112" r="34" fill="none" stroke="#6f7f4e" strokeOpacity="0.75" strokeWidth="3" />
+        <path d="M362 78V146M328 112H396" stroke="#6f7f4e" strokeOpacity="0.75" strokeWidth="3" />
+        <text x="48" y="316" fill="#20251f" fontSize="44" fontFamily="Segoe UI, Arial, sans-serif" fontWeight="700">
           {label}
         </text>
-        <text x="48" y="340" fill="#a8a29e" fontSize="18" fontFamily="Segoe UI, Arial, sans-serif">
-          цифровое расследование
+        <text x="48" y="340" fill="#686256" fontSize="18" fontFamily="Segoe UI, Arial, sans-serif">
+          расследование
         </text>
       </svg>
-      <div className="absolute inset-x-0 bottom-0 h-16 border-t border-stone-700/40 bg-[#0a0b0a]/80" />
     </div>
   );
 }
@@ -891,36 +1079,36 @@ function SmallFact({ label, value, wide }: { label: string; value: string; wide?
 
 function TaskBoard({ currentCase }: { currentCase: DetectiveCase }) {
   return (
-    <section className="rounded-md border border-white/10 bg-white/[0.06] p-4">
+    <section className="rounded-md border border-[#e5e1d8] bg-[#fbfbf8] p-4">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-sm font-semibold text-stone-100">
+          <div className="flex items-center gap-2 text-sm font-bold text-[#20251f]">
             <ListChecks className="h-4 w-4" />
-            Что нужно разгадать
+            Задачи по делу
           </div>
-          <p className="mt-1 text-sm text-stone-400">Идите по задачам, но проверяйте версии в любом порядке.</p>
+          <p className="mt-1 text-sm text-[#686256]">Это не квесты с одним путем, а простой чек-лист проверки версии.</p>
         </div>
-        <span className="w-fit rounded-full border border-[#acdb26] bg-[#acdb26] px-3 py-1 text-xs font-bold text-black">
+        <span className="w-fit rounded-md border border-[#d8d5ca] bg-white px-3 py-1 text-xs font-bold text-[#5d584f]">
           {currentCase.tasks.length} задач
         </span>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         {currentCase.tasks.map((task, index) => (
-          <article key={task.title} className="rounded-md border border-white/10 bg-black p-4">
+          <article key={task.title} className="rounded-md border border-[#e5e1d8] bg-white p-4">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <span
                   style={monoFont}
-                  className="grid h-8 w-8 place-items-center rounded-full border border-[#acdb26] bg-[#acdb26] text-xs font-bold text-black"
+                  className="grid h-8 w-8 place-items-center rounded-full bg-[#eef2e8] text-xs font-bold text-[#4f6638]"
                 >
                   {index + 1}
                 </span>
-                <h3 className="text-base font-semibold leading-6 text-stone-50">{task.title}</h3>
+                <h3 className="text-base font-bold leading-6 text-[#20251f]">{task.title}</h3>
               </div>
-              <span className="shrink-0 rounded-full border border-stone-700 px-2 py-1 text-xs text-stone-400">не начато</span>
+              <span className="shrink-0 rounded-md border border-[#d8d5ca] px-2 py-1 text-xs text-[#777164]">не начато</span>
             </div>
-            <p className="text-sm leading-6 text-stone-300">{task.detail}</p>
-            <div style={monoFont} className="mt-3 text-xs uppercase text-stone-600">
+            <p className="text-sm leading-6 text-[#5d584f]">{task.detail}</p>
+            <div style={monoFont} className="mt-3 text-xs uppercase text-[#8b867b]">
               {task.kind}
             </div>
           </article>
@@ -941,20 +1129,20 @@ function SummaryPanel({
 }) {
   return (
     <div className="grid gap-4 p-4 lg:p-6">
-      <section className="rounded-md border border-white bg-white p-5 text-black lg:p-7">
-        <div style={monoFont} className="mb-4 text-xs font-bold uppercase text-black/50">
-          старт дела / архив пуст
+      <section className="rounded-md border border-[#e5e1d8] bg-white p-5 lg:p-7">
+        <div style={monoFont} className="mb-4 text-xs font-bold uppercase text-[#8b867b]">
+          сначала только вводная
         </div>
-        <h2 className="text-4xl font-black leading-none sm:text-5xl">Что произошло</h2>
-        <p className="mt-5 max-w-4xl text-lg leading-8 text-black/80">{currentCase.whatHappened}</p>
+        <h2 className="text-3xl font-black leading-tight text-[#20251f] sm:text-4xl">Что произошло</h2>
+        <p className="mt-4 max-w-4xl text-lg leading-8 text-[#4e4a42]">{currentCase.whatHappened}</p>
         <div className="mt-6 grid gap-3 lg:grid-cols-2">
-          <div className="rounded-md border border-black/10 bg-[#f3f4ef] p-4">
-            <div className="mb-2 text-sm font-black">Главная тайна</div>
-            <p className="leading-7 text-black/70">{currentCase.mainMystery}</p>
+          <div className="rounded-md border border-[#e5e1d8] bg-[#fbfbf8] p-4">
+            <div className="mb-2 text-sm font-bold text-[#20251f]">Главный вопрос</div>
+            <p className="leading-7 text-[#5d584f]">{currentCase.mainMystery}</p>
           </div>
-          <div className="rounded-md border border-black/10 bg-[#acdb26] p-4">
-            <div className="mb-2 text-sm font-black">Что делать игроку</div>
-            <p className="leading-7 text-black/80">{currentCase.investigatorGoal}</p>
+          <div className="rounded-md border border-[#dfe5d7] bg-[#eef2e8] p-4">
+            <div className="mb-2 text-sm font-bold text-[#20251f]">Что нужно сделать</div>
+            <p className="leading-7 text-[#4d5b3c]">{currentCase.investigatorGoal}</p>
           </div>
         </div>
       </section>
@@ -962,35 +1150,35 @@ function SummaryPanel({
       <TaskBoard currentCase={currentCase} />
 
       {foundCount === 0 ? (
-        <section className="rounded-md border border-[#acdb26]/40 bg-[#acdb26]/10 p-4">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#d9ff6a]">
+        <section className="rounded-md border border-[#dfe5d7] bg-[#eef2e8] p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#4f6638]">
             <Lock className="h-4 w-4" />
-            Дело еще не раскрыто
+            Дальше: открыть первый след
           </div>
-          <p className="max-w-3xl text-sm leading-6 text-stone-300">
-            Подозреваемые, ложные следы, переписки и концовки скрыты. Начните с первых направлений слева: введите один из запросов в поиск, чтобы открыть первый цифровой след.
+          <p className="max-w-3xl text-sm leading-6 text-[#4d5b3c]">
+            Нажмите одну из кнопок справа в блоке “Что сделать сейчас”. После первой улики появятся люди и конкретные вопросы.
           </p>
         </section>
       ) : (
         <>
           <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-            <section className="rounded-md border border-stone-800 bg-stone-950 p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-stone-200">
-                <AlertTriangle className="h-4 w-4 text-amber-200" />
-                Ложные следы
+            <section className="rounded-md border border-[#e5e1d8] bg-[#fbfbf8] p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-bold text-[#20251f]">
+                <AlertTriangle className="h-4 w-4 text-[#b56f5a]" />
+                Что может сбить с толку
               </div>
               <div className="grid gap-3">
                 {currentCase.falseLeads.map((lead) => (
-                  <div key={lead} className="border-l border-stone-700 pl-3 text-sm leading-6 text-stone-300">
+                  <div key={lead} className="border-l border-[#d8d5ca] pl-3 text-sm leading-6 text-[#5d584f]">
                     {lead}
                   </div>
                 ))}
               </div>
             </section>
 
-            <section className="rounded-md border border-stone-800 bg-stone-950 p-4">
-              <div className="mb-3 text-sm font-semibold text-stone-200">Первые подозреваемые</div>
-              <p className="text-sm leading-6 text-stone-400">
+            <section className="rounded-md border border-[#e5e1d8] bg-[#fbfbf8] p-4">
+              <div className="mb-3 text-sm font-bold text-[#20251f]">Первые люди</div>
+              <p className="text-sm leading-6 text-[#5d584f]">
                 Эти профили появляются после первого найденного следа. Проверяйте их алиби через карту связей и канал допроса.
               </p>
             </section>
@@ -1002,31 +1190,31 @@ function SummaryPanel({
                 key={suspect.id}
                 type="button"
                 onClick={() => onOpenSuspect(suspect.id)}
-                className={cx("min-h-56 rounded-md border bg-stone-950 p-4 text-left transition hover:-translate-y-0.5", colorClasses[suspect.color])}
+                className="min-h-52 rounded-md border border-[#e5e1d8] bg-[#fbfbf8] p-4 text-left transition hover:bg-[#f6f5f0]"
               >
                 <div className="mb-3 flex items-center gap-3">
-                  <div className="grid h-10 w-10 place-items-center rounded-md border border-current/40 bg-black/30 text-sm font-semibold">
+                  <div className="grid h-10 w-10 place-items-center rounded-md bg-[#20251f] text-sm font-bold text-white">
                     {suspect.avatar}
                   </div>
                   <div className="min-w-0">
-                    <div className="truncate font-semibold">{suspect.name}</div>
-                    <div style={monoFont} className="truncate text-xs opacity-70">
+                    <div className="truncate font-bold text-[#20251f]">{suspect.name}</div>
+                    <div style={monoFont} className="truncate text-xs text-[#777164]">
                       {suspect.username}
                     </div>
                   </div>
                 </div>
-                <div className="text-sm leading-6 text-stone-300">{suspect.role}</div>
-                <div className="mt-3 text-xs text-stone-500">Алиби</div>
-                <div className="text-sm leading-6 text-stone-300">{suspect.alibi}</div>
+                <div className="text-sm leading-6 text-[#5d584f]">{suspect.role}</div>
+                <div className="mt-3 text-xs font-semibold uppercase text-[#8b867b]">Алиби</div>
+                <div className="text-sm leading-6 text-[#5d584f]">{suspect.alibi}</div>
               </button>
             ))}
           </div>
 
-          <section className="rounded-md border border-stone-800 bg-stone-950 p-4">
-            <div className="mb-3 text-sm font-semibold text-stone-200">Возможные концовки</div>
+          <section className="rounded-md border border-[#e5e1d8] bg-[#fbfbf8] p-4">
+            <div className="mb-3 text-sm font-bold text-[#20251f]">Возможные итоги</div>
             <div className="grid gap-3 md:grid-cols-3">
               {currentCase.endings.map((ending) => (
-                <div key={ending} className="rounded-md border border-stone-800 bg-[#10110f] p-3 text-sm leading-6 text-stone-300">
+                <div key={ending} className="rounded-md border border-[#e5e1d8] bg-white p-3 text-sm leading-6 text-[#5d584f]">
                   {ending}
                 </div>
               ))}
@@ -1040,24 +1228,24 @@ function SummaryPanel({
 
 function EmptyEvidencePanel({ currentCase, onUseTip }: { currentCase: DetectiveCase; onUseTip: (tip: string) => void }) {
   return (
-    <div className="grid min-h-[720px] place-items-center p-4 lg:p-6">
-      <section className="w-full max-w-3xl rounded-md border border-white bg-white p-6 text-black lg:p-8">
-        <div style={monoFont} className="mb-4 text-xs font-bold uppercase text-black/50">
+    <div className="grid min-h-[560px] place-items-center p-4 lg:p-6">
+      <section className="w-full max-w-3xl rounded-md border border-[#e5e1d8] bg-white p-6 lg:p-8">
+        <div style={monoFont} className="mb-4 text-xs font-bold uppercase text-[#8b867b]">
           0 / {currentCase.evidence.length} улик
         </div>
-        <h2 className="text-4xl font-black leading-none">Архив пока пуст</h2>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-black/70">
-          Сначала известно только то, что произошло. Улики не лежат готовым списком: их нужно найти через поисковые направления, вопросы и противоречия.
+        <h2 className="text-3xl font-black leading-tight text-[#20251f]">Улик пока нет</h2>
+        <p className="mt-4 max-w-2xl text-base leading-7 text-[#5d584f]">
+          Это нормально. Начните с одного простого действия ниже, и первая улика откроется автоматически.
         </p>
         <div className="mt-6 grid gap-2 sm:grid-cols-3">
-          {currentCase.terminalTips.map((tip) => (
+          {starterActions[currentCase.id].map((action) => (
             <button
-              key={tip}
+              key={action.label}
               type="button"
-              onClick={() => onUseTip(tip)}
-              className="min-h-12 rounded-full border border-black bg-black px-4 text-sm font-bold text-white transition hover:bg-[#acdb26] hover:text-black"
+              onClick={() => onUseTip(action.hint)}
+              className="min-h-12 rounded-md border border-[#d8d5ca] bg-[#fbfbf8] px-4 text-sm font-bold text-[#20251f] transition hover:bg-[#eef2e8]"
             >
-              {tip}
+              {action.label}
             </button>
           ))}
         </div>
@@ -1068,13 +1256,13 @@ function EmptyEvidencePanel({ currentCase, onUseTip }: { currentCase: DetectiveC
 
 function LockedStartPanel({ title, text }: { title: string; text: string }) {
   return (
-    <div className="grid min-h-[520px] place-items-center p-4 lg:p-6">
-      <section className="w-full max-w-2xl rounded-md border border-white/10 bg-white/[0.06] p-6">
-        <div className="mb-4 grid h-12 w-12 place-items-center rounded-full bg-[#acdb26] text-black">
+    <div className="grid min-h-[420px] place-items-center p-4 lg:p-6">
+      <section className="w-full max-w-2xl rounded-md border border-[#e5e1d8] bg-white p-6">
+        <div className="mb-4 grid h-12 w-12 place-items-center rounded-md bg-[#eef2e8] text-[#4f6638]">
           <Lock className="h-5 w-5" />
         </div>
-        <h2 className="text-3xl font-black text-stone-50">{title}</h2>
-        <p className="mt-3 text-base leading-7 text-stone-300">{text}</p>
+        <h2 className="text-2xl font-black text-[#20251f]">{title}</h2>
+        <p className="mt-3 text-base leading-7 text-[#5d584f]">{text}</p>
       </section>
     </div>
   );
@@ -1190,18 +1378,18 @@ function TimelinePanel({ currentCase }: { currentCase: DetectiveCase }) {
     <div className="p-4 lg:p-6">
       <div className="grid gap-3">
         {currentCase.timeline.map((item) => (
-          <div key={`${item.time}-${item.source}`} className="grid gap-3 rounded-md border border-stone-800 bg-stone-950 p-4 sm:grid-cols-[90px_120px_minmax(0,1fr)_110px] sm:items-center">
-            <div style={monoFont} className="text-lg text-stone-100">
+          <div key={`${item.time}-${item.source}`} className="grid gap-3 rounded-md border border-[#e5e1d8] bg-[#fbfbf8] p-4 sm:grid-cols-[90px_120px_minmax(0,1fr)_110px] sm:items-center">
+            <div style={monoFont} className="text-lg font-semibold text-[#20251f]">
               {item.time}
             </div>
-            <div className="text-xs uppercase text-stone-500">{item.source}</div>
-            <div className="text-sm leading-6 text-stone-300">{item.event}</div>
+            <div className="text-xs font-semibold uppercase text-[#8b867b]">{item.source}</div>
+            <div className="text-sm leading-6 text-[#5d584f]">{item.event}</div>
             <div
               className={cx(
                 "justify-self-start rounded-md border px-2 py-1 text-xs uppercase sm:justify-self-end",
-                item.confidence === "high" && "border-emerald-300/40 text-emerald-200",
-                item.confidence === "medium" && "border-amber-300/40 text-amber-100",
-                item.confidence === "low" && "border-rose-300/40 text-rose-100",
+                item.confidence === "high" && "border-[#cdd8c1] bg-[#eef2e8] text-[#4f6638]",
+                item.confidence === "medium" && "border-[#e5dcc5] bg-[#fbf6e8] text-[#6f5b2e]",
+                item.confidence === "low" && "border-[#dfc8bc] bg-[#fbf1ed] text-[#7c3f2e]",
               )}
             >
               {item.confidence === "high" ? "высокая" : item.confidence === "medium" ? "средняя" : "низкая"}
