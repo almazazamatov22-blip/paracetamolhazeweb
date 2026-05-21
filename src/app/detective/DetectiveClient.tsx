@@ -22,7 +22,7 @@ const infoRows = [
 
 export default function DetectiveClient() {
   return (
-    <main className="min-h-screen bg-white px-3 pb-10 pt-3 font-sans text-[14px] leading-[1.58] text-[#202122]">
+    <main className="min-h-screen w-full max-w-[1180px] bg-white px-3 pb-10 pt-3 font-sans text-[14px] leading-[1.58] text-[#202122]">
       <header>
         <div className="flex items-start justify-between gap-4 border-b border-[#a2a9b1]">
           <h1 className="font-serif text-[31px] font-normal leading-[1.25]">Habarhub (стример)</h1>
@@ -33,27 +33,27 @@ export default function DetectiveClient() {
 
         <div className="flex flex-wrap items-end justify-between gap-x-5 border-b border-[#a2a9b1] text-[14px]">
           <nav className="flex gap-4">
-            <a className="border-b-2 border-[#202122] py-2 text-[#202122]" href="#">
+            <a className="border-b-2 border-[#202122] py-2 text-[#202122]" href="/detective">
               Статья
             </a>
-            <a className="py-2 text-[#36c]" href="#">
+            <a className="py-2 text-[#36c]" href="/detective?tab=talk">
               Обсуждение
             </a>
           </nav>
           <nav className="flex flex-wrap gap-4">
-            <a className="border-b-2 border-[#202122] py-2 text-[#202122]" href="#">
+            <a className="border-b-2 border-[#202122] py-2 text-[#202122]" href="/detective">
               Читать
             </a>
-            <a className="py-2 text-[#36c]" href="#">
+            <a className="py-2 text-[#36c]" href="/detective?action=edit">
               Править
             </a>
-            <a className="py-2 text-[#36c]" href="#">
+            <a className="py-2 text-[#36c]" href="/detective?action=edit-source">
               Править код
             </a>
-            <a className="py-2 text-[#36c]" href="#">
+            <a className="py-2 text-[#36c]" href="/detective?action=history">
               История
             </a>
-            <a className="py-2 text-[#202122]" href="#">
+            <a className="py-2 text-[#202122]" href="/detective#tools">
               Инструменты⌄
             </a>
           </nav>
@@ -63,7 +63,7 @@ export default function DetectiveClient() {
       <article className="pt-3">
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="text-[13px]">Материал из Википедии — свободной энциклопедии</p>
-          <a className="hidden text-[13px] text-[#36c] hover:underline sm:inline" href="#">
+          <a className="hidden text-[13px] text-[#36c] hover:underline sm:inline" href="/detective?action=edit-source">
             [ править код ]
           </a>
         </div>
@@ -71,7 +71,7 @@ export default function DetectiveClient() {
         <div className="mb-4 flex items-center gap-2 text-[14px] text-[#54595d]">
           <span className="grid h-5 w-5 place-items-center rounded-full bg-[#72777d] text-[12px] font-bold text-white">i</span>
           <span>
-            <a className="text-[#36c] hover:underline" href="#">
+            <a className="text-[#36c] hover:underline" href="/detective#stable-version">
               Стабильная версия
             </a>
             , проверенная 21 мая 2026.
@@ -82,14 +82,14 @@ export default function DetectiveClient() {
 
         <p className="mb-2 pl-6 italic">
           У этого термина существуют и другие значения, см.{" "}
-          <a className="text-[#36c] hover:underline" href="#">
+          <a className="text-[#36c] hover:underline" href="https://ru.wikipedia.org/wiki/%D0%A5%D0%B0%D0%B1%D0%B0%D1%80">
             Habar
           </a>
           .
         </p>
         <p className="mb-3 pl-6 italic">
           Не следует путать с{" "}
-          <a className="text-[#36c] hover:underline" href="#">
+          <a className="text-[#36c] hover:underline" href="https://ru.wikipedia.org/wiki/Habr">
             Habrahabr
           </a>
           .
@@ -97,7 +97,7 @@ export default function DetectiveClient() {
 
         <p className="mb-3 max-w-[980px] text-[16px] leading-[1.62]">
           <b>Habarhub</b> — русскоязычный{" "}
-          <WikiLink>стример</WikiLink> и автор интернет-контента, известный ночными разговорными
+          <WikiLink href="https://ru.wikipedia.org/wiki/%D0%A1%D1%82%D1%80%D0%B8%D0%BC%D0%B8%D0%BD%D0%B3">стример</WikiLink> и автор интернет-контента, известный ночными разговорными
           эфирами, спокойной манерой общения и вниманием к историям зрителей. Основную известность
           получил благодаря прямым трансляциям, где игровые сессии совмещаются с обсуждением
           сообщений из чата, старых интернет-страниц и зрительских историй<Ref>1</Ref>.
@@ -187,9 +187,9 @@ export default function DetectiveClient() {
 
         <Section title="Примечания">
           <ol className="list-decimal space-y-1 pl-6 text-[14px]">
-            <li>Описание канала Habarhub в открытых публикациях сообщества.</li>
-            <li>Архивные нарезки ночных трансляций.</li>
-            <li>Материалы фанатских обсуждений Habar Chat.</li>
+            <li id="ref-1">Описание канала Habarhub в открытых публикациях сообщества.</li>
+            <li id="ref-2">Архивные нарезки ночных трансляций.</li>
+            <li id="ref-3">Материалы фанатских обсуждений Habar Chat.</li>
           </ol>
         </Section>
       </article>
@@ -242,13 +242,15 @@ function Infobox() {
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
+  const sectionSlug = slug(title);
+
   return (
-    <section id={slug(title)} className="clear-none mt-6 max-w-[980px]">
+    <section id={sectionSlug} className="clear-none mt-6 max-w-[980px]">
       <h2 className="mb-2 border-b border-[#a2a9b1] pb-1 font-serif text-[28px] font-normal leading-[1.3]">
         {title}
         <span className="ml-3 align-middle font-sans text-[13px]">
-          [ <a className="text-[#36c] hover:underline" href="#">править</a> |{" "}
-          <a className="text-[#36c] hover:underline" href="#">править код</a> ]
+          [ <a className="text-[#36c] hover:underline" href={`/detective?action=edit&section=${sectionSlug}`}>править</a> |{" "}
+          <a className="text-[#36c] hover:underline" href={`/detective?action=edit-source&section=${sectionSlug}`}>править код</a> ]
         </span>
       </h2>
       <div className="space-y-4 text-[16px] leading-[1.62]">{children}</div>
@@ -256,9 +258,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function WikiLink({ children }: { children: ReactNode }) {
+function WikiLink({ children, href }: { children: ReactNode; href?: string }) {
+  const link = href ?? (typeof children === "string" ? getWikiHref(children) : "/detective");
+
   return (
-    <a className="text-[#36c] hover:underline" href="#">
+    <a className="text-[#36c] hover:underline" href={link}>
       {children}
     </a>
   );
@@ -267,11 +271,25 @@ function WikiLink({ children }: { children: ReactNode }) {
 function Ref({ children }: { children: ReactNode }) {
   return (
     <sup className="whitespace-nowrap text-[12px]">
-      <a className="text-[#36c] hover:underline" href="#">
+      <a className="text-[#36c] hover:underline" href={`#ref-${children}`}>
         [{children}]
       </a>
     </sup>
   );
+}
+
+function getWikiHref(label: string) {
+  const links: Record<string, string> = {
+    Twitch: "https://ru.wikipedia.org/wiki/Twitch",
+    YouTube: "https://ru.wikipedia.org/wiki/YouTube",
+    Telegram: "https://ru.wikipedia.org/wiki/Telegram",
+    стример: "https://ru.wikipedia.org/wiki/%D0%A1%D1%82%D1%80%D0%B8%D0%BC%D0%B8%D0%BD%D0%B3",
+    видеоблогер: "https://ru.wikipedia.org/wiki/%D0%92%D0%B8%D0%B4%D0%B5%D0%BE%D0%B1%D0%BB%D0%BE%D0%B3",
+    "разговорные эфиры": "/detective#формат-эфиров",
+    игры: "https://ru.wikipedia.org/wiki/%D0%9A%D0%BE%D0%BC%D0%BF%D1%8C%D1%8E%D1%82%D0%B5%D1%80%D0%BD%D0%B0%D1%8F_%D0%B8%D0%B3%D1%80%D0%B0",
+  };
+
+  return links[label] ?? `/detective#${slug(label)}`;
 }
 
 function slug(value: string) {
