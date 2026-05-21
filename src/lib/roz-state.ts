@@ -266,7 +266,7 @@ export function addAuctionBid(state: RozState, input: RedemptionInput) {
     changed: true,
     state: {
       ...state,
-      auction_bids: [...state.auction_bids, bid].slice(-1000),
+      auction_bids: [...state.auction_bids, bid],
       auction_winner: null,
       updated_at: new Date().toISOString(),
     },
