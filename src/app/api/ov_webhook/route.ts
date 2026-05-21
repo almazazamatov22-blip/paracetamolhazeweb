@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
       settingsChanged = settingsChanged || result.changed;
     }
 
-    if (rozState.auction_reward_id === twitchRewardId) {
+    if (rozState.auction_reward_ids.includes(twitchRewardId)) {
       redemptionInput.userAvatar = redemptionInput.userAvatar || await loadUserAvatar();
       const result = addAuctionBid(rozState, redemptionInput);
       rozState = result.state;

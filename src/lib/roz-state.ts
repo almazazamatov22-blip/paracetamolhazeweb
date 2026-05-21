@@ -28,12 +28,15 @@ export interface RozAuctionBid {
   reward_id: string;
   reward_name: string;
   user_input: string;
+  redemption_count?: number;
   created_at: string;
 }
 
 export interface RozState {
   lottery_reward_id: string;
   lottery_reward_name: string;
+  auction_reward_ids: string[];
+  auction_reward_names: string[];
   auction_reward_id: string;
   auction_reward_name: string;
   lottery_prize: string;
@@ -70,6 +73,8 @@ const COLORS = [
 export const DEFAULT_ROZ_STATE: RozState = {
   lottery_reward_id: '',
   lottery_reward_name: '',
+  auction_reward_ids: [],
+  auction_reward_names: [],
   auction_reward_id: '',
   auction_reward_name: '',
   lottery_prize: 'Приз стримера',
@@ -90,6 +95,10 @@ function asString(value: unknown) {
 function asPositiveNumber(value: unknown, fallback: number) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? Math.floor(number) : fallback;
+}
+
+function asStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
 function asAutoMode(value: unknown): LotteryAutoMode {
@@ -142,6 +151,7 @@ function normalizeAuctionBid(value: unknown): RozAuctionBid | null {
     reward_id: asString(value.reward_id),
     reward_name: asString(value.reward_name),
     user_input: asString(value.user_input),
+    redemption_count: asPositiveNumber(value.redemption_count, 1),
     created_at: asString(value.created_at) || new Date().toISOString(),
   };
 }
@@ -155,11 +165,18 @@ export function normalizeRozState(value: unknown): RozState {
     ? raw.auction_bids.map(normalizeAuctionBid).filter((bid): bid is RozAuctionBid => Boolean(bid))
     : [];
 
+  const auctionRewardIds = asStringArray(raw.auction_reward_ids);
+  const legacyAuctionRewardId = asString(raw.auction_reward_id);
+  const auctionRewardNames = asStringArray(raw.auction_reward_names);
+  const legacyAuctionRewardName = asString(raw.auction_reward_name);
+
   return {
     lottery_reward_id: asString(raw.lottery_reward_id),
     lottery_reward_name: asString(raw.lottery_reward_name),
-    auction_reward_id: asString(raw.auction_reward_id),
-    auction_reward_name: asString(raw.auction_reward_name),
+    auction_reward_ids: auctionRewardIds.length ? auctionRewardIds : (legacyAuctionRewardId ? [legacyAuctionRewardId] : []),
+    auction_reward_names: auctionRewardNames.length ? auctionRewardNames : (legacyAuctionRewardName ? [legacyAuctionRewardName] : []),
+    auction_reward_id: legacyAuctionRewardId || auctionRewardIds[0] || '',
+    auction_reward_name: legacyAuctionRewardName || auctionRewardNames[0] || '',
     lottery_prize: asString(raw.lottery_prize) || DEFAULT_ROZ_STATE.lottery_prize,
     auction_prize: asString(raw.auction_prize) || DEFAULT_ROZ_STATE.auction_prize,
     lottery_auto_mode: asAutoMode(raw.lottery_auto_mode),
@@ -225,7 +242,7 @@ export function addAuctionBid(state: RozState, input: RedemptionInput) {
     return { state, changed: false };
   }
 
-  const bidAmount = parseBidAmount(input.userInput, input.rewardCost);
+  const bidAmount = input.rewardCost;
   if (bidAmount <= 0) return { state, changed: false };
 
   const bid: RozAuctionBid = {
@@ -241,6 +258,7 @@ export function addAuctionBid(state: RozState, input: RedemptionInput) {
     reward_id: input.rewardId,
     reward_name: input.rewardName,
     user_input: input.userInput,
+    redemption_count: 1,
     created_at: input.redeemedAt || new Date().toISOString(),
   };
 
@@ -255,11 +273,34 @@ export function addAuctionBid(state: RozState, input: RedemptionInput) {
   };
 }
 
+export function getAuctionTotals(bids: RozAuctionBid[]) {
+  const totals = new Map<string, RozAuctionBid>();
+
+  bids.forEach((bid) => {
+    const key = (bid.login || bid.username).toLowerCase();
+    const current = totals.get(key);
+
+    if (!current) {
+      totals.set(key, { ...bid, bid: bid.cost || bid.bid, redemption_count: 1 });
+      return;
+    }
+
+    totals.set(key, {
+      ...current,
+      avatar: current.avatar || bid.avatar,
+      bid: current.bid + (bid.cost || bid.bid),
+      cost: current.cost + (bid.cost || bid.bid),
+      redemption_count: (current.redemption_count || 1) + 1,
+      created_at: Date.parse(bid.created_at) > Date.parse(current.created_at) ? bid.created_at : current.created_at,
+    });
+  });
+
+  return Array.from(totals.values()).sort((a, b) => {
+    if (b.bid !== a.bid) return b.bid - a.bid;
+    return Date.parse(a.created_at) - Date.parse(b.created_at);
+  });
+}
+
 export function getBestAuctionBid(bids: RozAuctionBid[]) {
-  return bids.reduce<RozAuctionBid | null>((best, bid) => {
-    if (!best) return bid;
-    if (bid.bid > best.bid) return bid;
-    if (bid.bid === best.bid && Date.parse(bid.created_at) < Date.parse(best.created_at)) return bid;
-    return best;
-  }, null);
+  return getAuctionTotals(bids)[0] || null;
 }
