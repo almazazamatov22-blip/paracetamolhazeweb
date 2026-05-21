@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import DetectiveClient from "./DetectiveClient";
 
 export const metadata: Metadata = {
-  title: "Детектив // закрытый архив",
-  description: "Закрытый архив браузерных ARG-расследований.",
+  title: "Habarhub — энциклопедическая справка",
+  description: "Страница в стиле wiki-статьи о стримере Habarhub.",
   robots: {
     index: false,
     follow: false,
