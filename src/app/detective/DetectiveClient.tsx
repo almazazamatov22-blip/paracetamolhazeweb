@@ -21,10 +21,10 @@ const contents = [
 
 export default function DetectiveClient() {
   return (
-    <main className="min-h-screen bg-[#f8f9fa] text-[#202122]">
+    <main className="min-h-screen bg-[#dfe5ee] text-[#202122]">
       <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-8">
-        <article className="min-w-0 bg-white px-5 py-6 shadow-sm ring-1 ring-[#a2a9b1]/35 sm:px-8">
-          <header className="border-b border-[#a2a9b1] pb-3">
+        <article className="min-w-0 border-t-4 border-[#3366cc] bg-[#fffdf7] px-5 py-6 shadow-sm ring-1 ring-[#a2a9b1]/45 sm:px-8">
+          <header className="border-b border-[#a2a9b1] bg-[#f6f8fb] px-4 py-4">
             <h1 className="font-serif text-4xl font-normal leading-tight text-[#101418]">Habarhub</h1>
             <p className="mt-2 text-sm text-[#54595d]">Материал из свободной энциклопедии</p>
           </header>
@@ -142,11 +142,11 @@ export default function DetectiveClient() {
           </footer>
         </article>
 
-        <aside className="h-fit border border-[#a2a9b1] bg-white text-sm shadow-sm">
-          <div className="border-b border-[#a2a9b1] bg-[#eaecf0] px-4 py-3 text-center font-semibold">
+        <aside className="h-fit border border-[#7d8ca3] bg-[#fffdf7] text-sm shadow-sm">
+          <div className="border-b border-[#7d8ca3] bg-[#d8e3f3] px-4 py-3 text-center font-semibold">
             Habarhub
           </div>
-          <div className="grid place-items-center bg-[#f8f9fa] px-4 py-6">
+          <div className="grid place-items-center bg-[#eef3f9] px-4 py-6">
             <div className="grid h-36 w-36 place-items-center border border-[#a2a9b1] bg-white font-serif text-5xl text-[#54595d]">
               HH
             </div>
