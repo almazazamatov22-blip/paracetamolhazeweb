@@ -22,7 +22,8 @@ const infoRows = [
 
 export default function DetectiveClient() {
   return (
-    <main className="min-h-screen w-full max-w-[1180px] bg-white px-3 pb-10 pt-3 font-sans text-[14px] leading-[1.58] text-[#202122]">
+    <main className="min-h-screen w-full bg-white px-3 pb-10 pt-3 font-sans text-[14px] leading-[1.58] text-[#202122]">
+      <div className="w-full max-w-[1180px]">
       <header>
         <div className="flex items-start justify-between gap-4 border-b border-[#a2a9b1]">
           <h1 className="font-serif text-[31px] font-normal leading-[1.25]">Habarhub (стример)</h1>
@@ -193,6 +194,7 @@ export default function DetectiveClient() {
           </ol>
         </Section>
       </article>
+      </div>
     </main>
   );
 }
