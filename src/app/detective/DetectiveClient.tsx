@@ -21,18 +21,6 @@ const infoRows = [
   ["Сообщество", "Habar Chat"],
 ];
 
-const wikiLinks: Record<string, string> = {
-  стример: "https://ru.wikipedia.org/wiki/Стриминг",
-  видеоблогер: "https://ru.wikipedia.org/wiki/Видеоблог",
-  Twitch: "https://ru.wikipedia.org/wiki/Twitch",
-  YouTube: "https://ru.wikipedia.org/wiki/YouTube",
-  Telegram: "https://ru.wikipedia.org/wiki/Telegram",
-  Discord: "https://ru.wikipedia.org/wiki/Discord",
-  OBS: "https://ru.wikipedia.org/wiki/OBS_Studio",
-  "прямым трансляциям": "https://ru.wikipedia.org/wiki/Прямая_трансляция",
-  чат: "https://ru.wikipedia.org/wiki/Чат",
-};
-
 export default function DetectiveClient() {
   return (
     <main className="min-h-screen w-full bg-[#f8f9fa] font-sans text-[14px] leading-[1.58] text-[#202122]">
@@ -50,12 +38,9 @@ export default function DetectiveClient() {
                 <p className="text-[13px]">
                   Материал из Википедии — свободной энциклопедии
                 </p>
-                <a
-                  className="hidden text-[13px] text-[#36c] hover:underline sm:inline"
-                  href="/detective?action=edit-source"
-                >
+                <span className="hidden text-[13px] text-[#54595d] sm:inline">
                   [ править код ]
-                </a>
+                </span>
               </div>
 
               <div
@@ -66,12 +51,7 @@ export default function DetectiveClient() {
                   i
                 </span>
                 <span>
-                  <a
-                    className="text-[#36c] hover:underline"
-                    href="/detective#stable-version"
-                  >
-                    Стабильная версия
-                  </a>
+                  Стабильная версия
                   , проверенная 21 мая 2026.
                 </span>
               </div>
@@ -79,25 +59,11 @@ export default function DetectiveClient() {
               <Infobox />
 
               <p className="mb-2 pl-6 italic">
-                У этого термина существуют и другие значения, см.{" "}
-                <a
-                  className="text-[#36c] hover:underline"
-                  href="https://ru.wikipedia.org/wiki/Хабар"
-                >
-                  Habar
-                </a>
-                .
+                У этого термина существуют и другие значения, см. Habar.
               </p>
 
               <p className="mb-3 pl-6 italic">
-                Не следует путать с{" "}
-                <a
-                  className="text-[#36c] hover:underline"
-                  href="https://ru.wikipedia.org/wiki/Habr"
-                >
-                  Habrahabr
-                </a>
-                .
+                Не следует путать с Habrahabr.
               </p>
 
               <p className="mb-3 text-[16px] leading-[1.62]">
@@ -221,23 +187,23 @@ export default function DetectiveClient() {
                   <li id="ref-1">
                     Описание формата основано на публичных материалах канала и
                     пересказах зрителей.{" "}
-                    <a className="text-[#36c] hover:underline" href="#top">
+                    <span className="text-[#54595d]">
                       ↑
-                    </a>
+                    </span>
                   </li>
                   <li id="ref-2">
                     Упоминания визуального стиля встречаются в обсуждениях
                     фанатского сообщества.{" "}
-                    <a className="text-[#36c] hover:underline" href="#top">
+                    <span className="text-[#54595d]">
                       ↑
-                    </a>
+                    </span>
                   </li>
                   <li id="ref-3">
                     Ранняя формулировка из описания канала, сохраненного в
                     пользовательских заметках.{" "}
-                    <a className="text-[#36c] hover:underline" href="#top">
+                    <span className="text-[#54595d]">
                       ↑
-                    </a>
+                    </span>
                   </li>
                 </ol>
               </Section>
@@ -261,10 +227,7 @@ function SiteHeader() {
           ☰
         </button>
 
-        <a
-          href="/detective"
-          className="flex items-center gap-3 text-[#202122] no-underline"
-        >
+        <div className="flex items-center gap-3 text-[#202122]">
           <div className="grid h-11 w-11 place-items-center rounded-full border border-[#a2a9b1] bg-[#f8f9fa] font-serif text-[22px]">
             W
           </div>
@@ -276,10 +239,9 @@ function SiteHeader() {
               Свободная энциклопедия
             </div>
           </div>
-        </a>
+        </div>
 
         <form
-          action="https://ru.wikipedia.org/w/index.php"
           className="ml-0 hidden h-8 min-w-[320px] max-w-[475px] flex-1 items-stretch md:flex lg:ml-6"
         >
           <label className="sr-only" htmlFor="wiki-search">
@@ -321,22 +283,14 @@ function LeftContents() {
         <ul className="space-y-2">
           {contents.map((item) => (
             <li key={item.id}>
-              <a
-                className="font-medium text-[#202122] hover:text-[#36c] hover:underline"
-                href={`#${item.id}`}
-              >
+              <span className="font-medium text-[#202122]">
                 {item.label}
-              </a>
+              </span>
               {item.children.length > 0 ? (
-                <ul className="mt-2 space-y-2 pl-4 text-[#36c]">
+                <ul className="mt-2 space-y-2 pl-4 text-[#54595d]">
                   {item.children.map((child) => (
                     <li key={child}>
-                      <a
-                        className="hover:underline"
-                        href={`#${item.id}-${slug(child)}`}
-                      >
-                        {child}
-                      </a>
+                      <span>{child}</span>
                     </li>
                   ))}
                 </ul>
@@ -356,58 +310,40 @@ function ArticleHeader() {
         <h1 className="font-serif text-[31px] font-normal leading-[1.25] text-[#202122]">
           Habarhub (стример)
         </h1>
-        <a
-          className="mt-2 whitespace-nowrap text-[14px] font-semibold text-[#36c] hover:underline"
-          href="/detective?language=ru"
-        >
-          文 1 язык⌄
-        </a>
+        <div className="mt-1 text-right">
+          <div className="whitespace-nowrap text-[14px] font-semibold text-[#202122]">
+            文 2 языка⌄
+          </div>
+          <div className="text-[12px] text-[#54595d]">Русский · English</div>
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap items-end justify-between gap-4 text-[14px]">
         <div className="flex gap-5">
-          <a
-            className="border-b-2 border-[#202122] pb-2 text-[#202122]"
-            href="/detective"
-          >
+          <span className="border-b-2 border-[#202122] pb-2 text-[#202122]">
             Статья
-          </a>
-          <a className="pb-2 text-[#36c] hover:underline" href="/detective?tab=talk">
+          </span>
+          <span className="pb-2 text-[#54595d]">
             Обсуждение
-          </a>
+          </span>
         </div>
 
         <div className="flex flex-wrap gap-5">
-          <a
-            className="border-b-2 border-[#202122] pb-2 text-[#202122]"
-            href="/detective"
-          >
+          <span className="border-b-2 border-[#202122] pb-2 text-[#202122]">
             Читать
-          </a>
-          <a
-            className="pb-2 text-[#36c] hover:underline"
-            href="/detective?action=edit"
-          >
+          </span>
+          <span className="pb-2 text-[#54595d]">
             Править
-          </a>
-          <a
-            className="pb-2 text-[#36c] hover:underline"
-            href="/detective?action=edit-source"
-          >
+          </span>
+          <span className="pb-2 text-[#54595d]">
             Править код
-          </a>
-          <a
-            className="pb-2 text-[#36c] hover:underline"
-            href="/detective?action=history"
-          >
+          </span>
+          <span className="pb-2 text-[#54595d]">
             История
-          </a>
-          <a
-            className="pb-2 text-[#202122] hover:underline"
-            href="/detective?tools=1"
-          >
+          </span>
+          <span className="pb-2 text-[#54595d]">
             Инструменты⌄
-          </a>
+          </span>
         </div>
       </div>
     </header>
@@ -469,18 +405,12 @@ function Section({
       <h2 className="mb-3 border-b border-[#a2a9b1] font-serif text-[28px] font-normal leading-[1.3]">
         {title}{" "}
         <span className="align-middle font-sans text-[13px]">
-          <a
-            className="text-[#36c] hover:underline"
-            href={`/detective?action=edit&section=${id}`}
-          >
+          <span className="text-[#54595d]">
             [ править ]
-          </a>{" "}
-          <a
-            className="text-[#36c] hover:underline"
-            href={`/detective?action=edit-source&section=${id}`}
-          >
+          </span>{" "}
+          <span className="text-[#54595d]">
             [ править код ]
-          </a>
+          </span>
         </span>
       </h2>
       <div className="space-y-4 text-[16px] leading-[1.62]">{children}</div>
@@ -489,29 +419,13 @@ function Section({
 }
 
 function WikiLink({ children }: { children: string }) {
-  const href = wikiLinks[children] ?? `https://ru.wikipedia.org/wiki/${encodeURIComponent(children)}`;
-
-  return (
-    <a className="text-[#36c] hover:underline" href={href}>
-      {children}
-    </a>
-  );
+  return <span>{children}</span>;
 }
 
 function Ref({ children }: { children: ReactNode }) {
   return (
     <sup className="ml-0.5 text-[12px] leading-none">
-      <a className="text-[#36c] hover:underline" href={`#ref-${children}`}>
-        [{children}]
-      </a>
+      [{children}]
     </sup>
   );
-}
-
-function slug(value: string) {
-  return value
-    .toLowerCase()
-    .replaceAll(" ", "-")
-    .replaceAll("ё", "е")
-    .replace(/[^\p{Letter}\p{Number}-]/gu, "");
 }
