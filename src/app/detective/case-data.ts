@@ -310,6 +310,7 @@ export const detectiveCases: DetectiveCase[] = [
           "На записи слышно, как Habarhub говорит: 'Это не мой слой, кто его включил?' Через 12 секунд чат уходит в slow mode, а модератор Вика пишет: 'не трогайте лог'.",
         contradiction: "Команда канала объяснила все кешем, но slow mode включили вручную.",
         tags: ["Twitch", "OBS", "клип"],
+        unlockHints: ["02:13", "2:13", "шесть минут", "не мой слой"],
       },
       {
         id: "habarhub-discord-delete",
@@ -324,6 +325,7 @@ export const detectiveCases: DetectiveCase[] = [
           "В аудите видна роль admin-render, которая обычно принадлежит Денису. Причина удаления: 'личные данные'. Последнее сообщение отправила Вика.",
         contradiction: "Денис говорит, что в это время спал, но его роль активна в журнале.",
         tags: ["Discord", "аудит", "Вика", "Денис"],
+        unlockHints: ["01:58", "prize-raw", "#prize-raw", "личные данные"],
       },
       {
         id: "habarhub-donation-log",
@@ -338,6 +340,7 @@ export const detectiveCases: DetectiveCase[] = [
           "Профиль p-019 привязан к никам vel_mint и softdealer. Первый ник есть в старой таблице подрядчика, второй выиграл розыгрыш на стриме Habarhub.",
         contradiction: "Мира говорит, что подрядчик не имел доступа к выбору победителей.",
         tags: ["донаты", "розыгрыш", "бренд"],
+        unlockHints: ["p-019", "vel_mint", "softdealer", "повторяющийся платежный профиль"],
       },
       {
         id: "habarhub-tiktok-clip",
@@ -352,6 +355,7 @@ export const detectiveCases: DetectiveCase[] = [
           "В подписи: 'модерша сама себя сдала'. На исходнике видно, что перед сообщением Вики уже вспыхнул чужой оверлей.",
         contradiction: "Илья выложил клип через минуту после сбоя, будто ждал момент.",
         tags: ["TikTok", "клиппер", "ложный след"],
+        unlockHints: ["glitchpapa", "02:20", "модерша сама себя сдала"],
       },
       {
         id: "habarhub-mod-dm",
@@ -366,6 +370,7 @@ export const detectiveCases: DetectiveCase[] = [
           "Сообщение написано без заглавных: 'если я исчезну, смотри лог донатов. там денис и мира оба знали'. Через семь минут аккаунт Вики ушел в offline.",
         contradiction: "Мира утверждает, что узнала о проблеме только утром.",
         tags: ["Telegram", "Вика", "предупреждение"],
+        unlockHints: ["02:07", "если я исчезну", "смотри лог донатов"],
       },
       {
         id: "habarhub-obs-scene",
@@ -641,6 +646,7 @@ export const detectiveCases: DetectiveCase[] = [
           "Видео длится 41 секунду. Человек просит поддержать 'экстренный фонд съемочной группы'. Голос мягкий, но на словах 'помощь команде' появляется цифровой шипящий артефакт.",
         contradiction: "Если это официальное обращение, почему его залили через фан-канал без подтверждения представителей актера.",
         tags: ["YouTube", "deepfake", "зеркало"],
+        unlockHints: ["41 секунда", "помощь команде", "18:42", "цифровой шипящий артефакт"],
       },
       {
         id: "keanu-reddit-seed",
@@ -655,6 +661,7 @@ export const detectiveCases: DetectiveCase[] = [
           "Текст написан с ошибками, будто автор не фанат и плохо знает контекст. Через 11 минут пост удалили, но ссылка уже ушла в Telegram.",
         contradiction: "Майя говорит, что получила ссылку от волонтера, а не с Reddit.",
         tags: ["Reddit", "посев", "фанаты"],
+        unlockHints: ["18:39", "movieleaks", "закрытого zoom", "аккаунт создан в тот же день"],
       },
       {
         id: "keanu-wallet-page",
@@ -669,6 +676,7 @@ export const detectiveCases: DetectiveCase[] = [
           "Кнопка 'поддержать' ведет на крипто-кошелек. В HTML есть комментарий 'owen final after sarah review'.",
         contradiction: "Оуэн утверждает, что не знает Сару и получил только обезличенный бриф.",
         tags: ["кошелек", "домен", "HTML"],
+        unlockHints: ["owen final", "sarah review", "fund-crew-help", "за день до публикации"],
       },
       {
         id: "keanu-fan-email",
@@ -683,6 +691,7 @@ export const detectiveCases: DetectiveCase[] = [
           "Отправитель подписан как volunteer unit. В письме есть таблица каналов и готовые формулировки для Telegram, Reddit и TikTok.",
         contradiction: "Сара говорит, что фан-админы не получали никаких материалов от промо-команды.",
         tags: ["Email", "фан-каналы", "посев"],
+        unlockHints: ["volunteer unit", "не ждать официального анонса", "17:58"],
       },
       {
         id: "keanu-frame-metadata",
@@ -697,6 +706,7 @@ export const detectiveCases: DetectiveCase[] = [
           "В кадре видна та же наклейка на кейсе камеры, что и в закрытом промо-архиве. Маска лица накладывается с задержкой на 2 кадра.",
         contradiction: "Без доступа к бэкстейджу такая точная сцена была бы почти невозможна.",
         tags: ["метаданные", "кадр", "бэкстейдж"],
+        unlockHints: ["000217", "2 кадра", "наклейка", "internal"],
       },
       {
         id: "keanu-drive-share",
@@ -980,6 +990,7 @@ export const detectiveCases: DetectiveCase[] = [
           "Пост написан языком инсайдерского канала: 'не репостить, только своим'. Ссылка ведет через сокращатель, который позже меняет назначение на betting-лендинг.",
         contradiction: "Если это реальная утечка, зачем архиву лаунчер и депозитная ссылка.",
         tags: ["Telegram", "архив", "скам"],
+        unlockHints: ["donk_trenirovka.zip", "21:14", "не репостить", "только своим"],
       },
       {
         id: "donk-demo-hash",
@@ -994,6 +1005,7 @@ export const detectiveCases: DetectiveCase[] = [
           "Файлы fake1.dem и закрытая2.dem пересобраны из публичных матчей. fragment_03.dem имеет структуру тренировочного сервера, но звук удален.",
         contradiction: "Егор говорит, что архив видел после публикации, хотя мог быть источником именно fragment_03.dem.",
         tags: ["hash", "демо", "CS2"],
+        unlockHints: ["fragment_03", "fragment_03.dem", "fake1.dem", "21:22"],
       },
       {
         id: "donk-steam-comment",
@@ -1008,6 +1020,7 @@ export const detectiveCases: DetectiveCase[] = [
           "Боты писали: 'donk prac leaked here'. Паттерн похож на обычную фишинговую кампанию и не доказывает спортивную утечку.",
         contradiction: "Скам начался до Telegram-дропа, значит архив был частью рекламной воронки.",
         tags: ["Steam", "боты", "ложный след"],
+        unlockHints: ["20:57", "donk prac leaked here", "comment cache"],
       },
       {
         id: "donk-betting-post",
@@ -1022,6 +1035,7 @@ export const detectiveCases: DetectiveCase[] = [
           "Пост: 'после такой демки счет читается'. Сразу под ним партнерская ссылка на депозит и промокод DONK22.",
         contradiction: "Это создает шум вокруг Donk, но не содержит реального спортивного инсайда.",
         tags: ["ставки", "промокод", "Артем"],
+        unlockHints: ["donk22", "промокод donk22", "21:31", "после такой демки счет читается"],
       },
       {
         id: "donk-discord-leak",
@@ -1036,6 +1050,7 @@ export const detectiveCases: DetectiveCase[] = [
           "Егор: 'только не заливай raw, ок?' Стас: 'да я под блюр и без звука'. Время на скрине совпадает с появлением fragment_03.dem.",
         contradiction: "Стас утверждает, что удалил файл, но фрагмент оказался в архиве.",
         tags: ["Discord", "Егор", "Стас"],
+        unlockHints: ["18:43", "не заливай raw", "без звука", "raw"],
       },
       {
         id: "donk-real-fragment",

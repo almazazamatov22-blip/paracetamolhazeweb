@@ -132,20 +132,26 @@ const caseAccent: Record<DetectiveCaseId, { line: string; soft: string; text: st
 
 const starterActions: Record<DetectiveCaseId, Array<{ label: string; hint: string }>> = {
   habarhub: [
-    { label: "Посмотреть последние минуты стрима", hint: "архив стрима" },
-    { label: "Проверить донаты", hint: "лог донатов" },
-    { label: "Найти удаленные сообщения", hint: "восстановить dm" },
+    { label: "Найти момент сбоя эфира", hint: "введите время, когда на стриме появился чужой оверлей" },
+    { label: "Проверить старые розыгрыши", hint: "введите id платежного профиля из донат-лога" },
+    { label: "Найти сообщение Вики", hint: "введите фразу из предупреждения Вики" },
   ],
   keanu: [
-    { label: "Проверить само видео", hint: "метаданные кадра" },
-    { label: "Посмотреть страницу сбора", hint: "кошелек фонда" },
-    { label: "Найти, откуда пришла ссылка", hint: "cdn лог" },
+    { label: "Проверить удаленное видео", hint: "введите длительность ролика или фразу с артефактом" },
+    { label: "Проверить страницу сбора", hint: "введите скрытый комментарий из HTML" },
+    { label: "Найти первый посев", hint: "введите время первого поста на Reddit" },
   ],
   donk: [
-    { label: "Проверить архив с демками", hint: "hash dem" },
-    { label: "Найти путь файла", hint: "steam trade" },
-    { label: "Проверить вредный лаунчер", hint: "scan launcher" },
+    { label: "Проверить архив", hint: "введите название zip-файла из описания" },
+    { label: "Найти настоящий кусок", hint: "введите имя настоящего dem-фрагмента" },
+    { label: "Проверить ставки", hint: "введите промокод из поста канала" },
   ],
+};
+
+const episodeMeta: Record<DetectiveCaseId, { number: string; date: string }> = {
+  habarhub: { number: "1", date: "15 мая 2026 г., 04:28" },
+  keanu: { number: "2", date: "7 апреля 2026 г., 18:42" },
+  donk: { number: "3", date: "19 марта 2026 г., 21:14" },
 };
 
 function cx(...values: Array<string | false | null | undefined>) {
@@ -209,19 +215,9 @@ function pressureDelta(text: string) {
 
 function matchTerminalEvidence(currentCase: DetectiveCase, input: string, unlocked: string[]) {
   const normalized = normalize(input);
-  const queryTokens = normalized
-    .split(/[\s,.;:()[\]{}"'`/\\|+-]+/)
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 3 || token === "dm");
-
   return currentCase.evidence.find((item) => {
     if (unlocked.includes(item.id)) return false;
-
-    const directHint = item.unlockHints?.some((hint) => normalized.includes(normalize(hint)));
-    if (directHint) return true;
-
-    const searchableText = normalize([item.title, item.kind, item.source, item.summary, item.body, ...item.tags].join(" "));
-    return queryTokens.some((token) => searchableText.includes(token));
+    return item.unlockHints?.some((hint) => normalized.includes(normalize(hint)));
   });
 }
 
@@ -339,7 +335,7 @@ export default function DetectiveClient() {
 
     setTerminalLog((current) => [
       `Нет прямого совпадения: ${raw}`,
-      "Ищите по связке: источник + объект. Например: 'лог донатов', 'cdn лог', 'hash dem'.",
+      "Нужен точный след из текста: время, фраза, имя файла, код, домен или id.",
       ...current,
     ].slice(0, 7));
   }
@@ -439,7 +435,7 @@ export default function DetectiveClient() {
             </button>
             <div className="min-w-0">
               <div style={monoFont} className="text-xs uppercase text-[#777164]">
-                дело
+                эпизод {episodeMeta[currentCase.id].number}
               </div>
               <h1 className="truncate text-2xl font-black text-[#20251f] sm:text-3xl">{currentCase.menuTitle}</h1>
               <p className="truncate text-sm text-[#686256]">{currentCase.connectedTo}</p>
@@ -924,7 +920,7 @@ function CaseMenu({ onOpenCase }: { onOpenCase: (nextCase: DetectiveCase) => voi
     <main style={detectiveFont} className="min-h-screen bg-[#f4f4f2] text-[#20251f]">
       <section className="mx-auto grid min-h-screen w-full max-w-[1360px] grid-rows-[auto_minmax(0,1fr)] gap-6 px-4 py-6 sm:px-6 lg:px-8">
         <header className="rounded-md border border-[#dedbd2] bg-white p-5 shadow-sm lg:p-8">
-          <h1 className="mt-6 max-w-4xl text-4xl font-black leading-none text-[#20251f] sm:text-6xl">Выберите дело</h1>
+          <h1 className="mt-6 max-w-4xl text-4xl font-black leading-none text-[#20251f] sm:text-6xl">Эпизоды</h1>
         </header>
 
         <div className="grid content-center gap-4 lg:grid-cols-3">
@@ -937,9 +933,12 @@ function CaseMenu({ onOpenCase }: { onOpenCase: (nextCase: DetectiveCase) => voi
               <div className="grid gap-4 p-5">
                 <div>
                   <div className="mb-3 inline-flex rounded-md border border-[#d8d5ca] bg-[#fbfbf8] px-3 py-1 text-xs font-bold text-[#5d584f]">
-                    {item.connectedTo}
+                    Эпизод {episodeMeta[item.id].number}
                   </div>
                   <h2 className="text-2xl font-black leading-tight text-[#20251f]">{item.menuTitle}</h2>
+                  <div style={monoFont} className="mt-2 text-xs text-[#8b867b]">
+                    {episodeMeta[item.id].date}
+                  </div>
                   <p className="mt-3 text-sm leading-6 text-[#5d584f]">{item.description}</p>
                 </div>
 
@@ -1137,10 +1136,14 @@ function SummaryPanel({
     <div className="grid gap-4 p-4 lg:p-6">
       <section className="rounded-md border border-[#e5e1d8] bg-white p-5 lg:p-7">
         <div style={monoFont} className="mb-4 text-xs font-bold uppercase text-[#8b867b]">
-          сначала только вводная
+          Эпизод: {episodeMeta[currentCase.id].number}
         </div>
-        <h2 className="text-3xl font-black leading-tight text-[#20251f] sm:text-4xl">Что произошло</h2>
+        <h2 className="text-3xl font-black leading-tight text-[#20251f] sm:text-4xl">«{currentCase.menuTitle}»</h2>
+        <div style={monoFont} className="mt-3 text-sm text-[#8b867b]">
+          {episodeMeta[currentCase.id].date}
+        </div>
         <p className="mt-4 max-w-4xl text-lg leading-8 text-[#4e4a42]">{currentCase.whatHappened}</p>
+        <div className="my-6 h-px w-32 bg-[#d8d5ca]" />
         <div className="mt-6 grid gap-3 lg:grid-cols-2">
           <div className="rounded-md border border-[#e5e1d8] bg-[#fbfbf8] p-4">
             <div className="mb-2 text-sm font-bold text-[#20251f]">Главный вопрос</div>
