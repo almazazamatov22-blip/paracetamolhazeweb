@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 
 type Lang = "ru" | "en";
 type CallStage = "ringing" | "connected";
@@ -50,7 +50,6 @@ type Copy = {
     subtitle: string;
     accept: string;
     decline: string;
-    connected: string;
   };
 };
 
@@ -152,7 +151,6 @@ const copy: Record<Lang, Copy> = {
       subtitle: "Неизвестный номер",
       accept: "Принять",
       decline: "Отклонить",
-      connected: "Соединение установлено. Слушайте код.",
     },
   },
   en: {
@@ -252,7 +250,6 @@ const copy: Record<Lang, Copy> = {
       subtitle: "Unknown Number",
       accept: "Accept",
       decline: "Decline",
-      connected: "Connected. Listen to the code.",
     },
   },
 };
@@ -262,20 +259,33 @@ const TARGET_START_MINUTE = 0;
 const TARGET_END_MINUTE = 1;
 const RINGTONE_SRC = "/detective/ringtone.mp3";
 const CODE_VOICE_SRC = "/detective/code-voice.mp3";
+const SECRET_SEARCH_CODE = "568713";
+const SECRET_HANDLE_BINARY = toBinary("@detectivehazebot");
 
 export default function DetectiveClient() {
   const [lang, setLang] = useState<Lang>("ru");
   const [isCallOpen, setIsCallOpen] = useState(false);
   const [callStage, setCallStage] = useState<CallStage>("ringing");
+  const [isBinaryMode, setIsBinaryMode] = useState(false);
   const t = copy[lang];
 
   const ringAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceReplayTimerRef = useRef<number | null>(null);
   const isAudioPrimedRef = useRef(false);
   const activeWindowKeyRef = useRef("");
   const ringPlayBlockedRef = useRef(false);
 
+  const clearVoiceReplayTimer = () => {
+    if (voiceReplayTimerRef.current === null) {
+      return;
+    }
+    window.clearTimeout(voiceReplayTimerRef.current);
+    voiceReplayTimerRef.current = null;
+  };
+
   const resetVoiceAudio = () => {
+    clearVoiceReplayTimer();
     const voice = voiceAudioRef.current;
     if (!voice) {
       return;
@@ -311,7 +321,8 @@ export default function DetectiveClient() {
     resetVoiceAudio();
   };
 
-  const canUseAudibleCall = () => document.visibilityState === "visible" && document.hasFocus();
+  const canShowCall = () => document.visibilityState === "visible";
+  const canPlayRingtone = () => document.visibilityState === "visible" && document.hasFocus();
 
   const getWindowKey = (now: Date) =>
     `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${TARGET_HOUR}-${TARGET_START_MINUTE}-${TARGET_END_MINUTE}`;
@@ -369,7 +380,7 @@ export default function DetectiveClient() {
         activeWindowKeyRef.current = "";
         return;
       }
-      if (!canUseAudibleCall()) {
+      if (!canShowCall()) {
         return;
       }
 
@@ -451,7 +462,7 @@ export default function DetectiveClient() {
     const startRingtone = () => {
       stopRingtone();
 
-      if (!canUseAudibleCall()) {
+      if (!canPlayRingtone()) {
         return;
       }
 
@@ -471,7 +482,7 @@ export default function DetectiveClient() {
     };
 
     const syncRingtoneState = () => {
-      if (!canUseAudibleCall()) {
+      if (!canPlayRingtone()) {
         stopRingtone();
         return;
       }
@@ -522,15 +533,26 @@ export default function DetectiveClient() {
     stopAllAudio();
     setCallStage("connected");
 
-    const voice = voiceAudioRef.current;
-    const nextVoice = voice ?? new Audio(CODE_VOICE_SRC);
+    const nextVoice = new Audio(CODE_VOICE_SRC);
     voiceAudioRef.current = nextVoice;
     nextVoice.currentTime = 0;
-    nextVoice.loop = true;
+    nextVoice.loop = false;
     nextVoice.playbackRate = 0.8;
     if ("preservesPitch" in nextVoice) {
       (nextVoice as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = false;
     }
+
+    nextVoice.addEventListener("ended", () => {
+      clearVoiceReplayTimer();
+      voiceReplayTimerRef.current = window.setTimeout(() => {
+        if (voiceAudioRef.current !== nextVoice) {
+          return;
+        }
+        nextVoice.currentTime = 0;
+        void nextVoice.play().catch(() => undefined);
+      }, 1000);
+    });
+
     void nextVoice.play().catch(() => undefined);
   };
 
@@ -539,55 +561,58 @@ export default function DetectiveClient() {
       {isCallOpen ? (
         <IncomingCallModal
           t={t}
-          stage={callStage}
           onAccept={acceptCall}
           onDecline={closeCall}
         />
       ) : null}
 
       <div className="min-h-screen w-full bg-white">
-        <SiteHeader t={t} />
+        <SiteHeader t={t} onSecretCode={() => setIsBinaryMode(true)} />
 
         <div className="grid grid-cols-1 gap-8 px-3 pb-14 pt-5 md:px-6 xl:grid-cols-[280px_minmax(0,1fr)] xl:px-10">
-          <LeftContents t={t} />
+          {isBinaryMode ? <BinaryContents /> : <LeftContents t={t} />}
 
-          <article id="top" className="min-w-0">
-            <ArticleHeader t={t} lang={lang} onSwitch={setLang} />
+          {isBinaryMode ? (
+            <BinaryArticle />
+          ) : (
+            <article id="top" className="min-w-0">
+              <ArticleHeader t={t} lang={lang} onSwitch={setLang} />
 
-            <div className="pt-3">
-              <p className="mb-3 text-[13px]">{t.article.sourceLine}</p>
+              <div className="pt-3">
+                <p className="mb-3 text-[13px]">{t.article.sourceLine}</p>
 
-              <Infobox t={t} lang={lang} />
+                <Infobox t={t} lang={lang} />
 
-              {t.article.lead.map((text) => (
-                <p className="mb-3 text-[16px] leading-[1.62]" key={text}>
-                  {highlightTime(text)}
-                </p>
-              ))}
+                {t.article.lead.map((text) => (
+                  <p className="mb-3 text-[16px] leading-[1.62]" key={text}>
+                    {highlightTime(text)}
+                  </p>
+                ))}
 
-              {t.sections.map((section) => (
-                <Section key={section.id} id={section.id} title={section.title}>
-                  {section.subtitles ? (
-                    <>
-                      {section.subtitles.map((subtitle, index) => (
-                        <div key={`${section.id}-${subtitle}`}>
-                          <h3 id={`${section.id}-${slug(subtitle)}`} className="mb-2 text-[18px] font-semibold">
-                            {subtitle}
-                          </h3>
-                          {section.paragraphs[index] ? <p>{highlightTime(section.paragraphs[index])}</p> : null}
-                        </div>
-                      ))}
-                      {section.paragraphs.slice(section.subtitles.length).map((paragraph) => (
-                        <p key={paragraph}>{highlightTime(paragraph)}</p>
-                      ))}
-                    </>
-                  ) : (
-                    section.paragraphs.map((paragraph) => <p key={paragraph}>{highlightTime(paragraph)}</p>)
-                  )}
-                </Section>
-              ))}
-            </div>
-          </article>
+                {t.sections.map((section) => (
+                  <Section key={section.id} id={section.id} title={section.title}>
+                    {section.subtitles ? (
+                      <>
+                        {section.subtitles.map((subtitle, index) => (
+                          <div key={`${section.id}-${subtitle}`}>
+                            <h3 id={`${section.id}-${slug(subtitle)}`} className="mb-2 text-[18px] font-semibold">
+                              {subtitle}
+                            </h3>
+                            {section.paragraphs[index] ? <p>{highlightTime(section.paragraphs[index])}</p> : null}
+                          </div>
+                        ))}
+                        {section.paragraphs.slice(section.subtitles.length).map((paragraph) => (
+                          <p key={paragraph}>{highlightTime(paragraph)}</p>
+                        ))}
+                      </>
+                    ) : (
+                      section.paragraphs.map((paragraph) => <p key={paragraph}>{highlightTime(paragraph)}</p>)
+                    )}
+                  </Section>
+                ))}
+              </div>
+            </article>
+          )}
         </div>
       </div>
     </main>
@@ -596,12 +621,10 @@ export default function DetectiveClient() {
 
 function IncomingCallModal({
   t,
-  stage,
   onAccept,
   onDecline,
 }: {
   t: Copy;
-  stage: CallStage;
   onAccept: () => void;
   onDecline: () => void;
 }) {
@@ -616,10 +639,6 @@ function IncomingCallModal({
           alt={t.call.title}
           className="mb-4 h-auto w-full rounded-sm border border-[#eaecf0]"
         />
-
-        {stage === "connected" ? (
-          <p className="mb-4 text-center text-[14px] text-[#202122]">{t.call.connected}</p>
-        ) : null}
 
         <div className="flex items-center justify-center gap-3">
           <button
@@ -642,7 +661,16 @@ function IncomingCallModal({
   );
 }
 
-function SiteHeader({ t }: { t: Copy }) {
+function SiteHeader({ t, onSecretCode }: { t: Copy; onSecretCode: () => void }) {
+  const [query, setQuery] = useState("");
+
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (query.trim() === SECRET_SEARCH_CODE) {
+      onSecretCode();
+    }
+  };
+
   return (
     <header className="border-b border-[#eaecf0] bg-white">
       <div className="flex min-h-[64px] items-center gap-4 px-3 md:px-6 xl:px-10">
@@ -660,7 +688,7 @@ function SiteHeader({ t }: { t: Copy }) {
           </div>
         </div>
 
-        <form className="ml-0 hidden h-8 min-w-[320px] max-w-[520px] flex-1 items-stretch md:flex lg:ml-6">
+        <form className="ml-0 hidden h-8 min-w-[320px] max-w-[520px] flex-1 items-stretch md:flex lg:ml-6" onSubmit={handleSearch}>
           <label className="sr-only" htmlFor="wiki-search">
             {t.header.search}
           </label>
@@ -669,10 +697,12 @@ function SiteHeader({ t }: { t: Copy }) {
             className="min-w-0 flex-1 border border-[#a2a9b1] px-3 text-[14px] outline-offset-2"
             placeholder={t.header.search}
             type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
           />
           <button
             className="border border-l-0 border-[#a2a9b1] bg-[#f8f9fa] px-4 font-semibold text-[#202122] hover:bg-[#eaecf0]"
-            type="button"
+            type="submit"
           >
             {t.header.find}
           </button>
@@ -817,6 +847,49 @@ function Section({
   );
 }
 
+function BinaryContents() {
+  return (
+    <aside className="hidden xl:block">
+      <nav className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-auto pr-4 font-mono text-[13px] leading-[1.7]">
+        <div className="border-b border-[#eaecf0] pb-2">00110011 00110001 00110111</div>
+        <div className="pt-3 text-[#54595d]">
+          <p>00110101 00110110 00111000 00110111 00110001 00110011</p>
+          <p>01000000 01100100 01100101 01110100</p>
+          <p>01100101 01100011 01110100 01101001</p>
+        </div>
+      </nav>
+    </aside>
+  );
+}
+
+function BinaryArticle() {
+  const binaryLines = [
+    SECRET_HANDLE_BINARY,
+    "00110101 00110110 00111000 00110111 00110001 00110011",
+    "01001000 01000001 01000010 01000001 01010010 01001000 01010101 01000010",
+    SECRET_HANDLE_BINARY,
+    "00110010 00110001 00101110 00110000 00110101 00101110 00110010 00110000 00110010 00110110",
+    "00000000 01000000 01100100 01100101 01110100 01100101 01100011 01110100 01101001 01110110 01100101 01101000 01100001 01111010 01100101 01100010 01101111 01110100",
+    SECRET_HANDLE_BINARY,
+  ];
+
+  return (
+    <article id="top" className="min-w-0 font-mono text-[#202122]">
+      <header className="border-b border-[#a2a9b1] pb-3">
+        <h1 className="break-words text-[24px] font-normal leading-[1.45]">{SECRET_HANDLE_BINARY}</h1>
+      </header>
+
+      <div className="pt-5 text-[16px] leading-[1.8]">
+        {binaryLines.map((line, index) => (
+          <p className="mb-4 break-words" key={`${line}-${index}`}>
+            {line}
+          </p>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 function highlightTime(text: string) {
   const marker = "19:00";
   if (!text.includes(marker)) {
@@ -841,4 +914,10 @@ function slug(value: string) {
     .toLowerCase()
     .replaceAll(" ", "-")
     .replace(/[^\p{Letter}\p{Number}-]/gu, "");
+}
+
+function toBinary(value: string) {
+  return Array.from(value)
+    .map((character) => character.charCodeAt(0).toString(2).padStart(8, "0"))
+    .join(" ");
 }
