@@ -570,7 +570,7 @@ export default function DetectiveClient() {
         <SiteHeader t={t} onSecretCode={() => setIsBinaryMode(true)} />
 
         <div className="grid grid-cols-1 gap-8 px-3 pb-14 pt-5 md:px-6 xl:grid-cols-[280px_minmax(0,1fr)] xl:px-10">
-          {isBinaryMode ? <BinaryContents /> : <LeftContents t={t} />}
+          {isBinaryMode ? <div className="hidden xl:block" /> : <LeftContents t={t} />}
 
           {isBinaryMode ? (
             <BinaryArticle />
@@ -847,45 +847,12 @@ function Section({
   );
 }
 
-function BinaryContents() {
-  return (
-    <aside className="hidden xl:block">
-      <nav className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-auto pr-4 font-mono text-[13px] leading-[1.7]">
-        <div className="border-b border-[#eaecf0] pb-2">00110011 00110001 00110111</div>
-        <div className="pt-3 text-[#54595d]">
-          <p>00110101 00110110 00111000 00110111 00110001 00110011</p>
-          <p>01000000 01100100 01100101 01110100</p>
-          <p>01100101 01100011 01110100 01101001</p>
-        </div>
-      </nav>
-    </aside>
-  );
-}
-
 function BinaryArticle() {
-  const binaryLines = [
-    SECRET_HANDLE_BINARY,
-    "00110101 00110110 00111000 00110111 00110001 00110011",
-    "01001000 01000001 01000010 01000001 01010010 01001000 01010101 01000010",
-    SECRET_HANDLE_BINARY,
-    "00110010 00110001 00101110 00110000 00110101 00101110 00110010 00110000 00110010 00110110",
-    "00000000 01000000 01100100 01100101 01110100 01100101 01100011 01110100 01101001 01110110 01100101 01101000 01100001 01111010 01100101 01100010 01101111 01110100",
-    SECRET_HANDLE_BINARY,
-  ];
-
   return (
     <article id="top" className="min-w-0 font-mono text-[#202122]">
-      <header className="border-b border-[#a2a9b1] pb-3">
-        <h1 className="break-words text-[24px] font-normal leading-[1.45]">{SECRET_HANDLE_BINARY}</h1>
-      </header>
-
-      <div className="pt-5 text-[16px] leading-[1.8]">
-        {binaryLines.map((line, index) => (
-          <p className="mb-4 break-words" key={`${line}-${index}`}>
-            {line}
-          </p>
-        ))}
-      </div>
+      <h1 className="break-words border-b border-[#a2a9b1] pb-3 text-[24px] font-normal leading-[1.45]">
+        {SECRET_HANDLE_BINARY}
+      </h1>
     </article>
   );
 }
