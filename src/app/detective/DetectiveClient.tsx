@@ -270,7 +270,8 @@ export default function DetectiveClient() {
   const ringAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const isAudioPrimedRef = useRef(false);
-  const lastTriggerWindowKeyRef = useRef("");
+  const activeWindowKeyRef = useRef("");
+  const ringPlayBlockedRef = useRef(false);
 
   const resetVoiceAudio = () => {
     const voice = voiceAudioRef.current;
@@ -356,20 +357,21 @@ export default function DetectiveClient() {
         minute <= TARGET_END_MINUTE;
 
       if (!isInTargetWindow) {
+        activeWindowKeyRef.current = "";
         return;
       }
-      const canShowCall = document.visibilityState === "visible" && document.hasFocus();
+      const canShowCall = document.visibilityState === "visible";
       if (!canShowCall) {
         return;
       }
 
-      // Trigger once per day only in 19:00-19:01 local device time.
+      // Trigger once per each entry into the 19:00-19:01 window.
       const windowKey = getWindowKey(now);
-      if (lastTriggerWindowKeyRef.current === windowKey) {
+      if (activeWindowKeyRef.current === windowKey) {
         return;
       }
 
-      lastTriggerWindowKeyRef.current = windowKey;
+      activeWindowKeyRef.current = windowKey;
       stopAllAudio();
       setCallStage("ringing");
       setIsCallOpen(true);
@@ -432,8 +434,10 @@ export default function DetectiveClient() {
       return;
     }
 
+    ringPlayBlockedRef.current = false;
+
     const syncRingtoneState = () => {
-      const canPlay = document.visibilityState === "visible" && document.hasFocus();
+      const canPlay = document.visibilityState === "visible";
       if (!canPlay) {
         ring.pause();
         ring.currentTime = 0;
@@ -446,18 +450,34 @@ export default function DetectiveClient() {
 
       ring.loop = true;
       ring.currentTime = 0;
-      void ring.play().catch(() => undefined);
+      void ring.play().catch(() => {
+        ringPlayBlockedRef.current = true;
+      });
+    };
+
+    const retryOnGesture = () => {
+      if (!ringPlayBlockedRef.current) {
+        return;
+      }
+      syncRingtoneState();
     };
 
     syncRingtoneState();
     const syncTimer = window.setInterval(syncRingtoneState, 200);
     window.addEventListener("focus", syncRingtoneState);
     document.addEventListener("visibilitychange", syncRingtoneState);
+    window.addEventListener("pointerdown", retryOnGesture, { passive: true });
+    window.addEventListener("keydown", retryOnGesture);
+    window.addEventListener("touchstart", retryOnGesture, { passive: true });
 
     return () => {
       window.clearInterval(syncTimer);
       window.removeEventListener("focus", syncRingtoneState);
       document.removeEventListener("visibilitychange", syncRingtoneState);
+      window.removeEventListener("pointerdown", retryOnGesture);
+      window.removeEventListener("keydown", retryOnGesture);
+      window.removeEventListener("touchstart", retryOnGesture);
+      ringPlayBlockedRef.current = false;
       ring.pause();
       ring.currentTime = 0;
     };
