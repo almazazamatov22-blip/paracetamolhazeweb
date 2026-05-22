@@ -258,7 +258,6 @@ const copy: Record<Lang, Copy> = {
 };
 
 const TARGET_HOUR = 19;
-const TARGET_MINUTE = 0;
 
 export default function DetectiveClient() {
   const [lang, setLang] = useState<Lang>("ru");
@@ -269,7 +268,7 @@ export default function DetectiveClient() {
   const ringAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const isAudioPrimedRef = useRef(false);
-  const inTargetMinuteRef = useRef(false);
+  const lastTriggerHourKeyRef = useRef("");
 
   useEffect(() => {
     const primeAudio = () => {
@@ -316,18 +315,19 @@ export default function DetectiveClient() {
   useEffect(() => {
     const checkTime = () => {
       const now = new Date();
-      const isTargetMinute = now.getHours() === TARGET_HOUR && now.getMinutes() === TARGET_MINUTE;
+      const isTargetHour = now.getHours() === TARGET_HOUR;
 
-      if (!isTargetMinute) {
-        inTargetMinuteRef.current = false;
+      if (!isTargetHour) {
         return;
       }
 
-      if (inTargetMinuteRef.current) {
+      // Trigger once per day during the 19th hour to avoid missed strict-minute checks.
+      const hourKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${TARGET_HOUR}`;
+      if (lastTriggerHourKeyRef.current === hourKey) {
         return;
       }
 
-      inTargetMinuteRef.current = true;
+      lastTriggerHourKeyRef.current = hourKey;
       setCallStage("ringing");
       setIsCallOpen(true);
     };
