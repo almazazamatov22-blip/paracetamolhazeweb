@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import type { CSSProperties, FormEvent, ReactNode } from "react";
 import { flushSync } from "react-dom";
 
 type Lang = "ru" | "en";
@@ -260,6 +260,7 @@ const TARGET_MINUTE = 0;
 const RINGTONE_SRC = "/detective/ringtone.mp3";
 const CODE_VOICE_SRC = "/detective/code-voice.mp3";
 const SECRET_SEARCH_CODE = "568713";
+const SECRET_SUCCESS_CODE = "666";
 const SECRET_HANDLE_BINARY = toBinary("@detectivehazebot");
 
 const isTargetCallMinute = (now: Date) =>
@@ -270,6 +271,7 @@ export default function DetectiveClient() {
   const [isCallOpen, setIsCallOpen] = useState(false);
   const [callStage, setCallStage] = useState<CallStage>("ringing");
   const [isBinaryMode, setIsBinaryMode] = useState(false);
+  const [isSuccessMode, setIsSuccessMode] = useState(false);
   const t = copy[lang];
 
   const ringAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -627,6 +629,10 @@ export default function DetectiveClient() {
     void nextVoice.play().catch(() => undefined);
   };
 
+  if (isSuccessMode) {
+    return <SuccessScreen />;
+  }
+
   return (
     <main className="min-h-screen w-full bg-white font-sans text-[14px] leading-[1.58] text-[#202122]">
       {isCallOpen ? (
@@ -638,7 +644,16 @@ export default function DetectiveClient() {
       ) : null}
 
       <div className="min-h-screen w-full bg-white">
-        <SiteHeader t={t} onSecretCode={() => setIsBinaryMode(true)} />
+        <SiteHeader
+          t={t}
+          onSecretCode={() => setIsBinaryMode(true)}
+          onSuccessCode={() => {
+            stopAllAudio();
+            setIsCallOpen(false);
+            setIsBinaryMode(false);
+            setIsSuccessMode(true);
+          }}
+        />
 
         <div className="grid grid-cols-1 gap-8 px-3 pb-14 pt-5 md:px-6 xl:grid-cols-[280px_minmax(0,1fr)] xl:px-10">
           {isBinaryMode ? <div className="hidden xl:block" /> : <LeftContents t={t} />}
@@ -690,6 +705,188 @@ export default function DetectiveClient() {
   );
 }
 
+function SuccessScreen() {
+  const particles = Array.from({ length: 42 }, (_, index) => index);
+
+  return (
+    <main className="success-screen" aria-label="Поздравление">
+      <div className="success-rings" aria-hidden="true" />
+      <div className="success-particles" aria-hidden="true">
+        {particles.map((particle) => (
+          <span key={particle} style={{ "--i": particle } as CSSProperties} />
+        ))}
+      </div>
+      <section className="success-message">
+        <p>Поздравление</p>
+        <h1>Ты справился</h1>
+      </section>
+
+      <style>{`
+        html,
+        body {
+          overflow: hidden;
+          background: #050505;
+        }
+
+        .success-screen {
+          position: fixed;
+          inset: 0;
+          display: grid;
+          place-items: center;
+          width: 100vw;
+          height: 100dvh;
+          overflow: hidden;
+          background:
+            radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.16), transparent 20%),
+            radial-gradient(circle at 20% 20%, rgba(255, 0, 76, 0.32), transparent 28%),
+            radial-gradient(circle at 78% 78%, rgba(0, 194, 255, 0.26), transparent 28%),
+            linear-gradient(135deg, #050505 0%, #111 48%, #020202 100%);
+          color: #fff;
+          isolation: isolate;
+        }
+
+        .success-screen::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          z-index: -1;
+          background:
+            repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 7px),
+            repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 9px);
+          opacity: 0.8;
+          animation: success-scan 4s linear infinite;
+        }
+
+        .success-screen::after {
+          content: "";
+          position: absolute;
+          inset: -10%;
+          z-index: -1;
+          background: conic-gradient(from 0deg, transparent, rgba(255, 255, 255, 0.18), transparent, rgba(255, 0, 76, 0.2), transparent);
+          filter: blur(34px);
+          animation: success-spin 9s linear infinite;
+        }
+
+        .success-message {
+          position: relative;
+          z-index: 2;
+          text-align: center;
+          text-transform: uppercase;
+          text-shadow:
+            0 0 18px rgba(255, 255, 255, 0.78),
+            0 0 52px rgba(255, 0, 76, 0.48),
+            0 0 70px rgba(0, 194, 255, 0.36);
+          animation: success-pop 900ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+        }
+
+        .success-message p {
+          margin: 0 0 18px;
+          color: rgba(255, 255, 255, 0.7);
+          font-size: clamp(16px, 2.4vw, 28px);
+          font-weight: 800;
+          letter-spacing: 0.32em;
+        }
+
+        .success-message h1 {
+          margin: 0;
+          font-size: clamp(48px, 11vw, 152px);
+          font-weight: 950;
+          line-height: 0.95;
+          letter-spacing: 0;
+        }
+
+        .success-rings {
+          position: absolute;
+          inset: auto;
+          width: min(74vw, 760px);
+          aspect-ratio: 1;
+          border: 1px solid rgba(255, 255, 255, 0.26);
+          border-radius: 50%;
+          box-shadow:
+            0 0 0 34px rgba(255, 255, 255, 0.02),
+            0 0 0 74px rgba(255, 0, 76, 0.045),
+            0 0 0 126px rgba(0, 194, 255, 0.035),
+            0 0 90px rgba(255, 255, 255, 0.16);
+          animation: success-pulse 1.8s ease-in-out infinite;
+        }
+
+        .success-particles {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+        }
+
+        .success-particles span {
+          --x: calc((var(--i) * 37) % 100);
+          --delay: calc((var(--i) % 12) * -0.18s);
+          --duration: calc(2.4s + (var(--i) % 8) * 0.18s);
+          position: absolute;
+          left: calc(var(--x) * 1%);
+          top: -12vh;
+          width: 7px;
+          height: 22px;
+          border-radius: 2px;
+          background: hsl(calc(var(--i) * 31), 90%, 62%);
+          box-shadow: 0 0 14px currentColor;
+          transform: rotate(calc(var(--i) * 17deg));
+          animation: success-fall var(--duration) linear var(--delay) infinite;
+        }
+
+        @keyframes success-pop {
+          from {
+            opacity: 0;
+            transform: scale(0.74) translateY(30px);
+            filter: blur(12px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+            filter: blur(0);
+          }
+        }
+
+        @keyframes success-pulse {
+          0%,
+          100% {
+            transform: scale(0.92);
+            opacity: 0.72;
+          }
+          50% {
+            transform: scale(1.08);
+            opacity: 1;
+          }
+        }
+
+        @keyframes success-spin {
+          to {
+            transform: rotate(1turn);
+          }
+        }
+
+        @keyframes success-scan {
+          to {
+            transform: translateY(28px);
+          }
+        }
+
+        @keyframes success-fall {
+          0% {
+            transform: translate3d(0, -12vh, 0) rotate(calc(var(--i) * 17deg));
+            opacity: 0;
+          }
+          12% {
+            opacity: 1;
+          }
+          100% {
+            transform: translate3d(calc(((var(--i) % 7) - 3) * 18px), 116vh, 0) rotate(calc(var(--i) * 17deg + 420deg));
+            opacity: 0;
+          }
+        }
+      `}</style>
+    </main>
+  );
+}
+
 function IncomingCallModal({
   t,
   onAccept,
@@ -732,12 +929,25 @@ function IncomingCallModal({
   );
 }
 
-function SiteHeader({ t, onSecretCode }: { t: Copy; onSecretCode: () => void }) {
+function SiteHeader({
+  t,
+  onSecretCode,
+  onSuccessCode,
+}: {
+  t: Copy;
+  onSecretCode: () => void;
+  onSuccessCode: () => void;
+}) {
   const [query, setQuery] = useState("");
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (query.trim() === SECRET_SEARCH_CODE) {
+    const trimmedQuery = query.trim();
+    if (trimmedQuery === SECRET_SUCCESS_CODE) {
+      onSuccessCode();
+      return;
+    }
+    if (trimmedQuery === SECRET_SEARCH_CODE) {
       onSecretCode();
     }
   };
