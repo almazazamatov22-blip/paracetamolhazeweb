@@ -269,7 +269,7 @@ export default function DetectiveClient() {
   const ringAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const isAudioPrimedRef = useRef(false);
-  const lastCallKeyRef = useRef<string>("");
+  const inTargetMinuteRef = useRef(false);
 
   useEffect(() => {
     const primeAudio = () => {
@@ -316,16 +316,18 @@ export default function DetectiveClient() {
   useEffect(() => {
     const checkTime = () => {
       const now = new Date();
-      if (now.getHours() !== TARGET_HOUR || now.getMinutes() !== TARGET_MINUTE) {
+      const isTargetMinute = now.getHours() === TARGET_HOUR && now.getMinutes() === TARGET_MINUTE;
+
+      if (!isTargetMinute) {
+        inTargetMinuteRef.current = false;
         return;
       }
 
-      const dayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${TARGET_HOUR}-${TARGET_MINUTE}`;
-      if (lastCallKeyRef.current === dayKey) {
+      if (inTargetMinuteRef.current) {
         return;
       }
 
-      lastCallKeyRef.current = dayKey;
+      inTargetMinuteRef.current = true;
       setCallStage("ringing");
       setIsCallOpen(true);
     };
