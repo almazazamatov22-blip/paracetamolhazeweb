@@ -260,6 +260,8 @@ const copy: Record<Lang, Copy> = {
 const TARGET_HOUR = 19;
 const TARGET_START_MINUTE = 0;
 const TARGET_END_MINUTE = 1;
+const CALL_OWNER_KEY = "detective_call_owner";
+const CALL_TRIGGER_KEY = "detective_call_trigger_window";
 
 export default function DetectiveClient() {
   const [lang, setLang] = useState<Lang>("ru");
@@ -271,6 +273,70 @@ export default function DetectiveClient() {
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const isAudioPrimedRef = useRef(false);
   const lastTriggerWindowKeyRef = useRef("");
+  const tabIdRef = useRef("");
+
+  if (!tabIdRef.current) {
+    tabIdRef.current =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  const resetVoiceAudio = () => {
+    const voice = voiceAudioRef.current;
+    if (!voice) {
+      return;
+    }
+    voice.pause();
+    voice.currentTime = 0;
+    voice.loop = false;
+    voice.playbackRate = 1;
+    if ("preservesPitch" in voice) {
+      (voice as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
+    }
+  };
+
+  const stopRingtone = () => {
+    const ring = ringAudioRef.current;
+    if (!ring) {
+      return;
+    }
+    ring.pause();
+    ring.currentTime = 0;
+    ring.loop = false;
+  };
+
+  const stopAllAudio = () => {
+    stopRingtone();
+    resetVoiceAudio();
+  };
+
+  const getWindowKey = (now: Date) =>
+    `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${TARGET_HOUR}-${TARGET_START_MINUTE}-${TARGET_END_MINUTE}`;
+
+  const claimCallOwner = () => {
+    try {
+      const currentOwner = window.localStorage.getItem(CALL_OWNER_KEY);
+      if (currentOwner && currentOwner !== tabIdRef.current) {
+        return false;
+      }
+
+      window.localStorage.setItem(CALL_OWNER_KEY, tabIdRef.current);
+      return window.localStorage.getItem(CALL_OWNER_KEY) === tabIdRef.current;
+    } catch {
+      return true;
+    }
+  };
+
+  const releaseCallOwner = () => {
+    try {
+      if (window.localStorage.getItem(CALL_OWNER_KEY) === tabIdRef.current) {
+        window.localStorage.removeItem(CALL_OWNER_KEY);
+      }
+    } catch {
+      // ignore storage failures
+    }
+  };
 
   useEffect(() => {
     const primeAudio = () => {
@@ -328,19 +394,46 @@ export default function DetectiveClient() {
       }
 
       // Trigger once per day only in 19:00-19:01 local device time.
-      const windowKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${TARGET_HOUR}-${TARGET_START_MINUTE}-${TARGET_END_MINUTE}`;
+      const windowKey = getWindowKey(now);
       if (lastTriggerWindowKeyRef.current === windowKey) {
+        return;
+      }
+      try {
+        const globalWindowKey = window.localStorage.getItem(CALL_TRIGGER_KEY);
+        if (globalWindowKey === windowKey) {
+          lastTriggerWindowKeyRef.current = windowKey;
+          return;
+        }
+      } catch {
+        // ignore storage failures
+      }
+
+      if (!claimCallOwner()) {
         return;
       }
 
       lastTriggerWindowKeyRef.current = windowKey;
+      try {
+        window.localStorage.setItem(CALL_TRIGGER_KEY, windowKey);
+      } catch {
+        // ignore storage failures
+      }
+      stopAllAudio();
       setCallStage("ringing");
       setIsCallOpen(true);
     };
 
     checkTime();
-    const timer = window.setInterval(checkTime, 500);
+    const timer = window.setInterval(checkTime, 250);
+    let rafId = 0;
+    const rafLoop = () => {
+      checkTime();
+      rafId = window.requestAnimationFrame(rafLoop);
+    };
+    rafId = window.requestAnimationFrame(rafLoop);
+
     const onFocus = () => checkTime();
+    const onPageShow = () => checkTime();
     const onVisibility = () => {
       if (!document.hidden) {
         checkTime();
@@ -348,12 +441,47 @@ export default function DetectiveClient() {
     };
 
     window.addEventListener("focus", onFocus);
+    window.addEventListener("pageshow", onPageShow);
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       window.clearInterval(timer);
+      window.cancelAnimationFrame(rafId);
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("pageshow", onPageShow);
       document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    const hardStop = () => {
+      stopAllAudio();
+      releaseCallOwner();
+    };
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== CALL_OWNER_KEY) {
+        return;
+      }
+
+      if (event.newValue && event.newValue !== tabIdRef.current) {
+        stopAllAudio();
+        setCallStage("ringing");
+        setIsCallOpen(false);
+      }
+    };
+
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("pagehide", hardStop);
+    window.addEventListener("beforeunload", hardStop);
+    window.addEventListener("unload", hardStop);
+
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("pagehide", hardStop);
+      window.removeEventListener("beforeunload", hardStop);
+      window.removeEventListener("unload", hardStop);
+      hardStop();
     };
   }, []);
 
@@ -377,57 +505,15 @@ export default function DetectiveClient() {
     };
   }, [isCallOpen, callStage]);
 
-  useEffect(() => {
-    if (!isCallOpen || callStage !== "ringing") {
-      return;
-    }
-
-    const tryResumeRingtone = () => {
-      const ring = ringAudioRef.current;
-      if (!ring || !ring.paused) {
-        return;
-      }
-      void ring.play().catch(() => undefined);
-    };
-
-    window.addEventListener("pointerdown", tryResumeRingtone, { passive: true });
-    window.addEventListener("keydown", tryResumeRingtone);
-    window.addEventListener("touchstart", tryResumeRingtone, { passive: true });
-
-    return () => {
-      window.removeEventListener("pointerdown", tryResumeRingtone);
-      window.removeEventListener("keydown", tryResumeRingtone);
-      window.removeEventListener("touchstart", tryResumeRingtone);
-    };
-  }, [isCallOpen, callStage]);
-
-  const stopRingtone = () => {
-    const ring = ringAudioRef.current;
-    if (!ring) {
-      return;
-    }
-    ring.pause();
-    ring.currentTime = 0;
-  };
-
   const closeCall = () => {
-    stopRingtone();
-    const voice = voiceAudioRef.current;
-    if (voice) {
-      voice.pause();
-      voice.currentTime = 0;
-      voice.loop = false;
-      voice.playbackRate = 1;
-      if ("preservesPitch" in voice) {
-        (voice as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
-      }
-    }
+    stopAllAudio();
     setCallStage("ringing");
     setIsCallOpen(false);
+    releaseCallOwner();
   };
 
   const acceptCall = () => {
-    stopRingtone();
+    stopAllAudio();
     setCallStage("connected");
 
     const voice = voiceAudioRef.current;
