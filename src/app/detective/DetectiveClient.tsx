@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
+import { flushSync } from "react-dom";
 
 type Lang = "ru" | "en";
 type CallStage = "ringing" | "connected";
@@ -275,8 +276,9 @@ export default function DetectiveClient() {
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceReplayTimerRef = useRef<number | null>(null);
   const clockSampleRef = useRef<{ monotonic: number; wall: number } | null>(null);
+  const isCallOpenRef = useRef(false);
+  const dismissedWindowKeyRef = useRef("");
   const isAudioPrimedRef = useRef(false);
-  const activeWindowKeyRef = useRef("");
   const ringPlayBlockedRef = useRef(false);
 
   const clearVoiceReplayTimer = () => {
@@ -370,22 +372,27 @@ export default function DetectiveClient() {
   }, []);
 
   useEffect(() => {
+    isCallOpenRef.current = isCallOpen;
+  }, [isCallOpen]);
+
+  useEffect(() => {
     const triggerCallAt = (now: Date) => {
       if (!isTargetCallMinute(now)) {
-        activeWindowKeyRef.current = "";
+        dismissedWindowKeyRef.current = "";
         return;
       }
 
-      // Trigger once per each entry into the 19:00 minute.
       const windowKey = getWindowKey(now);
-      if (activeWindowKeyRef.current === windowKey) {
+      if (isCallOpenRef.current || dismissedWindowKeyRef.current === windowKey) {
         return;
       }
 
-      activeWindowKeyRef.current = windowKey;
+      isCallOpenRef.current = true;
       stopAllAudio();
-      setCallStage("ringing");
-      setIsCallOpen(true);
+      flushSync(() => {
+        setCallStage("ringing");
+        setIsCallOpen(true);
+      });
     };
 
     const checkTime = () => triggerCallAt(new Date());
@@ -393,6 +400,9 @@ export default function DetectiveClient() {
     let delayedTimers: number[] = [];
     const checkTimeBurst = () => {
       checkTime();
+      delayedTimers.push(window.setTimeout(checkTime, 0));
+      delayedTimers.push(window.setTimeout(checkTime, 10));
+      delayedTimers.push(window.setTimeout(checkTime, 20));
       delayedTimers.push(window.setTimeout(checkTime, 25));
       delayedTimers.push(window.setTimeout(checkTime, 50));
       delayedTimers.push(window.setTimeout(checkTime, 100));
@@ -428,7 +438,7 @@ export default function DetectiveClient() {
       const workerSource = `
         const tick = () => self.postMessage(Date.now());
         tick();
-        setInterval(tick, 50);
+        setInterval(tick, 20);
       `;
       const workerBlob = new Blob([workerSource], { type: "text/javascript" });
       workerUrl = URL.createObjectURL(workerBlob);
@@ -439,7 +449,7 @@ export default function DetectiveClient() {
     }
 
     checkTimeBurst();
-    const timer = window.setInterval(checkClock, 50);
+    const timer = window.setInterval(checkClock, 20);
     let rafId = 0;
     const rafLoop = () => {
       checkClock();
@@ -581,6 +591,11 @@ export default function DetectiveClient() {
 
   const closeCall = () => {
     stopAllAudio();
+    const now = new Date();
+    if (isTargetCallMinute(now)) {
+      dismissedWindowKeyRef.current = getWindowKey(now);
+    }
+    isCallOpenRef.current = false;
     setCallStage("ringing");
     setIsCallOpen(false);
   };
