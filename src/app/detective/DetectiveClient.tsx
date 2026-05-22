@@ -260,6 +260,8 @@ const copy: Record<Lang, Copy> = {
 const TARGET_HOUR = 19;
 const TARGET_START_MINUTE = 0;
 const TARGET_END_MINUTE = 1;
+const RINGTONE_SRC = "/detective/ringtone.mp3";
+const CODE_VOICE_SRC = "/detective/code-voice.mp3";
 
 export default function DetectiveClient() {
   const [lang, setLang] = useState<Lang>("ru");
@@ -282,6 +284,9 @@ export default function DetectiveClient() {
     voice.currentTime = 0;
     voice.loop = false;
     voice.playbackRate = 1;
+    voice.removeAttribute("src");
+    voice.load();
+    voiceAudioRef.current = null;
     if ("preservesPitch" in voice) {
       (voice as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
     }
@@ -295,12 +300,18 @@ export default function DetectiveClient() {
     ring.pause();
     ring.currentTime = 0;
     ring.loop = false;
+    ring.removeAttribute("src");
+    ring.load();
+    ringAudioRef.current = null;
+    ringPlayBlockedRef.current = false;
   };
 
   const stopAllAudio = () => {
     stopRingtone();
     resetVoiceAudio();
   };
+
+  const canUseAudibleCall = () => document.visibilityState === "visible" && document.hasFocus();
 
   const getWindowKey = (now: Date) =>
     `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${TARGET_HOUR}-${TARGET_START_MINUTE}-${TARGET_END_MINUTE}`;
@@ -312,12 +323,9 @@ export default function DetectiveClient() {
       }
       isAudioPrimedRef.current = true;
 
-      const primeElement = async (audio: HTMLAudioElement | null) => {
-        if (!audio) {
-          return;
-        }
-        const wasMuted = audio.muted;
-        audio.muted = true;
+      const primeElement = async (src: string) => {
+        const audio = new Audio(src);
+        audio.volume = 0;
         try {
           await audio.play();
         } catch {
@@ -325,11 +333,12 @@ export default function DetectiveClient() {
         }
         audio.pause();
         audio.currentTime = 0;
-        audio.muted = wasMuted;
+        audio.removeAttribute("src");
+        audio.load();
       };
 
-      void primeElement(ringAudioRef.current);
-      void primeElement(voiceAudioRef.current);
+      void primeElement(RINGTONE_SRC);
+      void primeElement(CODE_VOICE_SRC);
 
       window.removeEventListener("pointerdown", primeAudio);
       window.removeEventListener("keydown", primeAudio);
@@ -360,8 +369,7 @@ export default function DetectiveClient() {
         activeWindowKeyRef.current = "";
         return;
       }
-      const canShowCall = document.visibilityState === "visible";
-      if (!canShowCall) {
+      if (!canUseAudibleCall()) {
         return;
       }
 
@@ -411,15 +419,24 @@ export default function DetectiveClient() {
     const hardStop = () => {
       stopAllAudio();
     };
+    const stopWhenHidden = () => {
+      if (document.visibilityState !== "visible") {
+        hardStop();
+      }
+    };
 
+    window.addEventListener("blur", hardStop);
     window.addEventListener("pagehide", hardStop);
     window.addEventListener("beforeunload", hardStop);
     window.addEventListener("unload", hardStop);
+    document.addEventListener("visibilitychange", stopWhenHidden);
 
     return () => {
+      window.removeEventListener("blur", hardStop);
       window.removeEventListener("pagehide", hardStop);
       window.removeEventListener("beforeunload", hardStop);
       window.removeEventListener("unload", hardStop);
+      document.removeEventListener("visibilitychange", stopWhenHidden);
       hardStop();
     };
   }, []);
@@ -429,34 +446,46 @@ export default function DetectiveClient() {
       return;
     }
 
-    const ring = ringAudioRef.current;
-    if (!ring) {
-      return;
-    }
-
     ringPlayBlockedRef.current = false;
 
-    const syncRingtoneState = () => {
-      const canPlay = document.visibilityState === "visible";
-      if (!canPlay) {
-        ring.pause();
-        ring.currentTime = 0;
+    const startRingtone = () => {
+      stopRingtone();
+
+      if (!canUseAudibleCall()) {
         return;
       }
 
-      if (!ring.paused) {
-        return;
-      }
-
+      const ring = new Audio(RINGTONE_SRC);
       ring.loop = true;
-      ring.currentTime = 0;
-      void ring.play().catch(() => {
-        ringPlayBlockedRef.current = true;
-      });
+      ring.preload = "auto";
+      ringAudioRef.current = ring;
+
+      void ring
+        .play()
+        .then(() => {
+          ringPlayBlockedRef.current = false;
+        })
+        .catch(() => {
+          ringPlayBlockedRef.current = true;
+        });
+    };
+
+    const syncRingtoneState = () => {
+      if (!canUseAudibleCall()) {
+        stopRingtone();
+        return;
+      }
+
+      const ring = ringAudioRef.current;
+      if (ring && !ring.paused) {
+        return;
+      }
+
+      startRingtone();
     };
 
     const retryOnGesture = () => {
-      if (!ringPlayBlockedRef.current) {
+      if (!ringPlayBlockedRef.current || !isCallOpen || callStage !== "ringing") {
         return;
       }
       syncRingtoneState();
@@ -465,6 +494,7 @@ export default function DetectiveClient() {
     syncRingtoneState();
     const syncTimer = window.setInterval(syncRingtoneState, 200);
     window.addEventListener("focus", syncRingtoneState);
+    window.addEventListener("blur", stopRingtone);
     document.addEventListener("visibilitychange", syncRingtoneState);
     window.addEventListener("pointerdown", retryOnGesture, { passive: true });
     window.addEventListener("keydown", retryOnGesture);
@@ -473,13 +503,12 @@ export default function DetectiveClient() {
     return () => {
       window.clearInterval(syncTimer);
       window.removeEventListener("focus", syncRingtoneState);
+      window.removeEventListener("blur", stopRingtone);
       document.removeEventListener("visibilitychange", syncRingtoneState);
       window.removeEventListener("pointerdown", retryOnGesture);
       window.removeEventListener("keydown", retryOnGesture);
       window.removeEventListener("touchstart", retryOnGesture);
-      ringPlayBlockedRef.current = false;
-      ring.pause();
-      ring.currentTime = 0;
+      stopRingtone();
     };
   }, [isCallOpen, callStage]);
 
@@ -494,23 +523,19 @@ export default function DetectiveClient() {
     setCallStage("connected");
 
     const voice = voiceAudioRef.current;
-    if (!voice) {
-      return;
+    const nextVoice = voice ?? new Audio(CODE_VOICE_SRC);
+    voiceAudioRef.current = nextVoice;
+    nextVoice.currentTime = 0;
+    nextVoice.loop = true;
+    nextVoice.playbackRate = 0.8;
+    if ("preservesPitch" in nextVoice) {
+      (nextVoice as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = false;
     }
-    voice.currentTime = 0;
-    voice.loop = true;
-    voice.playbackRate = 0.8;
-    if ("preservesPitch" in voice) {
-      (voice as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = false;
-    }
-    void voice.play().catch(() => undefined);
+    void nextVoice.play().catch(() => undefined);
   };
 
   return (
     <main className="min-h-screen w-full bg-white font-sans text-[14px] leading-[1.58] text-[#202122]">
-      <audio ref={ringAudioRef} src="/detective/ringtone.mp3" preload="auto" />
-      <audio ref={voiceAudioRef} src="/detective/code-voice.mp3" preload="auto" />
-
       {isCallOpen ? (
         <IncomingCallModal
           t={t}
