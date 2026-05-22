@@ -811,7 +811,7 @@ function Infobox({ t, lang }: { t: Copy; lang: Lang }) {
 
       <div className="mx-auto mb-3 max-w-[290px] overflow-hidden bg-[#111111]">
         <img
-          src="/detective/habarhub-photo.jpg"
+          src="/detective404.jpg"
           alt={lang === "ru" ? "Фото Habarhub" : "Habarhub photo"}
           className="h-auto w-full object-cover"
           loading="eager"
