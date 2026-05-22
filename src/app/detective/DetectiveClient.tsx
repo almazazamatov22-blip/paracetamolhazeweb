@@ -233,7 +233,7 @@ const copy: Record<Lang, Copy> = {
         title: "Theories and leads",
         paragraphs: [
           "Inside the case narrative, two core theories are tracked: the creator disappeared voluntarily, or the creator may have been killed. The second theory remains an unverified investigation hypothesis.",
-          "The timeline review compares Twitch, YouTube, and Telegram activity windows, with special focus on the recurring 19:00 MSK slot.",
+          "The timeline review compares Twitch, YouTube, and Telegram activity windows, with special focus on the recurring 19:00 MSK slot. Archived marker: -..-. -...",
         ],
       },
       {
