@@ -170,7 +170,7 @@ const copy: Record<Lang, Copy> = {
       sourceLine: "From Wikipedia, the free encyclopedia",
       lead: [
         "Habarhub is a Russian[[bold:-]]speaking streamer and creator behind the HabarHub channel (YouTube: @VagabovDmitrii)[[bold:.]] The public Twitch description lists regular streams at 19:00 MSK and formats such as shows, films, reactions, games, IRL, and interactive sessions[[bold:.]]",
-        "The public profile facts below are based on the open channel descriptions.",
+        "The public profile facts[[bold:-]] below are based on the open channel descriptions[[bold:.]]",
       ],
     },
     tocTitle: "Contents",
@@ -224,7 +224,7 @@ const copy: Record<Lang, Copy> = {
         title: "Disappearance on 2026-05-21",
         subtitles: ["Final stream", "What viewers noticed"],
         paragraphs: [
-          "In the case timeline, a regular stream was expected at 19:00 MSK on May 21, 2026. The session did appear, but it ended without the usual closing segment and without a next[[bold:-]]stream note[[bold:.]]",
+          "In the case timeline, a regular stream was expected at 19:00 MSK on May 21, 2026. The session did appear, but it ended without the usual closing segment and without a next-stream note.",
           "After May 21, 2026 no new post appeared at the usual time window. In this storyline, that moment is treated as the start of the disappearance: accounts remain online, but the creator is silent.",
         ],
       },
