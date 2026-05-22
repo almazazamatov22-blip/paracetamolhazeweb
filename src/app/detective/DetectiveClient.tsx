@@ -522,7 +522,7 @@ export default function DetectiveClient() {
     }
     voice.currentTime = 0;
     voice.loop = true;
-    voice.playbackRate = 0.5;
+    voice.playbackRate = 0.8;
     if ("preservesPitch" in voice) {
       (voice as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = false;
     }
