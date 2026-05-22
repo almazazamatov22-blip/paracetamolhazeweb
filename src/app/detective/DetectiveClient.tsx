@@ -63,7 +63,7 @@ const copy: Record<Lang, Copy> = {
       find: "Найти",
     },
     article: {
-      title: "Habarhub (стример)",
+      title: "Мокривский (стример)",
       languageRu: "Русский",
       languageEn: "English",
       tabsLeftActive: "Статья",
@@ -71,8 +71,8 @@ const copy: Record<Lang, Copy> = {
       tabsRight: ["Читать", "Править", "История", "Инструменты"],
       sourceLine: "Материал из Википедии — свободной энциклопедии",
       lead: [
-        "Habarhub — русскоязычный стример и автор канала HabarHub (YouTube: @VagabovDmitrii)[[bold:.]] В открытом описании Twitch указаны регулярные эфиры в 19:00 МСК и форматы: шоу, фильмы, реакции, игры, IRL, интерактив[[bold:.]]",
-        "Основные публичные сведения собраны из описаний Twitch и YouTube-канала[[bold:.]]",
+        "Роман Мокривский, более известный как Mokrivskiy, — русскоязычный стример и контент-мейкер, связанный с Twitch, YouTube и Telegram[[bold:.]] Основная публичная известность построена вокруг Counter-Strike, разговорных эфиров, реакций и стримерского комьюнити[[bold:.]]",
+        "В открытых описаниях чаще всего упоминаются ник Mokrivskiy, игровые трансляции и активное общение с аудиторией[[bold:.]]",
       ],
     },
     tocTitle: "Содержание",
@@ -90,17 +90,17 @@ const copy: Record<Lang, Copy> = {
       { id: "community", label: "Реакция сообщества", children: [] },
     ],
     infobox: {
-      title: "Habarhub",
-      subtitle: "англ. Habarhub",
+      title: "Mokrivskiy",
+      subtitle: "англ. Mokrivskiy",
       rows: [
-        ["Псевдоним", "Habarhub"],
-        ["YouTube", "@VagabovDmitrii"],
-        ["Основной формат", "разговорные эфиры, реакции, игры"],
-        ["Расписание (профиль)", "19:00 МСК"],
+        ["Псевдоним", "Mokrivskiy"],
+        ["YouTube", "@mokrivskyi"],
+        ["Основной формат", "Counter-Strike, разговорные эфиры, реакции"],
+        ["Время в досье", "22:17 МСК"],
         ["Площадки", "Twitch, YouTube, Telegram"],
-        ["Описание контента", "шоу, фильмы, реакции, игры, IRL, интерактив"],
-        ["Статус в досье", "пропал из сети 21 мая 2026"],
-        ["Последний сигнал", "эфир без финального выхода на связь"],
+        ["Описание контента", "игры, IRL, стримерские разборы, интерактив"],
+        ["Статус в досье", "нет связи после 21 мая 2026"],
+        ["Последний сигнал", "эфир оборвался после 22:17 МСК"],
       ],
     },
     sections: [
@@ -109,16 +109,16 @@ const copy: Record<Lang, Copy> = {
         title: "Биография",
         subtitles: ["Публичные сведения"],
         paragraphs: [
-          "В открытых профилях автор использует имя[[bold:-]]Хабар. На Twitch[[bold:-]]профиль описан как канал с вечерними стримами, где совмещаются разговор, просмотры, реакции и игровые сессии.",
-          "На YouTube канал подписан как[[bold:-]]HabarHub и привязан к адресу @VagabovDmitrii. Подробные личные данные (дата рождения, город, семья) в доступных описаниях не раскрываются.",
+          "В открытых профилях и каталогах стримеров Роман указан под ником[[bold:-]]Mokrivskiy. На Twitch[[bold:-]]его связывают прежде всего с Counter-Strike, прямыми эфирами и постоянным контактом с чатом.",
+          "На YouTube и в Telegram аудитория следит за ним как[[bold:-]]за медийным участником русскоязычной Twitch-сцены. Подробности личной жизни в публичных описаниях раскрываются выборочно.",
         ],
       },
       {
         id: "platforms",
         title: "Платформы",
         paragraphs: [
-          "По описанию Twitch канал работает как ежедневная живая площадка[[bold:.]] Отдельно вынесены команды для чата и переходы к анонсам в Telegram, что указывает на привычный цикл- анонс, эфир, обсуждение после эфира[[bold:.]]",
-          "YouTube используется как витрина и архив канала HabarHub[[bold:.]] Оформление и текст на странице согласуются с Twitch-профилем- тот же ник, тот же акцент на разговорах и вечерних включениях.",
+          "Twitch остается исторической площадкой Мокривского[[bold:.]] Вокруг эфиров сформировался привычный цикл- анонс, прямой эфир, реакция чата и обсуждение клипов после трансляции[[bold:.]]",
+          "YouTube используется как архив и витрина публичных разборов Mokrivskiy[[bold:.]] Telegram работает как быстрый канал связи- там появляются анонсы, короткие сообщения и следы активности.",
         ],
       },
       {
@@ -126,23 +126,23 @@ const copy: Record<Lang, Copy> = {
         title: "Исчезновение 21.05.2026",
         subtitles: ["Последний эфир", "Что заметили зрители"],
         paragraphs: [
-          "Сюжет досье фиксирует, что 21 мая 2026 года к 19:00 МСК ожидался обычный стрим[[bold:.]] Запуск действительно появился, но эфир завершился без привычного финального блока и без сообщений о переносе следующего выхода.",
-          "После 21 мая 2026 аккаунты не дали нового поста в обычное время. Внутри кейса это считается моментом исчезновения[[bold:-]]канал на месте, но автор на связь не выходит.",
+          "Сюжет досье фиксирует, что 21 мая 2026 года к 22:17 МСК в чате ожидали обычный поздний эфир[[bold:.]] Трансляция действительно появилась, но оборвалась без привычного финального блока и без объяснения паузы.",
+          "После 21 мая 2026 аккаунты не дали понятного поста в обычном ритме. Внутри кейса это считается моментом исчезновения[[bold:-]]площадки на месте, но автор на связь не выходит.",
         ],
       },
       {
         id: "investigation",
         title: "Версии и зацепки",
         paragraphs: [
-          "Внутри сценария рассматриваются две основные версии: автор пропал без объяснений или автора могли убить[[bold:.]] Вторая версия остается только гипотезой расследования и требует подтверждения[[bold:-]]цифровыми уликами[[bold:.]]",
-          "Для проверки сравнивают интервалы активности и временные метки публикаций на Twitch, YouTube и в Telegram, с отдельным вниманием к регулярному слоту 19:00 МСК[[bold:.]]",
+          "Внутри сценария рассматриваются две основные версии: Роман пропал без объяснений или его могли убить[[bold:.]] Вторая версия остается только гипотезой расследования и требует подтверждения[[bold:-]]цифровыми уликами[[bold:.]]",
+          "Для проверки сравнивают интервалы активности и временные метки публикаций на Twitch, YouTube и в Telegram, с отдельным вниманием к отметке 22:17 МСК[[bold:.]]",
         ],
       },
       {
         id: "community",
         title: "Реакция сообщества[[bold:.]]",
         paragraphs: [
-          "Зрители[[bold:.]] разделились на две группы[[bold:-]] часть считает исчезновение запланированной паузой, часть настаивает, что последний эфир отличался по ритму и тону[[bold:-]]обычных включений[[bold:.]] Внутри сообщества сохраняется активный сбор заметок по датам и времени[[bold:.]]",
+          "Зрители[[bold:.]] разделились на две группы[[bold:-]] часть считает исчезновение медийной паузой, часть настаивает, что последний эфир отличался по ритму и тону[[bold:-]]обычных включений[[bold:.]] Внутри сообщества сохраняется активный сбор заметок по датам и времени[[bold:.]]",
           "Сообщество продолжает сверять архивы, таймкоды и редкие следы активности, пытаясь восстановить полную цепочку событий по минутам.",
         ],
       },
@@ -162,7 +162,7 @@ const copy: Record<Lang, Copy> = {
       find: "Search",
     },
     article: {
-      title: "Habarhub (streamer)",
+      title: "Mokrivskiy (streamer)",
       languageRu: "Русский",
       languageEn: "English",
       tabsLeftActive: "Article",
@@ -170,8 +170,8 @@ const copy: Record<Lang, Copy> = {
       tabsRight: ["Read", "Edit", "History", "Tools"],
       sourceLine: "From Wikipedia, the free encyclopedia",
       lead: [
-        "Habarhub is a Russian[[bold:-]]speaking streamer and creator behind the HabarHub channel (YouTube: @VagabovDmitrii)[[bold:.]] The public Twitch description lists regular streams at 19:00 MSK and formats such as shows, films, reactions, games, IRL, and interactive sessions[[bold:.]]",
-        "The public profile facts[[bold:-]] below are based on the open channel descriptions[[bold:.]]",
+        "Roman Mokrivskiy, better known as Mokrivskiy, is a Russian[[bold:-]]language streamer and online creator connected with Twitch, YouTube, Telegram, Counter-Strike, and live commentary[[bold:.]] The public profile facts focus on streams, reactions, community conflicts, and audience interaction[[bold:.]]",
+        "The public profile facts[[bold:-]] below are based on open streamer directories and media reports[[bold:.]]",
       ],
     },
     tocTitle: "Contents",
@@ -189,17 +189,17 @@ const copy: Record<Lang, Copy> = {
       { id: "community", label: "Community response", children: [] },
     ],
     infobox: {
-      title: "Habarhub",
-      subtitle: "eng. Habarhub",
+      title: "Mokrivskiy",
+      subtitle: "eng. Mokrivskiy",
       rows: [
-        ["Alias", "Habarhub"],
-        ["YouTube", "@VagabovDmitrii"],
-        ["Main format", "talk streams, reactions, games"],
-        ["Schedule (profile)", "19:00 MSK"],
+        ["Alias", "Mokrivskiy"],
+        ["YouTube", "@mokrivskyi"],
+        ["Main format", "Counter-Strike, talk streams, reactions"],
+        ["Case time", "22:17 MSK"],
         ["Platforms", "Twitch, YouTube, Telegram"],
-        ["Content", "shows, films, reactions, games, IRL, interactive"],
-        ["Case status", "missing online since May 21, 2026"],
-        ["Last signal", "stream ended with no final check-out"],
+        ["Content", "games, IRL, streamer commentary, interactive"],
+        ["Case status", "silent after May 21, 2026"],
+        ["Last signal", "stream broke after 22:17 MSK"],
       ],
     },
     sections: [
@@ -208,16 +208,16 @@ const copy: Record<Lang, Copy> = {
         title: "Biography",
         subtitles: ["Public profile"],
         paragraphs: [
-          "In public profiles, the creator uses the name \"Khabar\". The Twitch page presents the channel as a regular evening stream with mixed formats: conversation, reactions, and gameplay.",
-          "On YouTube, the channel is labeled HabarHub and attached to @VagabovDmitrii. Detailed personal data is not publicly disclosed in profile descriptions.",
+          "In public profiles and streamer directories, Roman is listed under the Mokrivskiy name. Twitch is tied to Counter-Strike, live broadcasts, and direct chat interaction.",
+          "On YouTube and Telegram, his audience follows him as a public figure in the Russian-language Twitch scene. Personal details appear selectively in public descriptions.",
         ],
       },
       {
         id: "platforms",
         title: "Platforms",
         paragraphs: [
-          "Based on the Twitch description, the channel runs on a recurring cycle: stream announcement, live session, and post-stream discussion. The profile also points viewers to Telegram updates via chat commands.",
-          "YouTube works as the public storefront and archive for HabarHub. The naming and channel text are consistent with Twitch and keep the same focus on evening talk content.",
+          "Twitch remains Mokrivskiy's historic base: stream announcement, live session, chat reaction, and post-stream clip discussion. Telegram carries faster updates and short signals.",
+          "YouTube works as an archive and public storefront for Mokrivskiy commentary. The wider format combines games, reactions, streamer drama, and audience-led discussion.",
         ],
       },
       {
@@ -225,16 +225,16 @@ const copy: Record<Lang, Copy> = {
         title: "Disappearance on 2026-05-21",
         subtitles: ["Final stream", "What viewers noticed"],
         paragraphs: [
-          "In the case timeline, a regular stream was expected at 19:00 MSK on May 21, 2026. The session did appear, but it ended without the usual closing segment and without a next-stream note.",
-          "After May 21, 2026 no new post appeared at the usual time window. In this storyline, that moment is treated as the start of the disappearance: accounts remain online, but the creator is silent.",
+          "In the case timeline, viewers expected a late stream at 22:17 MSK on May 21, 2026. The session did appear, but it ended without the usual closing segment and without a clear next-stream note.",
+          "After May 21, 2026 no clear post appeared in the expected rhythm. In this storyline, that moment is treated as the start of the disappearance: accounts remain online, but the creator is silent.",
         ],
       },
       {
         id: "investigation",
         title: "Theories and leads",
         paragraphs: [
-          "Inside the case narrative, two core theories are tracked: the creator disappeared voluntarily, or the creator may have been killed. The second theory remains an unverified investigation hypothesis.",
-          "The timeline review compares Twitch, YouTube, and Telegram activity windows, with special focus on the recurring 19:00 MSK slot.",
+          "Inside the case narrative, two core theories are tracked: Roman disappeared voluntarily, or Roman may have been killed. The second theory remains an unverified investigation hypothesis.",
+          "The timeline review compares Twitch, YouTube, and Telegram activity windows, with special focus on the 22:17 MSK mark.",
         ],
       },
       {
@@ -255,8 +255,8 @@ const copy: Record<Lang, Copy> = {
   },
 };
 
-const TARGET_HOUR = 19;
-const TARGET_MINUTE = 0;
+const TARGET_HOUR = 22;
+const TARGET_MINUTE = 17;
 const RINGTONE_SRC = "/detective/ringtone.mp3";
 const CODE_VOICE_SRC = "/detective/code-voice.mp3";
 const SECRET_SEARCH_CODE = "568713";
@@ -1084,7 +1084,7 @@ function Infobox({ t, lang }: { t: Copy; lang: Lang }) {
       <div className="mx-auto mb-3 max-w-[290px] overflow-hidden bg-[#111111]">
         <img
           src="/detective404.jpg"
-          alt={lang === "ru" ? "Фото Habarhub" : "Habarhub photo"}
+          alt={lang === "ru" ? "Фото Mokrivskiy" : "Mokrivskiy photo"}
           className="h-auto w-full object-cover"
           loading="eager"
         />
@@ -1132,8 +1132,8 @@ function BinaryArticle() {
 }
 
 function highlightTime(text: string) {
-  const marker = "19:00";
-  const boldMarkerPattern = /\[\[bold:([^\]]+)\]\]|19:00/g;
+  const marker = "22:17";
+  const boldMarkerPattern = /\[\[bold:([^\]]+)\]\]|22:17/g;
   if (!text.includes(marker) && !text.includes("[[bold:")) {
     return text;
   }
