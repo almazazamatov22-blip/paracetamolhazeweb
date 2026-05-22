@@ -255,8 +255,7 @@ const copy: Record<Lang, Copy> = {
 };
 
 const TARGET_HOUR = 19;
-const TARGET_START_MINUTE = 0;
-const TARGET_END_MINUTE = 1;
+const TARGET_MINUTE = 0;
 const RINGTONE_SRC = "/detective/ringtone.mp3";
 const CODE_VOICE_SRC = "/detective/code-voice.mp3";
 const SECRET_SEARCH_CODE = "568713";
@@ -272,6 +271,7 @@ export default function DetectiveClient() {
   const ringAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceReplayTimerRef = useRef<number | null>(null);
+  const clockSampleRef = useRef<{ monotonic: number; wall: number } | null>(null);
   const isAudioPrimedRef = useRef(false);
   const activeWindowKeyRef = useRef("");
   const ringPlayBlockedRef = useRef(false);
@@ -325,7 +325,7 @@ export default function DetectiveClient() {
   const canPlayRingtone = () => document.visibilityState === "visible" && document.hasFocus();
 
   const getWindowKey = (now: Date) =>
-    `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${TARGET_HOUR}-${TARGET_START_MINUTE}-${TARGET_END_MINUTE}`;
+    `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${TARGET_HOUR}-${TARGET_MINUTE}`;
 
   useEffect(() => {
     const primeAudio = () => {
@@ -370,11 +370,9 @@ export default function DetectiveClient() {
   useEffect(() => {
     const checkTime = () => {
       const now = new Date();
-      const minute = now.getMinutes();
       const isInTargetWindow =
         now.getHours() === TARGET_HOUR &&
-        minute >= TARGET_START_MINUTE &&
-        minute <= TARGET_END_MINUTE;
+        now.getMinutes() === TARGET_MINUTE;
 
       if (!isInTargetWindow) {
         activeWindowKeyRef.current = "";
@@ -384,7 +382,7 @@ export default function DetectiveClient() {
         return;
       }
 
-      // Trigger once per each entry into the 19:00-19:01 window.
+      // Trigger once per each entry into the 19:00 minute.
       const windowKey = getWindowKey(now);
       if (activeWindowKeyRef.current === windowKey) {
         return;
@@ -396,20 +394,43 @@ export default function DetectiveClient() {
       setIsCallOpen(true);
     };
 
-    checkTime();
-    const timer = window.setInterval(checkTime, 250);
-    let rafId = 0;
-    const rafLoop = () => {
+    let delayedTimers: number[] = [];
+    const checkTimeBurst = () => {
       checkTime();
-      rafId = window.requestAnimationFrame(rafLoop);
+      delayedTimers.push(window.setTimeout(checkTime, 100));
+      delayedTimers.push(window.setTimeout(checkTime, 350));
+      delayedTimers.push(window.setTimeout(checkTime, 900));
     };
-    rafId = window.requestAnimationFrame(rafLoop);
 
-    const onFocus = () => checkTime();
-    const onPageShow = () => checkTime();
+    const checkClock = () => {
+      const sample = {
+        monotonic: performance.now(),
+        wall: Date.now(),
+      };
+      const previousSample = clockSampleRef.current;
+      clockSampleRef.current = sample;
+
+      checkTime();
+
+      if (!previousSample) {
+        return;
+      }
+
+      const monotonicDelta = sample.monotonic - previousSample.monotonic;
+      const wallDelta = sample.wall - previousSample.wall;
+      if (Math.abs(wallDelta - monotonicDelta) > 1000) {
+        checkTimeBurst();
+      }
+    };
+
+    checkTimeBurst();
+    const timer = window.setInterval(checkClock, 100);
+
+    const onFocus = () => checkTimeBurst();
+    const onPageShow = () => checkTimeBurst();
     const onVisibility = () => {
       if (!document.hidden) {
-        checkTime();
+        checkTimeBurst();
       }
     };
 
@@ -419,7 +440,8 @@ export default function DetectiveClient() {
 
     return () => {
       window.clearInterval(timer);
-      window.cancelAnimationFrame(rafId);
+      delayedTimers.forEach((delayedTimer) => window.clearTimeout(delayedTimer));
+      delayedTimers = [];
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("pageshow", onPageShow);
       document.removeEventListener("visibilitychange", onVisibility);
