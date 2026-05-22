@@ -51,7 +51,6 @@ type Copy = {
     accept: string;
     decline: string;
     connected: string;
-    autoplayBlocked: string;
   };
 };
 
@@ -154,7 +153,6 @@ const copy: Record<Lang, Copy> = {
       accept: "Принять",
       decline: "Отклонить",
       connected: "Соединение установлено. Слушайте код.",
-      autoplayBlocked: "Браузер мог заблокировать автозвук. Нажмите «Принять» для воспроизведения.",
     },
   },
   en: {
@@ -255,7 +253,6 @@ const copy: Record<Lang, Copy> = {
       accept: "Accept",
       decline: "Decline",
       connected: "Connected. Listen to the code.",
-      autoplayBlocked: "Autoplay may be blocked by the browser. Press Accept to play audio.",
     },
   },
 };
@@ -267,12 +264,54 @@ export default function DetectiveClient() {
   const [lang, setLang] = useState<Lang>("ru");
   const [isCallOpen, setIsCallOpen] = useState(false);
   const [callStage, setCallStage] = useState<CallStage>("ringing");
-  const [callError, setCallError] = useState<string | null>(null);
   const t = copy[lang];
 
   const ringAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const isAudioPrimedRef = useRef(false);
   const lastCallKeyRef = useRef<string>("");
+
+  useEffect(() => {
+    const primeAudio = () => {
+      if (isAudioPrimedRef.current) {
+        return;
+      }
+      isAudioPrimedRef.current = true;
+
+      const primeElement = async (audio: HTMLAudioElement | null) => {
+        if (!audio) {
+          return;
+        }
+        const wasMuted = audio.muted;
+        audio.muted = true;
+        try {
+          await audio.play();
+        } catch {
+          // Ignore: some browsers may still block until a stronger gesture.
+        }
+        audio.pause();
+        audio.currentTime = 0;
+        audio.muted = wasMuted;
+      };
+
+      void primeElement(ringAudioRef.current);
+      void primeElement(voiceAudioRef.current);
+
+      window.removeEventListener("pointerdown", primeAudio);
+      window.removeEventListener("keydown", primeAudio);
+      window.removeEventListener("touchstart", primeAudio);
+    };
+
+    window.addEventListener("pointerdown", primeAudio, { passive: true });
+    window.addEventListener("keydown", primeAudio);
+    window.addEventListener("touchstart", primeAudio, { passive: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", primeAudio);
+      window.removeEventListener("keydown", primeAudio);
+      window.removeEventListener("touchstart", primeAudio);
+    };
+  }, []);
 
   useEffect(() => {
     const checkTime = () => {
@@ -288,13 +327,26 @@ export default function DetectiveClient() {
 
       lastCallKeyRef.current = dayKey;
       setCallStage("ringing");
-      setCallError(null);
       setIsCallOpen(true);
     };
 
     checkTime();
-    const timer = window.setInterval(checkTime, 1000);
-    return () => window.clearInterval(timer);
+    const timer = window.setInterval(checkTime, 500);
+    const onFocus = () => checkTime();
+    const onVisibility = () => {
+      if (!document.hidden) {
+        checkTime();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   useEffect(() => {
@@ -309,13 +361,37 @@ export default function DetectiveClient() {
 
     ring.loop = true;
     ring.currentTime = 0;
-    ring.play().catch(() => setCallError(t.call.autoplayBlocked));
+    void ring.play().catch(() => undefined);
 
     return () => {
       ring.pause();
       ring.currentTime = 0;
     };
-  }, [isCallOpen, callStage, t.call.autoplayBlocked]);
+  }, [isCallOpen, callStage]);
+
+  useEffect(() => {
+    if (!isCallOpen || callStage !== "ringing") {
+      return;
+    }
+
+    const tryResumeRingtone = () => {
+      const ring = ringAudioRef.current;
+      if (!ring || !ring.paused) {
+        return;
+      }
+      void ring.play().catch(() => undefined);
+    };
+
+    window.addEventListener("pointerdown", tryResumeRingtone, { passive: true });
+    window.addEventListener("keydown", tryResumeRingtone);
+    window.addEventListener("touchstart", tryResumeRingtone, { passive: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", tryResumeRingtone);
+      window.removeEventListener("keydown", tryResumeRingtone);
+      window.removeEventListener("touchstart", tryResumeRingtone);
+    };
+  }, [isCallOpen, callStage]);
 
   const stopRingtone = () => {
     const ring = ringAudioRef.current;
@@ -332,35 +408,42 @@ export default function DetectiveClient() {
     if (voice) {
       voice.pause();
       voice.currentTime = 0;
+      voice.loop = false;
+      voice.playbackRate = 1;
+      if ("preservesPitch" in voice) {
+        (voice as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
+      }
     }
     setCallStage("ringing");
-    setCallError(null);
     setIsCallOpen(false);
   };
 
   const acceptCall = () => {
     stopRingtone();
     setCallStage("connected");
-    setCallError(null);
 
     const voice = voiceAudioRef.current;
     if (!voice) {
       return;
     }
     voice.currentTime = 0;
-    voice.play().catch(() => setCallError(t.call.autoplayBlocked));
+    voice.loop = true;
+    voice.playbackRate = 0.5;
+    if ("preservesPitch" in voice) {
+      (voice as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = false;
+    }
+    void voice.play().catch(() => undefined);
   };
 
   return (
     <main className="min-h-screen w-full bg-white font-sans text-[14px] leading-[1.58] text-[#202122]">
       <audio ref={ringAudioRef} src="/detective/ringtone.mp3" preload="auto" />
-      <audio ref={voiceAudioRef} src="/detective/code-voice.mp3" preload="auto" onEnded={closeCall} />
+      <audio ref={voiceAudioRef} src="/detective/code-voice.mp3" preload="auto" />
 
       {isCallOpen ? (
         <IncomingCallModal
           t={t}
           stage={callStage}
-          error={callError}
           onAccept={acceptCall}
           onDecline={closeCall}
         />
@@ -418,13 +501,11 @@ export default function DetectiveClient() {
 function IncomingCallModal({
   t,
   stage,
-  error,
   onAccept,
   onDecline,
 }: {
   t: Copy;
   stage: CallStage;
-  error: string | null;
   onAccept: () => void;
   onDecline: () => void;
 }) {
@@ -443,8 +524,6 @@ function IncomingCallModal({
         {stage === "connected" ? (
           <p className="mb-4 text-center text-[14px] text-[#202122]">{t.call.connected}</p>
         ) : null}
-
-        {error ? <p className="mb-4 text-center text-[13px] text-[#b32424]">{error}</p> : null}
 
         <div className="flex items-center justify-center gap-3">
           <button
