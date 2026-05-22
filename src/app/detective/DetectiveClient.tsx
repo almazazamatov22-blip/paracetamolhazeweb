@@ -261,6 +261,9 @@ const CODE_VOICE_SRC = "/detective/code-voice.mp3";
 const SECRET_SEARCH_CODE = "568713";
 const SECRET_HANDLE_BINARY = toBinary("@detectivehazebot");
 
+const isTargetCallMinute = (now: Date) =>
+  now.getHours() === TARGET_HOUR && now.getMinutes() === TARGET_MINUTE;
+
 export default function DetectiveClient() {
   const [lang, setLang] = useState<Lang>("ru");
   const [isCallOpen, setIsCallOpen] = useState(false);
@@ -321,7 +324,6 @@ export default function DetectiveClient() {
     resetVoiceAudio();
   };
 
-  const canShowCall = () => document.visibilityState === "visible";
   const canPlayRingtone = () => document.visibilityState === "visible" && document.hasFocus();
 
   const getWindowKey = (now: Date) =>
@@ -368,17 +370,9 @@ export default function DetectiveClient() {
   }, []);
 
   useEffect(() => {
-    const checkTime = () => {
-      const now = new Date();
-      const isInTargetWindow =
-        now.getHours() === TARGET_HOUR &&
-        now.getMinutes() === TARGET_MINUTE;
-
-      if (!isInTargetWindow) {
+    const triggerCallAt = (now: Date) => {
+      if (!isTargetCallMinute(now)) {
         activeWindowKeyRef.current = "";
-        return;
-      }
-      if (!canShowCall()) {
         return;
       }
 
@@ -394,12 +388,17 @@ export default function DetectiveClient() {
       setIsCallOpen(true);
     };
 
+    const checkTime = () => triggerCallAt(new Date());
+
     let delayedTimers: number[] = [];
     const checkTimeBurst = () => {
       checkTime();
+      delayedTimers.push(window.setTimeout(checkTime, 25));
+      delayedTimers.push(window.setTimeout(checkTime, 50));
       delayedTimers.push(window.setTimeout(checkTime, 100));
-      delayedTimers.push(window.setTimeout(checkTime, 350));
-      delayedTimers.push(window.setTimeout(checkTime, 900));
+      delayedTimers.push(window.setTimeout(checkTime, 250));
+      delayedTimers.push(window.setTimeout(checkTime, 500));
+      delayedTimers.push(window.setTimeout(checkTime, 1000));
     };
 
     const checkClock = () => {
@@ -410,7 +409,7 @@ export default function DetectiveClient() {
       const previousSample = clockSampleRef.current;
       clockSampleRef.current = sample;
 
-      checkTime();
+      triggerCallAt(new Date(sample.wall));
 
       if (!previousSample) {
         return;
@@ -423,8 +422,30 @@ export default function DetectiveClient() {
       }
     };
 
+    let worker: Worker | null = null;
+    let workerUrl = "";
+    if (typeof Worker !== "undefined" && typeof Blob !== "undefined" && typeof URL !== "undefined") {
+      const workerSource = `
+        const tick = () => self.postMessage(Date.now());
+        tick();
+        setInterval(tick, 50);
+      `;
+      const workerBlob = new Blob([workerSource], { type: "text/javascript" });
+      workerUrl = URL.createObjectURL(workerBlob);
+      worker = new Worker(workerUrl);
+      worker.onmessage = (event: MessageEvent<number>) => {
+        triggerCallAt(new Date(event.data));
+      };
+    }
+
     checkTimeBurst();
-    const timer = window.setInterval(checkClock, 100);
+    const timer = window.setInterval(checkClock, 50);
+    let rafId = 0;
+    const rafLoop = () => {
+      checkClock();
+      rafId = window.requestAnimationFrame(rafLoop);
+    };
+    rafId = window.requestAnimationFrame(rafLoop);
 
     const onFocus = () => checkTimeBurst();
     const onPageShow = () => checkTimeBurst();
@@ -437,14 +458,27 @@ export default function DetectiveClient() {
     window.addEventListener("focus", onFocus);
     window.addEventListener("pageshow", onPageShow);
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pointermove", checkTime);
+    window.addEventListener("pointerdown", checkTime, { passive: true });
+    window.addEventListener("keydown", checkTime);
+    window.addEventListener("touchstart", checkTime, { passive: true });
 
     return () => {
       window.clearInterval(timer);
+      window.cancelAnimationFrame(rafId);
+      worker?.terminate();
+      if (workerUrl) {
+        URL.revokeObjectURL(workerUrl);
+      }
       delayedTimers.forEach((delayedTimer) => window.clearTimeout(delayedTimer));
       delayedTimers = [];
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("pageshow", onPageShow);
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pointermove", checkTime);
+      window.removeEventListener("pointerdown", checkTime);
+      window.removeEventListener("keydown", checkTime);
+      window.removeEventListener("touchstart", checkTime);
     };
   }, []);
 
