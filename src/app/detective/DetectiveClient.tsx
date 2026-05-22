@@ -873,8 +873,33 @@ function highlightTime(text: string) {
       nodes.push(text.slice(lastIndex, match.index));
     }
 
-    const value = match[0] === marker ? marker : match[1];
-    nodes.push(<strong key={`${value}-${match.index}`}>{value}</strong>);
+    const isTimeMarker = match[0] === marker;
+    const value = isTimeMarker ? marker : match[1];
+    const morseStyle =
+      !isTimeMarker && value === "-"
+        ? {
+            display: "inline-block",
+            transform: "scaleX(2.35)",
+            transformOrigin: "center",
+            margin: "0 0.28em",
+            fontWeight: 900,
+          }
+        : !isTimeMarker
+          ? {
+              display: "inline-block",
+              fontSize: "1.55em",
+              lineHeight: 0.8,
+              margin: "0 0.04em",
+              transform: "translateY(0.05em)",
+              fontWeight: 900,
+            }
+          : undefined;
+
+    nodes.push(
+      <strong key={`${value}-${match.index}`} style={morseStyle}>
+        {value}
+      </strong>,
+    );
     lastIndex = match.index + match[0].length;
   }
 
