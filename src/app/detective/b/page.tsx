@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import BWall from "./BWall";
+import BWall from "../../b/BWall";
 
 export const metadata: Metadata = {
   title: "b",
@@ -11,6 +11,6 @@ export const metadata: Metadata = {
   },
 };
 
-export default function BPage() {
+export default function DetectiveBPage() {
   return <BWall />;
 }
