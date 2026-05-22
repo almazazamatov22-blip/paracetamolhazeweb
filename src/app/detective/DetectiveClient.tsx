@@ -260,8 +260,6 @@ const copy: Record<Lang, Copy> = {
 const TARGET_HOUR = 19;
 const TARGET_START_MINUTE = 0;
 const TARGET_END_MINUTE = 1;
-const CALL_OWNER_KEY = "detective_call_owner";
-const CALL_TRIGGER_KEY = "detective_call_trigger_window";
 
 export default function DetectiveClient() {
   const [lang, setLang] = useState<Lang>("ru");
@@ -273,14 +271,6 @@ export default function DetectiveClient() {
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const isAudioPrimedRef = useRef(false);
   const lastTriggerWindowKeyRef = useRef("");
-  const tabIdRef = useRef("");
-
-  if (!tabIdRef.current) {
-    tabIdRef.current =
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  }
 
   const resetVoiceAudio = () => {
     const voice = voiceAudioRef.current;
@@ -313,30 +303,6 @@ export default function DetectiveClient() {
 
   const getWindowKey = (now: Date) =>
     `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${TARGET_HOUR}-${TARGET_START_MINUTE}-${TARGET_END_MINUTE}`;
-
-  const claimCallOwner = () => {
-    try {
-      const currentOwner = window.localStorage.getItem(CALL_OWNER_KEY);
-      if (currentOwner && currentOwner !== tabIdRef.current) {
-        return false;
-      }
-
-      window.localStorage.setItem(CALL_OWNER_KEY, tabIdRef.current);
-      return window.localStorage.getItem(CALL_OWNER_KEY) === tabIdRef.current;
-    } catch {
-      return true;
-    }
-  };
-
-  const releaseCallOwner = () => {
-    try {
-      if (window.localStorage.getItem(CALL_OWNER_KEY) === tabIdRef.current) {
-        window.localStorage.removeItem(CALL_OWNER_KEY);
-      }
-    } catch {
-      // ignore storage failures
-    }
-  };
 
   useEffect(() => {
     const primeAudio = () => {
@@ -392,32 +358,18 @@ export default function DetectiveClient() {
       if (!isInTargetWindow) {
         return;
       }
+      const canShowCall = document.visibilityState === "visible" && document.hasFocus();
+      if (!canShowCall) {
+        return;
+      }
 
       // Trigger once per day only in 19:00-19:01 local device time.
       const windowKey = getWindowKey(now);
       if (lastTriggerWindowKeyRef.current === windowKey) {
         return;
       }
-      try {
-        const globalWindowKey = window.localStorage.getItem(CALL_TRIGGER_KEY);
-        if (globalWindowKey === windowKey) {
-          lastTriggerWindowKeyRef.current = windowKey;
-          return;
-        }
-      } catch {
-        // ignore storage failures
-      }
-
-      if (!claimCallOwner()) {
-        return;
-      }
 
       lastTriggerWindowKeyRef.current = windowKey;
-      try {
-        window.localStorage.setItem(CALL_TRIGGER_KEY, windowKey);
-      } catch {
-        // ignore storage failures
-      }
       stopAllAudio();
       setCallStage("ringing");
       setIsCallOpen(true);
@@ -456,28 +408,13 @@ export default function DetectiveClient() {
   useEffect(() => {
     const hardStop = () => {
       stopAllAudio();
-      releaseCallOwner();
     };
 
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== CALL_OWNER_KEY) {
-        return;
-      }
-
-      if (event.newValue && event.newValue !== tabIdRef.current) {
-        stopAllAudio();
-        setCallStage("ringing");
-        setIsCallOpen(false);
-      }
-    };
-
-    window.addEventListener("storage", onStorage);
     window.addEventListener("pagehide", hardStop);
     window.addEventListener("beforeunload", hardStop);
     window.addEventListener("unload", hardStop);
 
     return () => {
-      window.removeEventListener("storage", onStorage);
       window.removeEventListener("pagehide", hardStop);
       window.removeEventListener("beforeunload", hardStop);
       window.removeEventListener("unload", hardStop);
@@ -495,11 +432,32 @@ export default function DetectiveClient() {
       return;
     }
 
-    ring.loop = true;
-    ring.currentTime = 0;
-    void ring.play().catch(() => undefined);
+    const syncRingtoneState = () => {
+      const canPlay = document.visibilityState === "visible" && document.hasFocus();
+      if (!canPlay) {
+        ring.pause();
+        ring.currentTime = 0;
+        return;
+      }
+
+      if (!ring.paused) {
+        return;
+      }
+
+      ring.loop = true;
+      ring.currentTime = 0;
+      void ring.play().catch(() => undefined);
+    };
+
+    syncRingtoneState();
+    const syncTimer = window.setInterval(syncRingtoneState, 200);
+    window.addEventListener("focus", syncRingtoneState);
+    document.addEventListener("visibilitychange", syncRingtoneState);
 
     return () => {
+      window.clearInterval(syncTimer);
+      window.removeEventListener("focus", syncRingtoneState);
+      document.removeEventListener("visibilitychange", syncRingtoneState);
       ring.pause();
       ring.currentTime = 0;
     };
@@ -509,7 +467,6 @@ export default function DetectiveClient() {
     stopAllAudio();
     setCallStage("ringing");
     setIsCallOpen(false);
-    releaseCallOwner();
   };
 
   const acceptCall = () => {
