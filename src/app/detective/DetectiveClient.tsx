@@ -258,6 +258,8 @@ const copy: Record<Lang, Copy> = {
 };
 
 const TARGET_HOUR = 19;
+const TARGET_START_MINUTE = 0;
+const TARGET_END_MINUTE = 1;
 
 export default function DetectiveClient() {
   const [lang, setLang] = useState<Lang>("ru");
@@ -268,7 +270,7 @@ export default function DetectiveClient() {
   const ringAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const isAudioPrimedRef = useRef(false);
-  const lastTriggerHourKeyRef = useRef("");
+  const lastTriggerWindowKeyRef = useRef("");
 
   useEffect(() => {
     const primeAudio = () => {
@@ -315,19 +317,23 @@ export default function DetectiveClient() {
   useEffect(() => {
     const checkTime = () => {
       const now = new Date();
-      const isTargetHour = now.getHours() === TARGET_HOUR;
+      const minute = now.getMinutes();
+      const isInTargetWindow =
+        now.getHours() === TARGET_HOUR &&
+        minute >= TARGET_START_MINUTE &&
+        minute <= TARGET_END_MINUTE;
 
-      if (!isTargetHour) {
+      if (!isInTargetWindow) {
         return;
       }
 
-      // Trigger once per day during the 19th hour to avoid missed strict-minute checks.
-      const hourKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${TARGET_HOUR}`;
-      if (lastTriggerHourKeyRef.current === hourKey) {
+      // Trigger once per day only in 19:00-19:01 local device time.
+      const windowKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${TARGET_HOUR}-${TARGET_START_MINUTE}-${TARGET_END_MINUTE}`;
+      if (lastTriggerWindowKeyRef.current === windowKey) {
         return;
       }
 
-      lastTriggerHourKeyRef.current = hourKey;
+      lastTriggerWindowKeyRef.current = windowKey;
       setCallStage("ringing");
       setIsCallOpen(true);
     };
