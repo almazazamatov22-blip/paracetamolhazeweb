@@ -169,7 +169,7 @@ const copy: Record<Lang, Copy> = {
       tabsRight: ["Read", "Edit", "History", "Tools"],
       sourceLine: "From Wikipedia, the free encyclopedia",
       lead: [
-        "Habarhub is a Russian-speaking streamer and creator behind the HabarHub channel (YouTube: @VagabovDmitrii). The public Twitch description lists regular streams at 19:00 MSK and formats such as shows, films, reactions, games, IRL, and interactive sessions.",
+        "Habarhub is a Russian[[bold:-]]speaking streamer and creator behind the HabarHub channel (YouTube: @VagabovDmitrii)[[bold:.]] The public Twitch description lists regular streams at 19:00 MSK and formats such as shows, films, reactions, games, IRL, and interactive sessions[[bold:.]]",
         "The public profile facts below are based on the open channel descriptions.",
       ],
     },
@@ -224,7 +224,7 @@ const copy: Record<Lang, Copy> = {
         title: "Disappearance on 2026-05-21",
         subtitles: ["Final stream", "What viewers noticed"],
         paragraphs: [
-          "In the case timeline, a regular stream was expected at 19:00 MSK on May 21, 2026. The session did appear, but it ended without the usual closing segment and without a next-stream note.",
+          "In the case timeline, a regular stream was expected at 19:00 MSK on May 21, 2026. The session did appear, but it ended without the usual closing segment and without a next[[bold:-]]stream note[[bold:.]]",
           "After May 21, 2026 no new post appeared at the usual time window. In this storyline, that moment is treated as the start of the disappearance: accounts remain online, but the creator is silent.",
         ],
       },
@@ -233,15 +233,15 @@ const copy: Record<Lang, Copy> = {
         title: "Theories and leads",
         paragraphs: [
           "Inside the case narrative, two core theories are tracked: the creator disappeared voluntarily, or the creator may have been killed. The second theory remains an unverified investigation hypothesis.",
-          "The timeline review compares Twitch, YouTube, and Telegram activity windows, with special focus on the recurring 19:00 MSK slot. Archived marker: -..-. -...",
+          "The timeline review compares Twitch, YouTube, and Telegram activity windows, with special focus on the recurring 19:00 MSK slot.",
         ],
       },
       {
         id: "community",
         title: "Community response",
         paragraphs: [
-          "Viewers split into two camps: one sees a planned pause, while another claims the final stream had a different pace and tone than normal sessions. The community keeps building a shared timeline by date and time.",
-          "Community members continue cross-checking archives, timestamps, and weak activity traces to rebuild the exact sequence minute by minute.",
+          "Viewers split into two camps[[bold:-]] one sees a planned pause, while another claims the final stream had a different pace and tone than normal sessions[[bold:.]] The community keeps building a shared timeline by date and time[[bold:.]]",
+          "Community members continue cross-checking archives, timestamps, and weak activity traces to rebuild the exact sequence minute by minute[[bold:.]]",
         ],
       },
     ],
@@ -859,18 +859,33 @@ function BinaryArticle() {
 
 function highlightTime(text: string) {
   const marker = "19:00";
-  if (!text.includes(marker)) {
+  const boldMarkerPattern = /\[\[bold:([^\]]+)\]\]|19:00/g;
+  if (!text.includes(marker) && !text.includes("[[bold:")) {
     return text;
   }
 
-  const parts = text.split(marker);
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = boldMarkerPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+
+    const value = match[0] === marker ? marker : match[1];
+    nodes.push(<strong key={`${value}-${match.index}`}>{value}</strong>);
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+
   return (
     <>
-      {parts.map((part, index) => (
-        <span key={`${part}-${index}`}>
-          {part}
-          {index < parts.length - 1 ? <strong>{marker}</strong> : null}
-        </span>
+      {nodes.map((node, index) => (
+        <span key={index}>{node}</span>
       ))}
     </>
   );
