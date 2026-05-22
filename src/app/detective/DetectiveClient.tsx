@@ -717,7 +717,6 @@ function SuccessScreen() {
         ))}
       </div>
       <section className="success-message">
-        <p>Поздравление</p>
         <h1>Ты справился</h1>
       </section>
 
@@ -777,14 +776,6 @@ function SuccessScreen() {
             0 0 52px rgba(255, 0, 76, 0.48),
             0 0 70px rgba(0, 194, 255, 0.36);
           animation: success-pop 900ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
-        }
-
-        .success-message p {
-          margin: 0 0 18px;
-          color: rgba(255, 255, 255, 0.7);
-          font-size: clamp(16px, 2.4vw, 28px);
-          font-weight: 800;
-          letter-spacing: 0.32em;
         }
 
         .success-message h1 {
