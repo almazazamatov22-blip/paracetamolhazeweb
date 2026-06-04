@@ -295,6 +295,8 @@
         const userId = urlParams.get('id');
         let isRunning = false;
         let lastTriggerId = null;
+        let triggerBaselineReady = false;
+        const pageStartedAt = Date.now();
 
         async function loadAssets() {
             if (!userId) return;
@@ -302,9 +304,17 @@
                 const res = await fetch(`/api/ov_upload?userId=${userId}`);
                 const assets = await res.json();
                 if (assets.panel_bg) document.getElementById('wrap').style.backgroundImage = `url(${assets.panel_bg})`;
-                if (assets.reward_img) document.getElementById('rewardImg').innerHTML = `<img src="${assets.reward_img}">`;
-                ['s_in', 's_roll', 's_win', 's_lose', 's_out'].forEach(k => {
-                    if (assets[k]) document.getElementById(k.replace('_', '')).src = assets[k];
+                const rewardImage = assets.reward_icon || assets.reward_img;
+                if (rewardImage) document.getElementById('rewardImg').innerHTML = `<img src="${rewardImage}">`;
+                [
+                    ['sIn', assets.sound_in || assets.s_in],
+                    ['sRoll', assets.sound_loop || assets.sound_roll || assets.s_roll],
+                    ['sWin', assets.sound_win || assets.s_win],
+                    ['sLose', assets.sound_lose || assets.s_lose],
+                    ['sOut', assets.sound_out || assets.s_out]
+                ].forEach(([id, url]) => {
+                    const audio = document.getElementById(id);
+                    if (audio && url) audio.src = url;
                 });
             } catch (e) { }
         }
@@ -321,17 +331,23 @@
         async function checkTrigger(isInitial = false) {
             if ((isRunning && !isInitial) || !userId) return;
             try {
-                const res = await fetch(`/api/ov_trigger?userId=${userId}&t=${Date.now()}`);
+                const res = await fetch(`/api/ov_trigger?userId=${userId}&type=fate&t=${Date.now()}`);
                 const data = await res.json();
-                if (data && data.triggerId) {
-                    if (lastTriggerId === null) {
-                        lastTriggerId = data.triggerId;
-                        return;
-                    }
-                    if (data.triggerId !== lastTriggerId) {
-                        lastTriggerId = data.triggerId;
-                        animate(data);
-                    }
+                if (!data || !data.triggerId) {
+                    triggerBaselineReady = true;
+                    return;
+                }
+
+                if (!triggerBaselineReady) {
+                    triggerBaselineReady = true;
+                    lastTriggerId = data.triggerId;
+                    if ((Number(data.timestamp) || 0) > pageStartedAt) animate(data);
+                    return;
+                }
+
+                if (data.triggerId !== lastTriggerId) {
+                    lastTriggerId = data.triggerId;
+                    animate(data);
                 }
             } catch (e) { }
         }
@@ -380,7 +396,10 @@
             }
             rollEl.classList.remove('rollFlash');
 
-            let resultNum = data.isTest ? (Math.random() > 0.5 ? data.userChoice : Math.floor(Math.random() * 99 + 1)) : Math.floor(Math.random() * 99 + 1);
+            let resultNum = Number(data.result);
+            if (!Number.isFinite(resultNum) || resultNum <= 0) {
+                resultNum = data.isTest ? (Math.random() > 0.5 ? data.userChoice : Math.floor(Math.random() * 99 + 1)) : Math.floor(Math.random() * 99 + 1);
+            }
             rollEl.textContent = resultNum.toString().padStart(2, '0');
 
             const isWin = parseInt(rollEl.textContent) === parseInt(pickEl.textContent);
@@ -415,6 +434,7 @@
                 // Small delay to ensure styles/assets are ready
                 setTimeout(() => animate(data), 500);
             } else {
+                checkTrigger(true);
                 setInterval(() => checkTrigger(false), 1500);
             }
         }

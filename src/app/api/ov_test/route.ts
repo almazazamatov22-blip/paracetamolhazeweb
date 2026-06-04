@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServerKey, getSupabaseUrl } from '@/lib/supabase-env';
 
 export const runtime = 'nodejs';
+
+function getSupabase() {
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseKey = getSupabaseServerKey();
+
+  if (!supabaseUrl || !supabaseKey) throw new Error('Supabase env missing');
+  return createClient(supabaseUrl, supabaseKey);
+}
 
 function getWeightedResult(settings: any) {
   const symbols = (settings.symbols || []).length > 0 ? settings.symbols : [
@@ -53,25 +62,26 @@ export async function POST(req: NextRequest) {
 
     if (!userId) return NextResponse.json({ error: 'Auth fail' }, { status: 401 });
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const supabase = getSupabase();
 
     const body = await req.json();
     const type = body.type || 'slots';
 
-    const { data: configs } = await supabase
+    const { data: config, error: configError } = await supabase
       .from('overlay_configs')
       .select('settings, assets')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .maybeSingle();
 
-    const config = configs?.[0] || null;
+    if (configError) throw configError;
+
     const allSettings: any = config?.settings || {};
     const assets: any = config?.assets || {};
     
     let settings = allSettings[type] || {};
-    // Migration fallback
-    if (!settings && type === 'fate' && allSettings.reward_id) settings = allSettings;
+    if (type === 'fate' && Object.keys(settings).length === 0 && allSettings.reward_id) {
+      settings = allSettings;
+    }
 
     let payload: any = {
       triggerId: Math.random().toString(36).substring(7),
@@ -99,7 +109,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    await supabase
+    const { error: upsertError } = await supabase
       .from('overlay_configs')
       .upsert({ 
         user_id: userId, 
@@ -107,6 +117,8 @@ export async function POST(req: NextRequest) {
         settings: allSettings,
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id' });
+
+    if (upsertError) throw upsertError;
 
     return NextResponse.json({ success: true, payload });
   } catch (err: any) {

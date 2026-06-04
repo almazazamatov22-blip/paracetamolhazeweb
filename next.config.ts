@@ -4,6 +4,9 @@ const lotomalUrl = process.env.NEXT_PUBLIC_LOTOMAL_URL || "https://lotomal.parac
 
 const nextConfig: NextConfig = {
   /* config options here */
+  turbopack: {
+    root: process.cwd(),
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

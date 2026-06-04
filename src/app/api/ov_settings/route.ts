@@ -1,40 +1,49 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { getSupabaseServerKey, getSupabaseUrl } from '@/lib/supabase-env';
 
 export const runtime = 'nodejs';
 
+function getSupabase() {
+    const supabaseUrl = getSupabaseUrl();
+    const supabaseKey = getSupabaseServerKey();
+
+    if (!supabaseUrl || !supabaseKey) throw new Error('Supabase env missing');
+    return createClient(supabaseUrl, supabaseKey);
+}
+
 export async function GET(req: Request) {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-    const type = searchParams.get('type') || 'fate';
+    try {
+        const { searchParams } = new URL(req.url);
+        const userId = searchParams.get('userId');
+        const type = searchParams.get('type') || 'fate';
 
-    if (!userId) return NextResponse.json({ error: 'No user ID' }, { status: 400 });
+        if (!userId) return NextResponse.json({ error: 'No user ID' }, { status: 400 });
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        const supabase = getSupabase();
 
-    const { data: config } = await supabase
-        .from('overlay_configs')
-        .select('settings, assets')
-        .eq('user_id', userId)
-        .maybeSingle();
+        const { data: config, error } = await supabase
+            .from('overlay_configs')
+            .select('settings, assets')
+            .eq('user_id', userId)
+            .maybeSingle();
 
-    if (!config) return NextResponse.json({});
+        if (error) throw error;
+        if (!config) return NextResponse.json({});
 
-    const allSettings = config.settings || {};
-    const assets = config.assets || {};
-    
-    // Merge assets into settings for convenience
-    let settings = allSettings[type] || {};
-    
-    // Migration fallback for fate
-    if (type === 'fate' && !settings && allSettings.reward_id) {
-        settings = allSettings;
+        const allSettings = config.settings || {};
+        const assets = config.assets || {};
+        let settings = allSettings[type] || {};
+
+        if (type === 'fate' && Object.keys(settings).length === 0 && allSettings.reward_id) {
+            settings = allSettings;
+        }
+
+        return NextResponse.json({ ...settings, ...assets });
+    } catch (err: any) {
+        return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
     }
-
-    return NextResponse.json({ ...settings, ...assets });
 }
 
 export async function POST(req: Request) {
@@ -61,15 +70,15 @@ export async function POST(req: Request) {
 
     if (!type || !settings) return NextResponse.json({ error: 'Missing type or settings' }, { status: 400 });
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = getSupabase();
 
-    const { data: current } = await supabase
+    const { data: current, error: currentError } = await supabase
         .from('overlay_configs')
         .select('settings, assets')
         .eq('user_id', userId)
         .maybeSingle();
+
+    if (currentError) return NextResponse.json({ error: currentError.message }, { status: 500 });
 
     const allSettings = current?.settings || {};
     
@@ -87,6 +96,7 @@ export async function POST(req: Request) {
         .upsert({
             user_id: userId,
             settings: allSettings,
+            assets: current?.assets || {},
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
 

@@ -239,18 +239,27 @@
             const sel = document.getElementById('reward-select');
             const opt = sel.options[sel.selectedIndex];
             try {
-                await fetch('/api/ov_settings', {
+                const settingsRes = await fetch('/api/ov_settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        reward_id: sel.value,
-                        reward_name: opt ? opt.textContent : '',
-                        min_val: f.min_val.value, max_val: f.max_val.value
+                        type: 'fate',
+                        settings: {
+                            reward_id: sel.value,
+                            reward_name: opt ? opt.textContent : '',
+                            min_val: f.min_val.value,
+                            max_val: f.max_val.value
+                        }
                     })
                 });
-                await fetch('/api/ov_subscribe', { method: 'POST' });
+                const settingsData = await settingsRes.json().catch(() => ({}));
+                if (!settingsRes.ok) throw new Error(settingsData.error || 'Settings save failed');
+
+                const subRes = await fetch('/api/ov_subscribe', { method: 'POST' });
+                const subData = await subRes.json().catch(() => ({}));
+                if (!subRes.ok) throw new Error(subData.error || 'Subscription failed');
                 showToast('Настройки обновлены');
-            } catch (e) { showToast('Ошибка!', true); }
+            } catch (e) { showToast(e.message || 'Ошибка!', true); }
             finally { btn.style.opacity = '1'; btn.textContent = 'СОХРАНИТЬ ВЫБОР'; }
         }
 
@@ -269,12 +278,13 @@
                         body: JSON.stringify({ name: file.name, type: file.type, data: reader.result.split(',')[1], key })
                     });
                     const d = await res.json();
+                    if (!res.ok) throw new Error(d.error || 'Upload failed');
                     if (d.url) { 
                         badge.classList.add('loaded');
                         text.textContent = 'Загружено';
                         showToast('Файл готов');
                     }
-                } catch (e) { text.textContent = 'Ошибка'; }
+                } catch (e) { text.textContent = 'Ошибка'; showToast(e.message || 'Ошибка загрузки', true); }
             };
             reader.readAsDataURL(file);
         }
@@ -302,14 +312,16 @@
 
         async function testOverlay() {
             try { 
-                await fetch('/api/ov_test', { 
+                const res = await fetch('/api/ov_test', { 
                     method: 'POST', 
                     headers: {'Content-Type': 'application/json'}, 
                     body: JSON.stringify({ type: 'fate' }) 
                 }); 
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || 'Test failed');
                 showToast('Тест запущен'); 
             }
-            catch (e) {}
+            catch (e) { showToast(e.message || 'Ошибка теста', true); }
         }
 
         function showToast(msg, isError = false) {

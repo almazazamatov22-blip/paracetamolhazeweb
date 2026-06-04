@@ -5,6 +5,8 @@ node_modules
 .wrangler
 .dev.vars
 .env*
+scratch/
 фейссвап/
 program.zip
 *.exe
+.vercel
