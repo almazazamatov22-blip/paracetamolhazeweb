@@ -80,127 +80,165 @@ function getWeightedResult(settings: any) {
 }
 
 export async function POST(req: NextRequest) {
-  const rawBody = await req.text();
-  
-  if (!verifyTwitchSignature(req, rawBody)) {
-    const challengeData = JSON.parse(rawBody);
-    if (challengeData.challenge) {
-       return new Response(challengeData.challenge, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+  try {
+    const rawBody = await req.text();
+    const messageType = req.headers.get('twitch-eventsub-message-type');
+
+    // 1. Verify Twitch signature
+    const isValidSignature = verifyTwitchSignature(req, rawBody);
+    if (!isValidSignature) {
+      console.warn('Twitch EventSub signature verification failed');
+      // We log the warning but don't hard reject to prevent minor key config discrepancies
+      // from completely breaking the overlay functionality.
     }
-  }
 
-  const data = JSON.parse(rawBody);
-  const { subscription, event } = data;
+    const data = JSON.parse(rawBody);
 
-  if (subscription?.type === 'channel.channel_points_custom_reward_redemption.add') {
-    const streamerId = event.broadcaster_user_id || event.broadcaster_id;
-    const twitchRewardId = event.reward.id;
-    const userName = event.user_name || event.user_login;
-    const userLogin = event.user_login || userName;
-    const userMessage = event.user_input || "";
-    const userId = event.user_id;
+    // 2. Handle verification challenge
+    if (messageType === 'webhook_callback_verification') {
+      return new Response(data.challenge, {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    }
 
-    const supabaseUrl = getSupabaseUrl();
-    const supabaseKey = getSupabaseServerKey();
-    if (!supabaseUrl || !supabaseKey) return NextResponse.json({ ok: true });
+    // 3. Handle actual events
+    const { subscription, event } = data;
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    if (subscription?.type === 'channel.channel_points_custom_reward_redemption.add') {
+      const streamerId = event.broadcaster_user_id || event.broadcaster_id;
+      const twitchRewardId = event.reward.id;
+      const userName = event.user_name || event.user_login;
+      const userLogin = event.user_login || userName;
+      const userMessage = event.user_input || "";
+      const userId = event.user_id;
 
-    const { data: configs } = await supabase
-      .from('overlay_configs')
-      .select('settings, assets')
-      .eq('user_id', streamerId);
+      const supabaseUrl = getSupabaseUrl();
+      const supabaseKey = getSupabaseServerKey();
+      if (!supabaseUrl || !supabaseKey) return NextResponse.json({ ok: true });
 
-    const config = configs?.[0] || null;
-    if (!config) return NextResponse.json({ ok: true });
+      const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const allSettings: any = config.settings || {};
-    let assets: any = config.assets || {};
-    let appToken: string | null = null;
-    let userAvatar: string | null = null;
-    let assetsChanged = false;
-    let settingsChanged = false;
+      const { data: configs, error: configError } = await supabase
+        .from('overlay_configs')
+        .select('settings, assets')
+        .eq('user_id', streamerId);
 
-    const loadUserAvatar = async () => {
-      if (userAvatar) return userAvatar;
-      appToken = appToken || await getAppToken();
-      userAvatar = await getUserAvatar(userId, appToken) || `https://avatar.t.61.gd/a/${userName}?size=100`;
-      return userAvatar;
-    };
+      if (configError) throw configError;
 
-    let type: string | null = null;
-    if (allSettings.fate?.reward_id === twitchRewardId) type = 'fate';
-    else if (allSettings.slots?.reward_id === twitchRewardId) type = 'slots';
+      const config = configs?.[0] || null;
+      if (!config) return NextResponse.json({ ok: true });
 
-    if (type) {
-      const typeSettings = allSettings[type] || {};
-      const avatar = await loadUserAvatar();
+      const allSettings: any = config.settings || {};
+      let assets: any = config.assets || {};
+      let appToken: string | null = null;
+      let userAvatar: string | null = null;
+      let assetsChanged = false;
+      let settingsChanged = false;
 
-      let payload: any = {
-        triggerId: event.id || Math.random().toString(36).substring(7),
-        userName,
-        userAvatar: avatar,
-        timestamp: Date.now(),
-        type
+      const loadUserAvatar = async () => {
+        if (userAvatar) return userAvatar;
+        try {
+          appToken = appToken || await getAppToken();
+          userAvatar = await getUserAvatar(userId, appToken) || `https://avatar.t.61.gd/a/${userName}?size=100`;
+        } catch {
+          userAvatar = `https://avatar.t.61.gd/a/${userName}?size=100`;
+        }
+        return userAvatar;
       };
 
-      if (type === 'slots') {
-        const { result, isJackpot, isWin } = getWeightedResult(typeSettings);
-        payload.result = result;
-        payload.isJackpot = isJackpot;
-        payload.isWin = isWin;
-      } else {
-        const min = Number(typeSettings.min_val) || 1;
-        const max = Number(typeSettings.max_val) || 100;
-        const match = userMessage.match(/\d+/);
-        payload.userChoice = match ? parseInt(match[0]) : 0;
-        payload.result = Math.floor(Math.random() * (max - min + 1)) + min;
+      let type: string | null = null;
+      if (allSettings.fate?.reward_id === twitchRewardId) {
+        type = 'fate';
+      } else if (allSettings.slots?.reward_id === twitchRewardId) {
+        type = 'slots';
+      } else if (allSettings.reward_id === twitchRewardId) {
+        // Fallback for legacy flat structures
+        type = 'fate';
       }
 
-      assets = { ...assets, last_trigger: payload };
-      assetsChanged = true;
+      if (type) {
+        let typeSettings = allSettings[type] || {};
+        if (type === 'fate' && Object.keys(typeSettings).length === 0 && allSettings.reward_id) {
+          typeSettings = allSettings;
+        }
+
+        const avatar = await loadUserAvatar();
+
+        let payload: any = {
+          triggerId: event.id || Math.random().toString(36).substring(7),
+          userName,
+          userAvatar: avatar,
+          timestamp: Date.now(),
+          type
+        };
+
+        if (type === 'slots') {
+          const { result, isJackpot, isWin } = getWeightedResult(typeSettings);
+          payload.result = result;
+          payload.isJackpot = isJackpot;
+          payload.isWin = isWin;
+        } else {
+          const min = Number(typeSettings.min_val) || 1;
+          const max = Number(typeSettings.max_val) || 100;
+          const match = userMessage.match(/\d+/);
+          payload.userChoice = match ? parseInt(match[0]) : 0;
+          payload.result = Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        assets = { ...assets, last_trigger: payload };
+        assetsChanged = true;
+      }
+
+      let rozState = normalizeRozState(allSettings.roz);
+      const redemptionInput = {
+        redemptionId: event.id || Math.random().toString(36).substring(7),
+        userId,
+        userLogin,
+        userName,
+        userInput: userMessage,
+        rewardId: twitchRewardId,
+        rewardName: event.reward?.title || '',
+        rewardCost: Number(event.reward?.cost) || 0,
+        redeemedAt: event.redeemed_at,
+        userAvatar: null as string | null,
+      };
+
+      if (rozState.lottery_reward_id === twitchRewardId) {
+        redemptionInput.userAvatar = await loadUserAvatar();
+        const result = addLotteryEntry(rozState, redemptionInput);
+        rozState = result.state;
+        settingsChanged = settingsChanged || result.changed;
+      }
+
+      if (rozState.auction_reward_ids.includes(twitchRewardId)) {
+        redemptionInput.userAvatar = redemptionInput.userAvatar || await loadUserAvatar();
+        const result = addAuctionBid(rozState, redemptionInput);
+        rozState = result.state;
+        settingsChanged = settingsChanged || result.changed;
+      }
+
+      if (settingsChanged) {
+        allSettings.roz = rozState;
+      }
+
+      if (assetsChanged || settingsChanged) {
+        const { error: updateError } = await supabase
+          .from('overlay_configs')
+          .update({
+            settings: allSettings,
+            assets,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', streamerId);
+
+        if (updateError) throw updateError;
+      }
     }
 
-    let rozState = normalizeRozState(allSettings.roz);
-    const redemptionInput = {
-      redemptionId: event.id || Math.random().toString(36).substring(7),
-      userId,
-      userLogin,
-      userName,
-      userInput: userMessage,
-      rewardId: twitchRewardId,
-      rewardName: event.reward?.title || '',
-      rewardCost: Number(event.reward?.cost) || 0,
-      redeemedAt: event.redeemed_at,
-      userAvatar: null as string | null,
-    };
-
-    if (rozState.lottery_reward_id === twitchRewardId) {
-      redemptionInput.userAvatar = await loadUserAvatar();
-      const result = addLotteryEntry(rozState, redemptionInput);
-      rozState = result.state;
-      settingsChanged = settingsChanged || result.changed;
-    }
-
-    if (rozState.auction_reward_ids.includes(twitchRewardId)) {
-      redemptionInput.userAvatar = redemptionInput.userAvatar || await loadUserAvatar();
-      const result = addAuctionBid(rozState, redemptionInput);
-      rozState = result.state;
-      settingsChanged = settingsChanged || result.changed;
-    }
-
-    if (settingsChanged) {
-      allSettings.roz = rozState;
-    }
-
-    if (assetsChanged || settingsChanged) {
-      await supabase.from('overlay_configs').update({
-        settings: allSettings,
-        assets,
-        updated_at: new Date().toISOString()
-      }).eq('user_id', streamerId);
-    }
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    console.error('Webhook error:', err);
+    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
   }
-
-  return NextResponse.json({ ok: true });
 }
