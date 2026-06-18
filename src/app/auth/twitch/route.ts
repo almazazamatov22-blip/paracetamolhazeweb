@@ -9,6 +9,8 @@ function sourcePath(source: string) {
   if (source === 'kinoquiz') return '/kinoquiz';
   if (source === 'roz') return '/roz';
   if (source === 'overlays') return '/overlays/dashboard';
+  if (source === 'cs2') return '/cs2';
+  if (source === 'cs2interactive') return '/cs2interactive';
   if (source === 'bred' || source === 'trueorfalse' || source === 'trueorfasle') return '/bred';
   return '/overlays/dashboard';
 }

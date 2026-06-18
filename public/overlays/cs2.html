@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>CS2 Interactive Overlay</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: transparent;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'Inter', sans-serif;
+      position: relative;
+    }
+
+    /* ── Queue container (top-right) ── */
+    #queue-container {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      width: 340px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 10;
+    }
+
+    /* ── Individual notification card ── */
+    .notif-card {
+      background: linear-gradient(135deg,
+        rgba(0, 0, 0, 0.88) 0%,
+        rgba(20, 20, 20, 0.92) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow:
+        0 8px 32px rgba(0,0,0,0.6),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      transform: translateX(120%);
+      opacity: 0;
+      transition: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .notif-card.enter {
+      animation: cs2-slide-in 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    }
+
+    .notif-card.exit {
+      animation: cs2-slide-out 0.35s ease-in forwards;
+    }
+
+    @keyframes cs2-slide-in {
+      0%   { transform: translateX(120%); opacity: 0; }
+      60%  { transform: translateX(-8px); opacity: 1; }
+      80%  { transform: translateX(4px); }
+      100% { transform: translateX(0); opacity: 1; }
+    }
+
+    @keyframes cs2-slide-out {
+      0%   { transform: translateX(0); opacity: 1; }
+      100% { transform: translateX(120%); opacity: 0; }
+    }
+
+    /* Accent bar on left edge */
+    .notif-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      border-radius: 14px 0 0 14px;
+    }
+
+    .notif-card.status-pending::before   { background: #f59e0b; }
+    .notif-card.status-processing::before { background: #60a5fa; animation: cs2-bar-pulse 0.8s ease-in-out infinite; }
+    .notif-card.status-done::before      { background: #1ed760; }
+    .notif-card.status-error::before     { background: #f87171; }
+
+    @keyframes cs2-bar-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Shimmer on processing */
+    .notif-card.status-processing::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+      animation: cs2-shimmer 1.5s ease-in-out infinite;
+    }
+
+    @keyframes cs2-shimmer {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    /* Avatar */
+    .notif-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+      border: 2px solid rgba(255,255,255,0.1);
+    }
+
+    .notif-avatar-placeholder {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    /* Text */
+    .notif-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .notif-user {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .notif-reward {
+      font-size: 12px;
+      color: rgba(255,255,255,0.6);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .notif-action {
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      font-family: monospace;
+    }
+
+    /* Status icon */
+    .notif-status-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+      width: 28px;
+      text-align: center;
+    }
+
+    /* ── Big activation banner (center-bottom) ── */
+    #banner-container {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .banner-card {
+      background: linear-gradient(135deg,
+        rgba(0,0,0,0.9) 0%,
+        rgba(15,15,15,0.95) 100%);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 20px;
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      backdrop-filter: blur(20px);
+      box-shadow:
+        0 16px 48px rgba(0,0,0,0.7),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+      max-width: 500px;
+      text-align: left;
+    }
+
+    .banner-card.enter {
+      animation: cs2-banner-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    .banner-card.exit {
+      animation: cs2-banner-out 0.4s ease-in forwards;
+    }
+
+    @keyframes cs2-banner-in {
+      0%   { transform: scale(0.7) translateY(30px); opacity: 0; }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    @keyframes cs2-banner-out {
+      0%   { transform: scale(1) translateY(0); opacity: 1; }
+      100% { transform: scale(0.85) translateY(20px); opacity: 0; }
+    }
+
+    .banner-icon { font-size: 40px; flex-shrink: 0; }
+
+    .banner-info { display: flex; flex-direction: column; gap: 4px; }
+
+    .banner-user {
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .banner-reward {
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+
+    .banner-avatar {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid rgba(255,255,255,0.2);
+      flex-shrink: 0;
+    }
+
+    /* Progress bar at bottom of banner */
+    .banner-progress {
+      position: absolute;
+      bottom: 0; left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #1ed760, #0aad48);
+      border-radius: 0 0 20px 20px;
+      animation: cs2-progress 4s linear forwards;
+    }
+
+    @keyframes cs2-progress {
+      from { width: 100%; }
+      to { width: 0%; }
+    }
+
+    /* Particle burst on done */
+    .particle-burst {
+      position: fixed;
+      pointer-events: none;
+      z-index: 30;
+    }
+
+    .particle-burst .p {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      animation: cs2-burst calc(0.6s + var(--d, 0s)) ease-out forwards;
+    }
+
+    @keyframes cs2-burst {
+      0%   { transform: translate(0,0) scale(1); opacity: 1; }
+      100% { transform: translate(var(--tx, 0), var(--ty, 0)) scale(0); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="queue-container"></div>
+  <div id="banner-container"></div>
+
+  <script>
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      const STREAMER_ID = params.get('streamerId') || '';
+      const BASE_URL = params.get('baseUrl') || (window.location.origin !== 'null' ? window.location.origin : 'https://paracetamolhaze.vercel.app');
+      const POLL_INTERVAL = 1200; // ms
+
+      const ACTION_ICONS = {
+        drop_weapon:   '🔫',
+        freeze_3:      '🧊',
+        freeze_5:      '❄️',
+        spin_180:      '🔄',
+        block_jump:    '🚫',
+        block_crouch:  '🦆',
+        play_sound:    '🔊',
+      };
+
+      const queueEl = document.getElementById('queue-container');
+      const bannerEl = document.getElementById('banner-container');
+
+      // Sound effect (Web Audio API — короткий позывной)
+      let audioCtx = null;
+      function getAudioCtx() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        return audioCtx;
+      }
+
+      function playActivationSound() {
+        try {
+          const ctx = getAudioCtx();
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(880, ctx.currentTime);
+          osc1.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.15);
+
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime(440, ctx.currentTime);
+          osc2.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.2);
+
+          gain.gain.setValueAtTime(0.2, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+          osc1.start(ctx.currentTime);
+          osc1.stop(ctx.currentTime + 0.4);
+          osc2.start(ctx.currentTime);
+          osc2.stop(ctx.currentTime + 0.4);
+        } catch(e) {}
+      }
+
+      // Particle burst on completion
+      function spawnParticles(x, y) {
+        const burst = document.createElement('div');
+        burst.className = 'particle-burst';
+        burst.style.left = x + 'px';
+        burst.style.top = y + 'px';
+        const colors = ['#1ed760', '#60a5fa', '#a78bfa', '#f59e0b', '#f87171'];
+        for (let i = 0; i < 12; i++) {
+          const p = document.createElement('div');
+          p.className = 'p';
+          const angle = (i / 12) * Math.PI * 2;
+          const dist = 40 + Math.random() * 60;
+          p.style.setProperty('--tx', (Math.cos(angle) * dist) + 'px');
+          p.style.setProperty('--ty', (Math.sin(angle) * dist) + 'px');
+          p.style.setProperty('--d', (Math.random() * 0.2) + 's');
+          p.style.background = colors[i % colors.length];
+          burst.appendChild(p);
+        }
+        document.body.appendChild(burst);
+        setTimeout(() => burst.remove(), 900);
+      }
+
+      // ── State ──
+      const shown = new Map(); // id → { el, status }
+      let bannerTimer = null;
+      let lastSince = new Date(Date.now() - 30000).toISOString();
+
+      // ── Queue card management ──
+      function getStatusIcon(status) {
+        if (status === 'pending')    return '⏳';
+        if (status === 'processing') return '⚡';
+        if (status === 'done')       return '✅';
+        if (status === 'error')      return '❌';
+        return '❓';
+      }
+
+      function createCard(event) {
+        const card = document.createElement('div');
+        card.className = `notif-card status-${event.status}`;
+        card.id = 'card-' + event.id;
+
+        const icon = ACTION_ICONS[event.action_type] || '🎮';
+
+        card.innerHTML = `
+          ${event.user_avatar
+            ? `<img class="notif-avatar" src="${event.user_avatar}" alt="${event.user_name}" onerror="this.style.display='none'" />`
+            : `<div class="notif-avatar-placeholder">${icon}</div>`
+          }
+          <div class="notif-info">
+            <div class="notif-user">${event.user_name}</div>
+            <div class="notif-reward">${event.reward_name || event.action_type}</div>
+            <div class="notif-action">${event.action_type}</div>
+          </div>
+          <div class="notif-status-icon">${getStatusIcon(event.status)}</div>
+        `;
+
+        return card;
+      }
+
+      function addOrUpdateCard(event) {
+        const existing = shown.get(event.id);
+
+        if (existing) {
+          // Обновить статус
+          if (existing.status === event.status) return;
+          existing.status = event.status;
+          existing.el.className = `notif-card status-${event.status} enter`;
+          const si = existing.el.querySelector('.notif-status-icon');
+          if (si) si.textContent = getStatusIcon(event.status);
+
+          if (event.status === 'done') {
+            const rect = existing.el.getBoundingClientRect();
+            spawnParticles(rect.left + rect.width / 2, rect.top + rect.height / 2);
+            setTimeout(() => removeCard(event.id), 3000);
+          } else if (event.status === 'error') {
+            setTimeout(() => removeCard(event.id), 5000);
+          }
+          return;
+        }
+
+        // Новая карточка
+        const card = createCard(event);
+        queueEl.prepend(card);
+
+        // Trigger enter animation next frame
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => { card.classList.add('enter'); });
+        });
+
+        shown.set(event.id, { el: card, status: event.status });
+
+        // Auto-remove after timeout
+        const removeDelay = event.status === 'done' ? 3000 : event.status === 'error' ? 5000 : 20000;
+        setTimeout(() => removeCard(event.id), removeDelay);
+      }
+
+      function removeCard(id) {
+        const entry = shown.get(id);
+        if (!entry) return;
+        entry.el.classList.remove('enter');
+        entry.el.classList.add('exit');
+        setTimeout(() => {
+          entry.el.remove();
+          shown.delete(id);
+        }, 400);
+      }
+
+      // ── Banner (big central notification) ──
+      function showBanner(event) {
+        if (bannerTimer) {
+          clearTimeout(bannerTimer);
+          // remove existing
+          const old = bannerEl.querySelector('.banner-card');
+          if (old) { old.remove(); }
+        }
+
+        playActivationSound();
+
+        const icon = ACTION_ICONS[event.action_type] || '🎮';
+        const card = document.createElement('div');
+        card.className = 'banner-card enter';
+        card.style.position = 'relative';
+        card.innerHTML = `
+          ${event.user_avatar
+            ? `<img class="banner-avatar" src="${event.user_avatar}" alt="" onerror="this.style.display='none'" />`
+            : ''
+          }
+          <div class="banner-icon">${icon}</div>
+          <div class="banner-info">
+            <div class="banner-user">${event.user_name} активировал</div>
+            <div class="banner-reward">${event.reward_name || event.action_type}</div>
+          </div>
+          <div class="banner-progress"></div>
+        `;
+
+        bannerEl.appendChild(card);
+
+        bannerTimer = setTimeout(() => {
+          card.classList.remove('enter');
+          card.classList.add('exit');
+          setTimeout(() => card.remove(), 450);
+        }, 4000);
+      }
+
+      // ── Polling ──
+      const seenForBanner = new Set();
+
+      async function poll() {
+        if (!STREAMER_ID) return;
+        try {
+          const res = await fetch(`${BASE_URL}/api/cs2/overlay/events?streamerId=${STREAMER_ID}&since=${encodeURIComponent(lastSince)}`);
+          if (!res.ok) return;
+          const { events, serverTime } = await res.json();
+
+          if (serverTime) lastSince = new Date(Date.now() - 5000).toISOString();
+
+          for (const ev of (events || [])) {
+            addOrUpdateCard(ev);
+
+            // Show banner only for fresh pending events
+            if (!seenForBanner.has(ev.id) && ev.status === 'pending') {
+              seenForBanner.add(ev.id);
+              showBanner(ev);
+            }
+          }
+        } catch(e) {
+          console.warn('[CS2 Overlay] Poll error:', e);
+        }
+      }
+
+      if (!STREAMER_ID) {
+        queueEl.innerHTML = '<div style="color:rgba(255,255,255,0.3);padding:12px;font-size:13px;">⚠️ streamerId не задан в URL</div>';
+      } else {
+        poll();
+        setInterval(poll, POLL_INTERVAL);
+      }
+    })();
+  </script>
+</body>
+</html>

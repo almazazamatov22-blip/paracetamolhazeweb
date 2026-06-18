@@ -170,8 +170,8 @@ export default function Home() {
               return (
                 <a
                   key={project.title}
-                  href={project.disabled ? undefined : href}
-                  className={`paracetamol-project-card ${project.disabled ? 'is-disabled' : ''}`}
+                  href={href}
+                  className="paracetamol-project-card"
                   onMouseMove={handleCardMouseMove}
                   onMouseLeave={handleCardMouseLeave}
                 >
