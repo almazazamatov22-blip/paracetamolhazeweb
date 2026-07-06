@@ -10,8 +10,9 @@ const MIN_FONT_SIZE = 32;
 const MAX_FONT_SIZE = 240;
 const MIN_OUTLINE_WIDTH = 0;
 const MAX_OUTLINE_WIDTH = 14;
-const MIN_ANIMATION_SPEED = 0.6;
-const MAX_ANIMATION_SPEED = 6;
+const MIN_LETTER_SPACING = 0;
+const MAX_LETTER_SPACING = 32;
+const CHANGE_ANIMATION_DURATION_MS = 620;
 const DEFAULT_COLOR = '#ffffff';
 const DEFAULT_OUTLINE_COLOR = '#000000';
 
@@ -36,7 +37,7 @@ type FontFamily =
   | 'monospace'
   | 'serif';
 
-type TextPosition = 'top' | 'bottom' | 'left' | 'right';
+type TextPosition = 'top' | 'bottom';
 type OverlayAnimation = 'none' | 'fade' | 'pulse' | 'pop' | 'slide' | 'float' | 'glow' | 'bounce';
 
 type TomalState = {
@@ -44,13 +45,13 @@ type TomalState = {
   text: string;
   color: string;
   fontSize: number;
+  letterSpacing: number;
   fontFamily: FontFamily;
   textPosition: TextPosition;
   outlineEnabled: boolean;
   outlineColor: string;
   outlineWidth: number;
   animation: OverlayAnimation;
-  animationSpeed: number;
 };
 
 const DEFAULT_STATE: TomalState = {
@@ -58,13 +59,13 @@ const DEFAULT_STATE: TomalState = {
   text: '',
   color: DEFAULT_COLOR,
   fontSize: 120,
+  letterSpacing: 0,
   fontFamily: 'geist',
   textPosition: 'top',
   outlineEnabled: false,
   outlineColor: DEFAULT_OUTLINE_COLOR,
   outlineWidth: 3,
   animation: 'none',
-  animationSpeed: 1.8,
 };
 
 const FONT_OPTIONS: Array<{ value: FontFamily; label: string; css: string }> = [
@@ -92,8 +93,6 @@ const FONT_OPTIONS: Array<{ value: FontFamily; label: string; css: string }> = [
 const TEXT_POSITION_OPTIONS: Array<{ value: TextPosition; label: string }> = [
   { value: 'top', label: 'Сверху' },
   { value: 'bottom', label: 'Снизу' },
-  { value: 'left', label: 'Слева' },
-  { value: 'right', label: 'Справа' },
 ];
 
 const ANIMATION_OPTIONS: Array<{ value: OverlayAnimation; label: string }> = [
@@ -121,12 +120,12 @@ function clampFontSize(value: number) {
   return clampNumber(value, MIN_FONT_SIZE, MAX_FONT_SIZE, DEFAULT_STATE.fontSize);
 }
 
-function clampOutlineWidth(value: number) {
-  return clampNumber(value, MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH, DEFAULT_STATE.outlineWidth);
+function clampLetterSpacing(value: number) {
+  return clampNumber(value, MIN_LETTER_SPACING, MAX_LETTER_SPACING, DEFAULT_STATE.letterSpacing);
 }
 
-function clampAnimationSpeed(value: number) {
-  return clampNumber(value, MIN_ANIMATION_SPEED, MAX_ANIMATION_SPEED, DEFAULT_STATE.animationSpeed, false);
+function clampOutlineWidth(value: number) {
+  return clampNumber(value, MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH, DEFAULT_STATE.outlineWidth);
 }
 
 function parseCounter(rawValue: string) {
@@ -146,7 +145,7 @@ function normalizeFontFamily(value: unknown): FontFamily {
 }
 
 function normalizeTextPosition(value: unknown): TextPosition {
-  return value === 'bottom' || value === 'left' || value === 'right' ? value : DEFAULT_STATE.textPosition;
+  return value === 'bottom' ? value : DEFAULT_STATE.textPosition;
 }
 
 function normalizeAnimation(value: unknown): OverlayAnimation {
@@ -167,20 +166,18 @@ function normalizeState(state: Partial<TomalState>): TomalState {
     text: normalizeText(state.text),
     color: normalizeColor(state.color),
     fontSize: clampFontSize(Number(state.fontSize ?? DEFAULT_STATE.fontSize)),
+    letterSpacing: clampLetterSpacing(Number(state.letterSpacing ?? DEFAULT_STATE.letterSpacing)),
     fontFamily: normalizeFontFamily(state.fontFamily),
     textPosition: normalizeTextPosition(state.textPosition),
     outlineEnabled: Boolean(state.outlineEnabled),
     outlineColor: normalizeColor(state.outlineColor, DEFAULT_OUTLINE_COLOR),
     outlineWidth: clampOutlineWidth(Number(state.outlineWidth ?? DEFAULT_STATE.outlineWidth)),
     animation: normalizeAnimation(state.animation),
-    animationSpeed: clampAnimationSpeed(Number(state.animationSpeed ?? DEFAULT_STATE.animationSpeed)),
   };
 }
 
 function getFlexDirection(position: TextPosition) {
   if (position === 'bottom') return 'column-reverse';
-  if (position === 'left') return 'row';
-  if (position === 'right') return 'row-reverse';
   return 'column';
 }
 
@@ -190,7 +187,10 @@ export default function TomalPage() {
   const [overlayUrl, setOverlayUrl] = useState('/tomal/overlay');
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState('Загрузка');
+  const [previewPulseKey, setPreviewPulseKey] = useState(0);
+  const [previewAnimationActive, setPreviewAnimationActive] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const previewAnimationTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   useEffect(() => {
     setOverlayUrl(`${window.location.origin}/tomal/overlay`);
@@ -217,6 +217,7 @@ export default function TomalPage() {
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+      if (previewAnimationTimerRef.current) window.clearTimeout(previewAnimationTimerRef.current);
     };
   }, []);
 
@@ -257,8 +258,20 @@ export default function TomalPage() {
     }, 450);
   };
 
+  const triggerPreviewAnimation = () => {
+    if (state.animation === 'none') return;
+    if (previewAnimationTimerRef.current) window.clearTimeout(previewAnimationTimerRef.current);
+    setPreviewAnimationActive(true);
+    previewAnimationTimerRef.current = window.setTimeout(() => setPreviewAnimationActive(false), CHANGE_ANIMATION_DURATION_MS);
+    setPreviewPulseKey((currentKey) => currentKey + 1);
+  };
+
   const setCounter = (nextValue: number) => {
-    updateState({ value: clampCounter(nextValue) }, true);
+    const nextCounter = clampCounter(nextValue);
+    if (nextCounter !== state.value) {
+      triggerPreviewAnimation();
+    }
+    updateState({ value: nextCounter }, true);
   };
 
   const handleManualChange = (nextDraftValue: string) => {
@@ -270,23 +283,30 @@ export default function TomalPage() {
     const parsedValue = parseCounter(nextDraftValue);
     if (parsedValue === null) return;
 
+    if (parsedValue !== state.value) {
+      triggerPreviewAnimation();
+    }
     setDraftValue(String(parsedValue));
     updateState({ value: parsedValue });
   };
 
   const commitDraftValue = () => {
     const parsedValue = parseCounter(draftValue);
-    updateState({ value: parsedValue ?? state.value }, true);
+    const nextCounter = parsedValue ?? state.value;
+    if (nextCounter !== state.value) {
+      triggerPreviewAnimation();
+    }
+    updateState({ value: nextCounter }, true);
   };
 
   const previewFontFamily = useMemo(() => getFontCss(state.fontFamily), [state.fontFamily]);
   const previewTextSize = Math.max(18, Math.round(state.fontSize * 0.34));
   const previewStackStyle = useMemo(() => ({
-    '--tomal-animation-duration': `${state.animationSpeed}s`,
     color: state.color,
     flexDirection: getFlexDirection(state.textPosition),
     fontFamily: previewFontFamily,
-  }) as CSSProperties, [previewFontFamily, state.animationSpeed, state.color, state.textPosition]);
+    letterSpacing: `${state.letterSpacing}px`,
+  }) as CSSProperties, [previewFontFamily, state.color, state.letterSpacing, state.textPosition]);
   const outlineStyle = useMemo(() => ({
     WebkitTextStroke: state.outlineEnabled ? `${state.outlineWidth}px ${state.outlineColor}` : '0 transparent',
   }) as CSSProperties, [state.outlineColor, state.outlineEnabled, state.outlineWidth]);
@@ -489,7 +509,7 @@ export default function TomalPage() {
         .tomal-segment-grid {
           display: grid;
           gap: 10px;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
         .tomal-segment-button {
@@ -515,6 +535,22 @@ export default function TomalPage() {
           accent-color: #ffffff;
           height: 18px;
           width: 18px;
+        }
+
+        .tomal-field {
+          display: flex;
+          flex: 1;
+          flex-direction: column;
+          gap: 6px;
+          min-width: 88px;
+        }
+
+        .tomal-field-label {
+          color: rgba(255, 255, 255, 0.58);
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0;
+          text-transform: uppercase;
         }
 
         .tomal-status {
@@ -559,7 +595,6 @@ export default function TomalPage() {
 
         .tomal-preview-text,
         .tomal-preview-count {
-          letter-spacing: 0;
           line-height: 0.95;
           max-width: 100%;
           overflow-wrap: anywhere;
@@ -578,69 +613,73 @@ export default function TomalPage() {
           white-space: nowrap;
         }
 
-        .tomal-animation-fade {
-          animation: tomalFade var(--tomal-animation-duration) ease-in-out infinite alternate;
+        .tomal-change-animation-fade {
+          animation: tomalChangeFade ${CHANGE_ANIMATION_DURATION_MS}ms ease-out both;
         }
 
-        .tomal-animation-pulse {
-          animation: tomalPulse var(--tomal-animation-duration) ease-in-out infinite;
+        .tomal-change-animation-pulse {
+          animation: tomalChangePulse ${CHANGE_ANIMATION_DURATION_MS}ms ease-out both;
         }
 
-        .tomal-animation-pop {
-          animation: tomalPop var(--tomal-animation-duration) ease-in-out infinite;
+        .tomal-change-animation-pop {
+          animation: tomalChangePop ${CHANGE_ANIMATION_DURATION_MS}ms cubic-bezier(0.2, 1.6, 0.35, 1) both;
         }
 
-        .tomal-animation-slide {
-          animation: tomalSlide var(--tomal-animation-duration) ease-in-out infinite;
+        .tomal-change-animation-slide {
+          animation: tomalChangeSlide ${CHANGE_ANIMATION_DURATION_MS}ms ease-out both;
         }
 
-        .tomal-animation-float {
-          animation: tomalFloat var(--tomal-animation-duration) ease-in-out infinite;
+        .tomal-change-animation-float {
+          animation: tomalChangeFloat ${CHANGE_ANIMATION_DURATION_MS}ms ease-out both;
         }
 
-        .tomal-animation-glow {
-          animation: tomalGlow var(--tomal-animation-duration) ease-in-out infinite;
+        .tomal-change-animation-glow {
+          animation: tomalChangeGlow ${CHANGE_ANIMATION_DURATION_MS}ms ease-out both;
         }
 
-        .tomal-animation-bounce {
-          animation: tomalBounce var(--tomal-animation-duration) ease-in-out infinite;
+        .tomal-change-animation-bounce {
+          animation: tomalChangeBounce ${CHANGE_ANIMATION_DURATION_MS}ms ease-out both;
         }
 
-        @keyframes tomalFade {
-          from { opacity: 0.56; }
-          to { opacity: 1; }
+        @keyframes tomalChangeFade {
+          0% { opacity: 0.35; }
+          100% { opacity: 1; }
         }
 
-        @keyframes tomalPulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.045); }
+        @keyframes tomalChangePulse {
+          0% { transform: scale(1); }
+          42% { transform: scale(1.08); }
+          100% { transform: scale(1); }
         }
 
-        @keyframes tomalPop {
-          0%, 100% { transform: scale(1); }
-          12% { transform: scale(1.08); }
-          24% { transform: scale(0.98); }
+        @keyframes tomalChangePop {
+          0% { transform: scale(0.72); opacity: 0; }
+          70% { transform: scale(1.08); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
         }
 
-        @keyframes tomalSlide {
-          0%, 100% { transform: translateX(0); }
-          50% { transform: translateX(14px); }
+        @keyframes tomalChangeSlide {
+          0% { transform: translateY(18px); opacity: 0; }
+          100% { transform: translateY(0); opacity: 1; }
         }
 
-        @keyframes tomalFloat {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-12px); }
+        @keyframes tomalChangeFloat {
+          0% { transform: translateY(16px); }
+          55% { transform: translateY(-8px); }
+          100% { transform: translateY(0); }
         }
 
-        @keyframes tomalGlow {
-          0%, 100% { filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
-          50% { filter: drop-shadow(0 0 18px currentColor); }
+        @keyframes tomalChangeGlow {
+          0% { filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+          45% { filter: drop-shadow(0 0 22px currentColor); }
+          100% { filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
         }
 
-        @keyframes tomalBounce {
-          0%, 100% { transform: translateY(0); }
-          35% { transform: translateY(-18px); }
-          55% { transform: translateY(4px); }
+        @keyframes tomalChangeBounce {
+          0% { transform: translateY(0); }
+          34% { transform: translateY(-22px); }
+          58% { transform: translateY(5px); }
+          100% { transform: translateY(0); }
         }
 
         @media (max-width: 960px) {
@@ -763,24 +802,30 @@ export default function TomalPage() {
               Включить
             </label>
             <div className="tomal-inline-row">
-              <input
-                className="tomal-color-input"
-                type="color"
-                value={state.outlineColor}
-                disabled={!state.outlineEnabled}
-                aria-label="Outline color"
-                onChange={(event) => updateState({ outlineColor: event.target.value })}
-              />
-              <input
-                className="tomal-input"
-                type="number"
-                min={MIN_OUTLINE_WIDTH}
-                max={MAX_OUTLINE_WIDTH}
-                value={state.outlineWidth}
-                disabled={!state.outlineEnabled}
-                aria-label="Outline width"
-                onChange={(event) => updateState({ outlineWidth: Number(event.target.value) })}
-              />
+              <label className="tomal-field">
+                <span className="tomal-field-label">Цвет</span>
+                <input
+                  className="tomal-color-input"
+                  type="color"
+                  value={state.outlineColor}
+                  disabled={!state.outlineEnabled}
+                  aria-label="Outline color"
+                  onChange={(event) => updateState({ outlineColor: event.target.value })}
+                />
+              </label>
+              <label className="tomal-field">
+                <span className="tomal-field-label">Размер</span>
+                <input
+                  className="tomal-input"
+                  type="number"
+                  min={MIN_OUTLINE_WIDTH}
+                  max={MAX_OUTLINE_WIDTH}
+                  value={state.outlineWidth}
+                  disabled={!state.outlineEnabled}
+                  aria-label="Outline size"
+                  onChange={(event) => updateState({ outlineWidth: Number(event.target.value) })}
+                />
+              </label>
             </div>
           </div>
 
@@ -825,11 +870,35 @@ export default function TomalPage() {
           </div>
 
           <div className="tomal-section">
-            <h2 className="tomal-section-title">Анимация</h2>
+            <h2 className="tomal-section-title">Расстояние между букв</h2>
+            <div className="tomal-inline-row">
+              <input
+                className="tomal-range"
+                type="range"
+                min={MIN_LETTER_SPACING}
+                max={MAX_LETTER_SPACING}
+                value={state.letterSpacing}
+                aria-label="Letter spacing"
+                onChange={(event) => updateState({ letterSpacing: Number(event.target.value) })}
+              />
+              <input
+                className="tomal-input"
+                type="number"
+                min={MIN_LETTER_SPACING}
+                max={MAX_LETTER_SPACING}
+                value={state.letterSpacing}
+                aria-label="Letter spacing number"
+                onChange={(event) => updateState({ letterSpacing: Number(event.target.value) })}
+              />
+            </div>
+          </div>
+
+          <div className="tomal-section">
+            <h2 className="tomal-section-title">Анимация числа</h2>
             <select
               className="tomal-select"
               value={state.animation}
-              aria-label="Overlay animation"
+              aria-label="Counter change animation"
               onChange={(event) => updateState({ animation: event.target.value as OverlayAnimation })}
             >
               {ANIMATION_OPTIONS.map((animation) => (
@@ -839,44 +908,22 @@ export default function TomalPage() {
               ))}
             </select>
           </div>
-
-          <div className="tomal-section">
-            <h2 className="tomal-section-title">Скорость</h2>
-            <div className="tomal-inline-row">
-              <input
-                className="tomal-range"
-                type="range"
-                min={MIN_ANIMATION_SPEED}
-                max={MAX_ANIMATION_SPEED}
-                step="0.1"
-                value={state.animationSpeed}
-                aria-label="Animation speed"
-                onChange={(event) => updateState({ animationSpeed: Number(event.target.value) })}
-              />
-              <input
-                className="tomal-input"
-                type="number"
-                min={MIN_ANIMATION_SPEED}
-                max={MAX_ANIMATION_SPEED}
-                step="0.1"
-                value={state.animationSpeed}
-                aria-label="Animation speed number"
-                onChange={(event) => updateState({ animationSpeed: Number(event.target.value) })}
-              />
-            </div>
-          </div>
         </section>
 
         <aside className="tomal-preview-panel" aria-label="Overlay preview">
           <h2 className="tomal-section-title">Предпросмотр</h2>
           <div className="tomal-preview">
-            <div className={`tomal-preview-stack tomal-animation-${state.animation}`} style={previewStackStyle}>
+            <div className="tomal-preview-stack" style={previewStackStyle}>
               {state.text.trim() && (
                 <div className="tomal-preview-text" style={{ ...outlineStyle, fontSize: `${previewTextSize}px` }}>
                   {state.text}
                 </div>
               )}
-              <div className="tomal-preview-count" style={{ ...outlineStyle, fontSize: `${state.fontSize}px` }}>
+              <div
+                className={`tomal-preview-count${previewAnimationActive && state.animation !== 'none' ? ` tomal-change-animation-${state.animation}` : ''}`}
+                key={previewPulseKey}
+                style={{ ...outlineStyle, fontSize: `${state.fontSize}px` }}
+              >
                 {state.value}/{MAX_VALUE}
               </div>
             </div>

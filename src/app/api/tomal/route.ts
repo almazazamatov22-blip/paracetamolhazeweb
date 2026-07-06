@@ -32,7 +32,7 @@ type FontFamily =
   | 'monospace'
   | 'serif';
 
-type TextPosition = 'top' | 'bottom' | 'left' | 'right';
+type TextPosition = 'top' | 'bottom';
 type OverlayAnimation = 'none' | 'fade' | 'pulse' | 'pop' | 'slide' | 'float' | 'glow' | 'bounce';
 
 type TomalState = {
@@ -40,13 +40,13 @@ type TomalState = {
   text: string;
   color: string;
   fontSize: number;
+  letterSpacing: number;
   fontFamily: FontFamily;
   textPosition: TextPosition;
   outlineEnabled: boolean;
   outlineColor: string;
   outlineWidth: number;
   animation: OverlayAnimation;
-  animationSpeed: number;
   updatedAt: string;
 };
 
@@ -55,13 +55,13 @@ const DEFAULT_STATE: TomalState = {
   text: '',
   color: DEFAULT_COLOR,
   fontSize: 120,
+  letterSpacing: 0,
   fontFamily: 'geist',
   textPosition: 'top',
   outlineEnabled: false,
   outlineColor: DEFAULT_OUTLINE_COLOR,
   outlineWidth: 3,
   animation: 'none',
-  animationSpeed: 1.8,
   updatedAt: new Date(0).toISOString(),
 };
 
@@ -90,14 +90,14 @@ function clampFontSize(value: number) {
   return Math.min(240, Math.max(32, Math.trunc(value)));
 }
 
+function clampLetterSpacing(value: number) {
+  if (!Number.isFinite(value)) return DEFAULT_STATE.letterSpacing;
+  return Math.min(32, Math.max(0, Math.trunc(value)));
+}
+
 function clampOutlineWidth(value: number) {
   if (!Number.isFinite(value)) return DEFAULT_STATE.outlineWidth;
   return Math.min(14, Math.max(0, Math.trunc(value)));
-}
-
-function clampAnimationSpeed(value: number) {
-  if (!Number.isFinite(value)) return DEFAULT_STATE.animationSpeed;
-  return Number(Math.min(6, Math.max(0.6, value)).toFixed(1));
 }
 
 function normalizeColor(value: unknown, fallback = DEFAULT_COLOR) {
@@ -130,7 +130,7 @@ function normalizeFontFamily(value: unknown): FontFamily {
 }
 
 function normalizeTextPosition(value: unknown): TextPosition {
-  return value === 'bottom' || value === 'left' || value === 'right' ? value : 'top';
+  return value === 'bottom' ? value : 'top';
 }
 
 function normalizeAnimation(value: unknown): OverlayAnimation {
@@ -151,13 +151,13 @@ function normalizeState(input: Partial<TomalState>): TomalState {
     text: typeof input.text === 'string' ? input.text.slice(0, 120) : '',
     color: normalizeColor(input.color),
     fontSize: clampFontSize(Number(input.fontSize ?? DEFAULT_STATE.fontSize)),
+    letterSpacing: clampLetterSpacing(Number(input.letterSpacing ?? DEFAULT_STATE.letterSpacing)),
     fontFamily: normalizeFontFamily(input.fontFamily),
     textPosition: normalizeTextPosition(input.textPosition),
     outlineEnabled: Boolean(input.outlineEnabled),
     outlineColor: normalizeColor(input.outlineColor, DEFAULT_OUTLINE_COLOR),
     outlineWidth: clampOutlineWidth(Number(input.outlineWidth ?? DEFAULT_STATE.outlineWidth)),
     animation: normalizeAnimation(input.animation),
-    animationSpeed: clampAnimationSpeed(Number(input.animationSpeed ?? DEFAULT_STATE.animationSpeed)),
     updatedAt: typeof input.updatedAt === 'string' ? input.updatedAt : new Date().toISOString(),
   };
 }

@@ -1,13 +1,14 @@
 'use client';
 
 import type { CSSProperties } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const MAX_VALUE = 100;
 const TOMAL_USER_ID = 'tomal-overlay';
 const TOMAL_SETTINGS_KEY = 'tomal';
 const SAFETY_SYNC_INTERVAL = 60_000;
+const CHANGE_ANIMATION_DURATION_MS = 620;
 const DEFAULT_COLOR = '#ffffff';
 const DEFAULT_OUTLINE_COLOR = '#000000';
 
@@ -32,7 +33,7 @@ type FontFamily =
   | 'monospace'
   | 'serif';
 
-type TextPosition = 'top' | 'bottom' | 'left' | 'right';
+type TextPosition = 'top' | 'bottom';
 type OverlayAnimation = 'none' | 'fade' | 'pulse' | 'pop' | 'slide' | 'float' | 'glow' | 'bounce';
 
 type TomalState = {
@@ -40,13 +41,13 @@ type TomalState = {
   text: string;
   color: string;
   fontSize: number;
+  letterSpacing: number;
   fontFamily: FontFamily;
   textPosition: TextPosition;
   outlineEnabled: boolean;
   outlineColor: string;
   outlineWidth: number;
   animation: OverlayAnimation;
-  animationSpeed: number;
 };
 
 const DEFAULT_STATE: TomalState = {
@@ -54,13 +55,13 @@ const DEFAULT_STATE: TomalState = {
   text: '',
   color: DEFAULT_COLOR,
   fontSize: 120,
+  letterSpacing: 0,
   fontFamily: 'geist',
   textPosition: 'top',
   outlineEnabled: false,
   outlineColor: DEFAULT_OUTLINE_COLOR,
   outlineWidth: 3,
   animation: 'none',
-  animationSpeed: 1.8,
 };
 
 const FONT_MAP: Record<FontFamily, string> = {
@@ -115,7 +116,7 @@ function normalizeFontFamily(value: unknown): FontFamily {
 }
 
 function normalizeTextPosition(value: unknown): TextPosition {
-  return value === 'bottom' || value === 'left' || value === 'right' ? value : 'top';
+  return value === 'bottom' ? value : 'top';
 }
 
 function normalizeAnimation(value: unknown): OverlayAnimation {
@@ -132,34 +133,55 @@ function normalizeAnimation(value: unknown): OverlayAnimation {
 
 function getFlexDirection(position: TextPosition) {
   if (position === 'bottom') return 'column-reverse';
-  if (position === 'left') return 'row';
-  if (position === 'right') return 'row-reverse';
   return 'column';
 }
 
 function normalizeState(state: Partial<TomalState>): TomalState {
   const rawValue = Number(state.value ?? DEFAULT_STATE.value);
   const rawFontSize = Number(state.fontSize ?? DEFAULT_STATE.fontSize);
+  const rawLetterSpacing = Number(state.letterSpacing ?? DEFAULT_STATE.letterSpacing);
   const rawOutlineWidth = Number(state.outlineWidth ?? DEFAULT_STATE.outlineWidth);
-  const rawAnimationSpeed = Number(state.animationSpeed ?? DEFAULT_STATE.animationSpeed);
 
   return {
     value: Number.isFinite(rawValue) ? Math.min(MAX_VALUE, Math.max(0, Math.trunc(rawValue))) : DEFAULT_STATE.value,
     text: typeof state.text === 'string' ? state.text.slice(0, 120) : '',
     color: normalizeColor(state.color),
     fontSize: Number.isFinite(rawFontSize) ? Math.min(240, Math.max(32, Math.trunc(rawFontSize))) : DEFAULT_STATE.fontSize,
+    letterSpacing: Number.isFinite(rawLetterSpacing) ? Math.min(32, Math.max(0, Math.trunc(rawLetterSpacing))) : DEFAULT_STATE.letterSpacing,
     fontFamily: normalizeFontFamily(state.fontFamily),
     textPosition: normalizeTextPosition(state.textPosition),
     outlineEnabled: Boolean(state.outlineEnabled),
     outlineColor: normalizeColor(state.outlineColor, DEFAULT_OUTLINE_COLOR),
     outlineWidth: Number.isFinite(rawOutlineWidth) ? Math.min(14, Math.max(0, Math.trunc(rawOutlineWidth))) : DEFAULT_STATE.outlineWidth,
     animation: normalizeAnimation(state.animation),
-    animationSpeed: Number.isFinite(rawAnimationSpeed) ? Math.min(6, Math.max(0.6, rawAnimationSpeed)) : DEFAULT_STATE.animationSpeed,
   };
 }
 
 export default function TomalOverlayPage() {
   const [state, setState] = useState<TomalState>(DEFAULT_STATE);
+  const [animationKey, setAnimationKey] = useState(0);
+  const [animationActive, setAnimationActive] = useState(false);
+  const animationTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const hasLoadedStateRef = useRef(false);
+
+  const triggerChangeAnimation = useCallback(() => {
+    if (animationTimerRef.current) window.clearTimeout(animationTimerRef.current);
+    setAnimationActive(true);
+    animationTimerRef.current = window.setTimeout(() => setAnimationActive(false), CHANGE_ANIMATION_DURATION_MS);
+    setAnimationKey((currentKey) => currentKey + 1);
+  }, []);
+
+  const applyState = useCallback((nextState: Partial<TomalState>) => {
+    setState((currentState) => {
+      const normalizedState = normalizeState(nextState);
+      const shouldAnimate = hasLoadedStateRef.current && normalizedState.value !== currentState.value && normalizedState.animation !== 'none';
+      hasLoadedStateRef.current = true;
+      if (shouldAnimate) {
+        triggerChangeAnimation();
+      }
+      return normalizedState;
+    });
+  }, [triggerChangeAnimation]);
 
   useEffect(() => {
     let active = true;
@@ -168,7 +190,7 @@ export default function TomalOverlayPage() {
       try {
         const response = await fetch('/api/tomal', { cache: 'no-store' });
         const data = await response.json();
-        if (active) setState(normalizeState(data));
+        if (active) applyState(data);
       } catch {
         if (active) setState((currentState) => currentState);
       }
@@ -189,7 +211,7 @@ export default function TomalOverlayPage() {
           const nextRow = payload.new as { settings?: Record<string, unknown> } | null;
           const nextState = nextRow?.settings?.[TOMAL_SETTINGS_KEY];
           if (active && nextState && typeof nextState === 'object') {
-            setState(normalizeState(nextState as Partial<TomalState>));
+            applyState(nextState as Partial<TomalState>);
           }
         }
       )
@@ -200,16 +222,17 @@ export default function TomalOverlayPage() {
     return () => {
       active = false;
       window.clearInterval(safetySync);
+      if (animationTimerRef.current) window.clearTimeout(animationTimerRef.current);
       void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [applyState]);
 
   const stackStyle = useMemo(() => ({
-    '--tomal-animation-duration': `${state.animationSpeed}s`,
     color: state.color,
     flexDirection: getFlexDirection(state.textPosition),
     fontFamily: FONT_MAP[state.fontFamily],
-  }) as CSSProperties, [state.animationSpeed, state.color, state.fontFamily, state.textPosition]);
+    letterSpacing: `${state.letterSpacing}px`,
+  }) as CSSProperties, [state.color, state.fontFamily, state.letterSpacing, state.textPosition]);
   const outlineStyle = useMemo(() => ({
     WebkitTextStroke: state.outlineEnabled ? `${state.outlineWidth}px ${state.outlineColor}` : '0 transparent',
   }) as CSSProperties, [state.outlineColor, state.outlineEnabled, state.outlineWidth]);
@@ -248,7 +271,6 @@ export default function TomalOverlayPage() {
 
         .tomal-overlay-text,
         .tomal-overlay-count {
-          letter-spacing: 0;
           line-height: 0.95;
           max-width: 100%;
           overflow-wrap: anywhere;
@@ -268,79 +290,88 @@ export default function TomalOverlayPage() {
           white-space: nowrap;
         }
 
-        .tomal-animation-fade {
-          animation: tomalFade var(--tomal-animation-duration) ease-in-out infinite alternate;
+        .tomal-change-animation-fade {
+          animation: tomalChangeFade ${CHANGE_ANIMATION_DURATION_MS}ms ease-out both;
         }
 
-        .tomal-animation-pulse {
-          animation: tomalPulse var(--tomal-animation-duration) ease-in-out infinite;
+        .tomal-change-animation-pulse {
+          animation: tomalChangePulse ${CHANGE_ANIMATION_DURATION_MS}ms ease-out both;
         }
 
-        .tomal-animation-pop {
-          animation: tomalPop var(--tomal-animation-duration) ease-in-out infinite;
+        .tomal-change-animation-pop {
+          animation: tomalChangePop ${CHANGE_ANIMATION_DURATION_MS}ms cubic-bezier(0.2, 1.6, 0.35, 1) both;
         }
 
-        .tomal-animation-slide {
-          animation: tomalSlide var(--tomal-animation-duration) ease-in-out infinite;
+        .tomal-change-animation-slide {
+          animation: tomalChangeSlide ${CHANGE_ANIMATION_DURATION_MS}ms ease-out both;
         }
 
-        .tomal-animation-float {
-          animation: tomalFloat var(--tomal-animation-duration) ease-in-out infinite;
+        .tomal-change-animation-float {
+          animation: tomalChangeFloat ${CHANGE_ANIMATION_DURATION_MS}ms ease-out both;
         }
 
-        .tomal-animation-glow {
-          animation: tomalGlow var(--tomal-animation-duration) ease-in-out infinite;
+        .tomal-change-animation-glow {
+          animation: tomalChangeGlow ${CHANGE_ANIMATION_DURATION_MS}ms ease-out both;
         }
 
-        .tomal-animation-bounce {
-          animation: tomalBounce var(--tomal-animation-duration) ease-in-out infinite;
+        .tomal-change-animation-bounce {
+          animation: tomalChangeBounce ${CHANGE_ANIMATION_DURATION_MS}ms ease-out both;
         }
 
-        @keyframes tomalFade {
-          from { opacity: 0.56; }
-          to { opacity: 1; }
+        @keyframes tomalChangeFade {
+          0% { opacity: 0.35; }
+          100% { opacity: 1; }
         }
 
-        @keyframes tomalPulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.045); }
+        @keyframes tomalChangePulse {
+          0% { transform: scale(1); }
+          42% { transform: scale(1.08); }
+          100% { transform: scale(1); }
         }
 
-        @keyframes tomalPop {
-          0%, 100% { transform: scale(1); }
-          12% { transform: scale(1.08); }
-          24% { transform: scale(0.98); }
+        @keyframes tomalChangePop {
+          0% { transform: scale(0.72); opacity: 0; }
+          70% { transform: scale(1.08); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
         }
 
-        @keyframes tomalSlide {
-          0%, 100% { transform: translateX(0); }
-          50% { transform: translateX(14px); }
+        @keyframes tomalChangeSlide {
+          0% { transform: translateY(18px); opacity: 0; }
+          100% { transform: translateY(0); opacity: 1; }
         }
 
-        @keyframes tomalFloat {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-12px); }
+        @keyframes tomalChangeFloat {
+          0% { transform: translateY(16px); }
+          55% { transform: translateY(-8px); }
+          100% { transform: translateY(0); }
         }
 
-        @keyframes tomalGlow {
-          0%, 100% { filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
-          50% { filter: drop-shadow(0 0 18px currentColor); }
+        @keyframes tomalChangeGlow {
+          0% { filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+          45% { filter: drop-shadow(0 0 22px currentColor); }
+          100% { filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
         }
 
-        @keyframes tomalBounce {
-          0%, 100% { transform: translateY(0); }
-          35% { transform: translateY(-18px); }
-          55% { transform: translateY(4px); }
+        @keyframes tomalChangeBounce {
+          0% { transform: translateY(0); }
+          34% { transform: translateY(-22px); }
+          58% { transform: translateY(5px); }
+          100% { transform: translateY(0); }
         }
       `}</style>
 
-      <div className={`tomal-overlay-stack tomal-animation-${state.animation}`} style={stackStyle}>
+      <div className="tomal-overlay-stack" style={stackStyle}>
         {state.text.trim() && (
           <div className="tomal-overlay-text" style={{ ...outlineStyle, fontSize: `${textSize}px` }}>
             {state.text}
           </div>
         )}
-        <div className="tomal-overlay-count" style={{ ...outlineStyle, fontSize: `${state.fontSize}px` }} aria-live="polite">
+        <div
+          className={`tomal-overlay-count${animationActive && state.animation !== 'none' ? ` tomal-change-animation-${state.animation}` : ''}`}
+          key={animationKey}
+          style={{ ...outlineStyle, fontSize: `${state.fontSize}px` }}
+          aria-live="polite"
+        >
           {state.value}/{MAX_VALUE}
         </div>
       </div>
