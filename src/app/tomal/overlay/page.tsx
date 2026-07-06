@@ -1,8 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 const MAX_VALUE = 100;
+const TOMAL_USER_ID = 'tomal-overlay';
+const TOMAL_SETTINGS_KEY = 'tomal';
+const SAFETY_SYNC_INTERVAL = 60_000;
 
 type AlignX = 'left' | 'center' | 'right';
 type AlignY = 'top' | 'center' | 'bottom';
@@ -47,11 +51,32 @@ export default function TomalOverlayPage() {
     };
 
     void fetchState();
-    const interval = window.setInterval(fetchState, 1000);
+    const channel = supabase
+      .channel('tomal-overlay-state')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'overlay_configs',
+          filter: `user_id=eq.${TOMAL_USER_ID}`,
+        },
+        (payload) => {
+          const nextRow = payload.new as { settings?: Record<string, unknown> } | null;
+          const nextState = nextRow?.settings?.[TOMAL_SETTINGS_KEY];
+          if (active && nextState && typeof nextState === 'object') {
+            setState(normalizeState(nextState as Partial<TomalState>));
+          }
+        }
+      )
+      .subscribe();
+
+    const safetySync = window.setInterval(fetchState, SAFETY_SYNC_INTERVAL);
 
     return () => {
       active = false;
-      window.clearInterval(interval);
+      window.clearInterval(safetySync);
+      void supabase.removeChannel(channel);
     };
   }, []);
 
