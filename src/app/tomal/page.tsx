@@ -1,41 +1,53 @@
 'use client';
 
 import { Copy, ExternalLink, Minus, Plus } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const MIN_VALUE = 0;
 const MAX_VALUE = 100;
+const MIN_FONT_SIZE = 32;
+const MAX_FONT_SIZE = 220;
+const DEFAULT_COLOR = '#ffffff';
 
-type AlignX = 'left' | 'center' | 'right';
-type AlignY = 'top' | 'center' | 'bottom';
+type FontFamily = 'geist' | 'arial' | 'impact' | 'georgia' | 'courier' | 'trebuchet' | 'waffle';
 
 type TomalState = {
   value: number;
-  alignX: AlignX;
-  alignY: AlignY;
+  text: string;
+  color: string;
+  fontSize: number;
+  fontFamily: FontFamily;
 };
 
 const DEFAULT_STATE: TomalState = {
   value: MIN_VALUE,
-  alignX: 'center',
-  alignY: 'center',
+  text: '',
+  color: DEFAULT_COLOR,
+  fontSize: 120,
+  fontFamily: 'geist',
 };
 
-const HORIZONTAL_OPTIONS: Array<{ value: AlignX; label: string }> = [
-  { value: 'left', label: 'Слева' },
-  { value: 'center', label: 'Центр' },
-  { value: 'right', label: 'Справа' },
+const FONT_OPTIONS: Array<{ value: FontFamily; label: string; css: string }> = [
+  { value: 'geist', label: 'Geist', css: 'var(--font-geist-sans), Arial, sans-serif' },
+  { value: 'arial', label: 'Arial', css: 'Arial, Helvetica, sans-serif' },
+  { value: 'impact', label: 'Impact', css: 'Impact, Haettenschweiler, sans-serif' },
+  { value: 'georgia', label: 'Georgia', css: 'Georgia, serif' },
+  { value: 'courier', label: 'Courier', css: '"Courier New", monospace' },
+  { value: 'trebuchet', label: 'Trebuchet', css: '"Trebuchet MS", Arial, sans-serif' },
+  { value: 'waffle', label: 'Waffle', css: '"Waffle Soft", var(--font-geist-sans), Arial, sans-serif' },
 ];
 
-const VERTICAL_OPTIONS: Array<{ value: AlignY; label: string }> = [
-  { value: 'top', label: 'Сверху' },
-  { value: 'center', label: 'Центр' },
-  { value: 'bottom', label: 'Снизу' },
-];
+function clampNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.trunc(value)));
+}
 
 function clampCounter(value: number) {
-  if (!Number.isFinite(value)) return MIN_VALUE;
-  return Math.min(MAX_VALUE, Math.max(MIN_VALUE, Math.trunc(value)));
+  return clampNumber(value, MIN_VALUE, MAX_VALUE);
+}
+
+function clampFontSize(value: number) {
+  return clampNumber(value, MIN_FONT_SIZE, MAX_FONT_SIZE);
 }
 
 function parseCounter(rawValue: string) {
@@ -44,11 +56,31 @@ function parseCounter(rawValue: string) {
   return clampCounter(parsed);
 }
 
+function normalizeColor(value: unknown) {
+  if (typeof value !== 'string') return DEFAULT_COLOR;
+  const color = value.trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_COLOR;
+}
+
+function normalizeFontFamily(value: unknown): FontFamily {
+  return FONT_OPTIONS.some((font) => font.value === value) ? value as FontFamily : DEFAULT_STATE.fontFamily;
+}
+
+function getFontCss(fontFamily: FontFamily) {
+  return FONT_OPTIONS.find((font) => font.value === fontFamily)?.css || FONT_OPTIONS[0].css;
+}
+
+function normalizeText(value: unknown) {
+  return typeof value === 'string' ? value.slice(0, 80) : '';
+}
+
 function normalizeState(state: Partial<TomalState>): TomalState {
   return {
     value: clampCounter(Number(state.value ?? DEFAULT_STATE.value)),
-    alignX: state.alignX === 'left' || state.alignX === 'right' ? state.alignX : 'center',
-    alignY: state.alignY === 'top' || state.alignY === 'bottom' ? state.alignY : 'center',
+    text: normalizeText(state.text),
+    color: normalizeColor(state.color),
+    fontSize: clampFontSize(Number(state.fontSize ?? DEFAULT_STATE.fontSize)),
+    fontFamily: normalizeFontFamily(state.fontFamily),
   };
 }
 
@@ -58,6 +90,7 @@ export default function TomalPage() {
   const [overlayUrl, setOverlayUrl] = useState('/tomal/overlay');
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState('Загрузка');
+  const saveTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   useEffect(() => {
     setOverlayUrl(`${window.location.origin}/tomal/overlay`);
@@ -81,6 +114,12 @@ export default function TomalPage() {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    };
+  }, []);
+
   const persistState = async (nextState: TomalState) => {
     setState(nextState);
     setDraftValue(String(nextState.value));
@@ -100,12 +139,26 @@ export default function TomalPage() {
     }
   };
 
-  const setCounter = (nextValue: number) => {
-    void persistState({ ...state, value: clampCounter(nextValue) });
+  const updateState = (patch: Partial<TomalState>, immediate = false) => {
+    const nextState = normalizeState({ ...state, ...patch });
+    setState(nextState);
+    setDraftValue(String(nextState.value));
+
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+
+    if (immediate) {
+      void persistState(nextState);
+      return;
+    }
+
+    setStatus('Ожидание');
+    saveTimerRef.current = window.setTimeout(() => {
+      void persistState(nextState);
+    }, 450);
   };
 
-  const setAlignment = (nextAlignment: Partial<Pick<TomalState, 'alignX' | 'alignY'>>) => {
-    void persistState(normalizeState({ ...state, ...nextAlignment }));
+  const setCounter = (nextValue: number) => {
+    updateState({ value: clampCounter(nextValue) }, true);
   };
 
   const handleManualChange = (nextDraftValue: string) => {
@@ -118,19 +171,16 @@ export default function TomalPage() {
     if (parsedValue === null) return;
 
     setDraftValue(String(parsedValue));
-    void persistState({ ...state, value: parsedValue });
+    updateState({ value: parsedValue });
   };
 
   const commitDraftValue = () => {
     const parsedValue = parseCounter(draftValue);
-    void persistState({ ...state, value: parsedValue ?? state.value });
+    updateState({ value: parsedValue ?? state.value }, true);
   };
 
-  const previewPosition = useMemo(() => {
-    const justifyContent = state.alignX === 'left' ? 'flex-start' : state.alignX === 'right' ? 'flex-end' : 'center';
-    const alignItems = state.alignY === 'top' ? 'flex-start' : state.alignY === 'bottom' ? 'flex-end' : 'center';
-    return { alignItems, justifyContent };
-  }, [state.alignX, state.alignY]);
+  const previewFontFamily = useMemo(() => getFontCss(state.fontFamily), [state.fontFamily]);
+  const previewTextSize = Math.max(18, Math.round(state.fontSize * 0.34));
 
   const copyOverlayUrl = async () => {
     try {
@@ -216,13 +266,16 @@ export default function TomalPage() {
         }
 
         .tomal-link-row,
-        .tomal-controls {
+        .tomal-controls,
+        .tomal-inline-row {
           display: flex;
           gap: 10px;
         }
 
         .tomal-link-input,
-        .tomal-input {
+        .tomal-input,
+        .tomal-text-input,
+        .tomal-select {
           background: rgba(255, 255, 255, 0.06);
           border: 1px solid rgba(255, 255, 255, 0.12);
           border-radius: 8px;
@@ -233,9 +286,15 @@ export default function TomalPage() {
           outline: none;
         }
 
-        .tomal-link-input {
+        .tomal-link-input,
+        .tomal-text-input,
+        .tomal-select {
           flex: 1;
           padding: 0 12px;
+        }
+
+        .tomal-select option {
+          color: #101010;
         }
 
         .tomal-input {
@@ -250,10 +309,36 @@ export default function TomalPage() {
           margin: 0;
         }
 
+        .tomal-color-input {
+          appearance: none;
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 8px;
+          cursor: pointer;
+          height: 46px;
+          padding: 4px;
+          width: 58px;
+        }
+
+        .tomal-color-input::-webkit-color-swatch-wrapper {
+          padding: 0;
+        }
+
+        .tomal-color-input::-webkit-color-swatch {
+          border: 0;
+          border-radius: 5px;
+        }
+
+        .tomal-range {
+          accent-color: #ffffff;
+          flex: 1;
+          min-width: 120px;
+        }
+
         .tomal-icon-button,
-        .tomal-control-button,
-        .tomal-align-button {
+        .tomal-control-button {
           align-items: center;
+          background: rgba(255, 255, 255, 0.08);
           border: 1px solid rgba(255, 255, 255, 0.14);
           border-radius: 8px;
           color: #ffffff;
@@ -267,36 +352,13 @@ export default function TomalPage() {
             background 140ms ease,
             border-color 140ms ease,
             transform 140ms ease;
-        }
-
-        .tomal-icon-button,
-        .tomal-control-button {
-          background: rgba(255, 255, 255, 0.08);
           width: 46px;
         }
 
         .tomal-control-button:hover,
-        .tomal-icon-button:hover,
-        .tomal-align-button:hover {
+        .tomal-icon-button:hover {
           border-color: rgba(255, 255, 255, 0.34);
           transform: translateY(-1px);
-        }
-
-        .tomal-align-grid {
-          display: grid;
-          gap: 10px;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-
-        .tomal-align-button {
-          background: rgba(255, 255, 255, 0.06);
-          padding: 0 10px;
-        }
-
-        .tomal-align-button.active {
-          background: #ffffff;
-          border-color: #ffffff;
-          color: #101010;
         }
 
         .tomal-status {
@@ -312,6 +374,7 @@ export default function TomalPage() {
         }
 
         .tomal-preview {
+          align-items: center;
           aspect-ratio: 16 / 9;
           background:
             linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%),
@@ -323,18 +386,38 @@ export default function TomalPage() {
           border: 1px solid rgba(255, 255, 255, 0.09);
           border-radius: 8px;
           display: flex;
+          justify-content: center;
+          min-height: 240px;
+          overflow: hidden;
           padding: 18px;
+          text-align: center;
         }
 
+        .tomal-preview-stack {
+          align-items: center;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          max-width: 100%;
+        }
+
+        .tomal-preview-text,
         .tomal-preview-count {
-          color: #ffffff;
-          font-size: clamp(36px, 6vw, 74px);
-          font-weight: 950;
           letter-spacing: 0;
-          line-height: 0.9;
+          line-height: 0.95;
+          max-width: 100%;
+          overflow-wrap: anywhere;
           text-shadow:
             0 4px 22px rgba(0, 0, 0, 0.68),
             0 0 4px rgba(0, 0, 0, 0.9);
+        }
+
+        .tomal-preview-text {
+          font-weight: 850;
+        }
+
+        .tomal-preview-count {
+          font-weight: 950;
           white-space: nowrap;
         }
 
@@ -343,7 +426,8 @@ export default function TomalPage() {
             grid-template-columns: 1fr;
           }
 
-          .tomal-link-row {
+          .tomal-link-row,
+          .tomal-inline-row {
             flex-wrap: wrap;
           }
 
@@ -404,42 +488,90 @@ export default function TomalPage() {
           </div>
 
           <div className="tomal-section">
-            <h2 className="tomal-section-title">Выравнивание по горизонтали</h2>
-            <div className="tomal-align-grid">
-              {HORIZONTAL_OPTIONS.map((option) => (
-                <button
-                  className={`tomal-align-button${state.alignX === option.value ? ' active' : ''}`}
-                  key={option.value}
-                  type="button"
-                  onClick={() => setAlignment({ alignX: option.value })}
-                >
-                  {option.label}
-                </button>
-              ))}
+            <h2 className="tomal-section-title">Текст</h2>
+            <input
+              className="tomal-text-input"
+              value={state.text}
+              maxLength={80}
+              placeholder="Например: сбор на челлендж"
+              aria-label="Overlay text"
+              onChange={(event) => updateState({ text: event.target.value })}
+            />
+          </div>
+
+          <div className="tomal-section">
+            <h2 className="tomal-section-title">Цвет</h2>
+            <div className="tomal-inline-row">
+              <input
+                className="tomal-color-input"
+                type="color"
+                value={state.color}
+                aria-label="Overlay color"
+                onChange={(event) => updateState({ color: event.target.value })}
+              />
+              <input
+                className="tomal-text-input"
+                value={state.color}
+                aria-label="Overlay color hex"
+                readOnly
+              />
             </div>
           </div>
 
           <div className="tomal-section">
-            <h2 className="tomal-section-title">Выравнивание по вертикали</h2>
-            <div className="tomal-align-grid">
-              {VERTICAL_OPTIONS.map((option) => (
-                <button
-                  className={`tomal-align-button${state.alignY === option.value ? ' active' : ''}`}
-                  key={option.value}
-                  type="button"
-                  onClick={() => setAlignment({ alignY: option.value })}
-                >
-                  {option.label}
-                </button>
-              ))}
+            <h2 className="tomal-section-title">Размер шрифта</h2>
+            <div className="tomal-inline-row">
+              <input
+                className="tomal-range"
+                type="range"
+                min={MIN_FONT_SIZE}
+                max={MAX_FONT_SIZE}
+                value={state.fontSize}
+                aria-label="Overlay font size"
+                onChange={(event) => updateState({ fontSize: Number(event.target.value) })}
+              />
+              <input
+                className="tomal-input"
+                type="number"
+                min={MIN_FONT_SIZE}
+                max={MAX_FONT_SIZE}
+                value={state.fontSize}
+                aria-label="Overlay font size number"
+                onChange={(event) => updateState({ fontSize: Number(event.target.value) })}
+              />
             </div>
+          </div>
+
+          <div className="tomal-section">
+            <h2 className="tomal-section-title">Шрифт</h2>
+            <select
+              className="tomal-select"
+              value={state.fontFamily}
+              aria-label="Overlay font family"
+              onChange={(event) => updateState({ fontFamily: event.target.value as FontFamily })}
+            >
+              {FONT_OPTIONS.map((font) => (
+                <option key={font.value} value={font.value}>
+                  {font.label}
+                </option>
+              ))}
+            </select>
           </div>
         </section>
 
         <aside className="tomal-preview-panel" aria-label="Overlay preview">
           <h2 className="tomal-section-title">Предпросмотр</h2>
-          <div className="tomal-preview" style={previewPosition}>
-            <div className="tomal-preview-count">{state.value}/{MAX_VALUE}</div>
+          <div className="tomal-preview">
+            <div className="tomal-preview-stack" style={{ color: state.color, fontFamily: previewFontFamily }}>
+              {state.text.trim() && (
+                <div className="tomal-preview-text" style={{ fontSize: `${previewTextSize}px` }}>
+                  {state.text}
+                </div>
+              )}
+              <div className="tomal-preview-count" style={{ fontSize: `${state.fontSize}px` }}>
+                {state.value}/{MAX_VALUE}
+              </div>
+            </div>
           </div>
         </aside>
       </div>

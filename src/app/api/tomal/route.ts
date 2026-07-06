@@ -8,21 +8,25 @@ export const dynamic = 'force-dynamic';
 const TOMAL_USER_ID = 'tomal-overlay';
 const TOMAL_SETTINGS_KEY = 'tomal';
 const MAX_VALUE = 100;
+const DEFAULT_COLOR = '#ffffff';
 
-type AlignX = 'left' | 'center' | 'right';
-type AlignY = 'top' | 'center' | 'bottom';
+type FontFamily = 'geist' | 'arial' | 'impact' | 'georgia' | 'courier' | 'trebuchet' | 'waffle';
 
 type TomalState = {
   value: number;
-  alignX: AlignX;
-  alignY: AlignY;
+  text: string;
+  color: string;
+  fontSize: number;
+  fontFamily: FontFamily;
   updatedAt: string;
 };
 
 const DEFAULT_STATE: TomalState = {
   value: 0,
-  alignX: 'center',
-  alignY: 'center',
+  text: '',
+  color: DEFAULT_COLOR,
+  fontSize: 120,
+  fontFamily: 'geist',
   updatedAt: new Date(0).toISOString(),
 };
 
@@ -46,11 +50,35 @@ function clampCounter(value: number) {
   return Math.min(MAX_VALUE, Math.max(0, Math.trunc(value)));
 }
 
+function clampFontSize(value: number) {
+  if (!Number.isFinite(value)) return DEFAULT_STATE.fontSize;
+  return Math.min(220, Math.max(32, Math.trunc(value)));
+}
+
+function normalizeColor(value: unknown) {
+  if (typeof value !== 'string') return DEFAULT_COLOR;
+  const color = value.trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_COLOR;
+}
+
+function normalizeFontFamily(value: unknown): FontFamily {
+  return value === 'arial' ||
+    value === 'impact' ||
+    value === 'georgia' ||
+    value === 'courier' ||
+    value === 'trebuchet' ||
+    value === 'waffle'
+    ? value
+    : 'geist';
+}
+
 function normalizeState(input: Partial<TomalState>): TomalState {
   return {
     value: clampCounter(Number(input.value ?? DEFAULT_STATE.value)),
-    alignX: input.alignX === 'left' || input.alignX === 'right' ? input.alignX : 'center',
-    alignY: input.alignY === 'top' || input.alignY === 'bottom' ? input.alignY : 'center',
+    text: typeof input.text === 'string' ? input.text.slice(0, 80) : '',
+    color: normalizeColor(input.color),
+    fontSize: clampFontSize(Number(input.fontSize ?? DEFAULT_STATE.fontSize)),
+    fontFamily: normalizeFontFamily(input.fontFamily),
     updatedAt: typeof input.updatedAt === 'string' ? input.updatedAt : new Date().toISOString(),
   };
 }
