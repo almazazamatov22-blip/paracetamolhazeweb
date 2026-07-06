@@ -755,7 +755,7 @@ export default function TomalPage() {
               className="tomal-text-input"
               value={state.text}
               maxLength={120}
-              placeholder="Например: сбор на челлендж"
+              placeholder="ПУПУПУ"
               aria-label="Overlay text"
               onChange={(event) => updateState({ text: event.target.value })}
             />
