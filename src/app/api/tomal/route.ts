@@ -9,8 +9,31 @@ const TOMAL_USER_ID = 'tomal-overlay';
 const TOMAL_SETTINGS_KEY = 'tomal';
 const MAX_VALUE = 100;
 const DEFAULT_COLOR = '#ffffff';
+const DEFAULT_OUTLINE_COLOR = '#000000';
 
-type FontFamily = 'geist' | 'arial' | 'impact' | 'georgia' | 'courier' | 'trebuchet' | 'waffle';
+type FontFamily =
+  | 'geist'
+  | 'system'
+  | 'arial'
+  | 'impact'
+  | 'georgia'
+  | 'courier'
+  | 'trebuchet'
+  | 'waffle'
+  | 'verdana'
+  | 'tahoma'
+  | 'times'
+  | 'comic'
+  | 'lucida'
+  | 'segoe'
+  | 'garamond'
+  | 'palatino'
+  | 'franklin'
+  | 'monospace'
+  | 'serif';
+
+type TextPosition = 'top' | 'bottom' | 'left' | 'right';
+type OverlayAnimation = 'none' | 'fade' | 'pulse' | 'pop' | 'slide' | 'float' | 'glow' | 'bounce';
 
 type TomalState = {
   value: number;
@@ -18,6 +41,12 @@ type TomalState = {
   color: string;
   fontSize: number;
   fontFamily: FontFamily;
+  textPosition: TextPosition;
+  outlineEnabled: boolean;
+  outlineColor: string;
+  outlineWidth: number;
+  animation: OverlayAnimation;
+  animationSpeed: number;
   updatedAt: string;
 };
 
@@ -27,6 +56,12 @@ const DEFAULT_STATE: TomalState = {
   color: DEFAULT_COLOR,
   fontSize: 120,
   fontFamily: 'geist',
+  textPosition: 'top',
+  outlineEnabled: false,
+  outlineColor: DEFAULT_OUTLINE_COLOR,
+  outlineWidth: 3,
+  animation: 'none',
+  animationSpeed: 1.8,
   updatedAt: new Date(0).toISOString(),
 };
 
@@ -52,33 +87,77 @@ function clampCounter(value: number) {
 
 function clampFontSize(value: number) {
   if (!Number.isFinite(value)) return DEFAULT_STATE.fontSize;
-  return Math.min(220, Math.max(32, Math.trunc(value)));
+  return Math.min(240, Math.max(32, Math.trunc(value)));
 }
 
-function normalizeColor(value: unknown) {
-  if (typeof value !== 'string') return DEFAULT_COLOR;
+function clampOutlineWidth(value: number) {
+  if (!Number.isFinite(value)) return DEFAULT_STATE.outlineWidth;
+  return Math.min(14, Math.max(0, Math.trunc(value)));
+}
+
+function clampAnimationSpeed(value: number) {
+  if (!Number.isFinite(value)) return DEFAULT_STATE.animationSpeed;
+  return Number(Math.min(6, Math.max(0.6, value)).toFixed(1));
+}
+
+function normalizeColor(value: unknown, fallback = DEFAULT_COLOR) {
+  if (typeof value !== 'string') return fallback;
   const color = value.trim();
-  return /^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_COLOR;
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : fallback;
 }
 
 function normalizeFontFamily(value: unknown): FontFamily {
-  return value === 'arial' ||
+  return value === 'system' ||
+    value === 'arial' ||
     value === 'impact' ||
     value === 'georgia' ||
     value === 'courier' ||
     value === 'trebuchet' ||
-    value === 'waffle'
+    value === 'waffle' ||
+    value === 'verdana' ||
+    value === 'tahoma' ||
+    value === 'times' ||
+    value === 'comic' ||
+    value === 'lucida' ||
+    value === 'segoe' ||
+    value === 'garamond' ||
+    value === 'palatino' ||
+    value === 'franklin' ||
+    value === 'monospace' ||
+    value === 'serif'
     ? value
     : 'geist';
+}
+
+function normalizeTextPosition(value: unknown): TextPosition {
+  return value === 'bottom' || value === 'left' || value === 'right' ? value : 'top';
+}
+
+function normalizeAnimation(value: unknown): OverlayAnimation {
+  return value === 'fade' ||
+    value === 'pulse' ||
+    value === 'pop' ||
+    value === 'slide' ||
+    value === 'float' ||
+    value === 'glow' ||
+    value === 'bounce'
+    ? value
+    : 'none';
 }
 
 function normalizeState(input: Partial<TomalState>): TomalState {
   return {
     value: clampCounter(Number(input.value ?? DEFAULT_STATE.value)),
-    text: typeof input.text === 'string' ? input.text.slice(0, 80) : '',
+    text: typeof input.text === 'string' ? input.text.slice(0, 120) : '',
     color: normalizeColor(input.color),
     fontSize: clampFontSize(Number(input.fontSize ?? DEFAULT_STATE.fontSize)),
     fontFamily: normalizeFontFamily(input.fontFamily),
+    textPosition: normalizeTextPosition(input.textPosition),
+    outlineEnabled: Boolean(input.outlineEnabled),
+    outlineColor: normalizeColor(input.outlineColor, DEFAULT_OUTLINE_COLOR),
+    outlineWidth: clampOutlineWidth(Number(input.outlineWidth ?? DEFAULT_STATE.outlineWidth)),
+    animation: normalizeAnimation(input.animation),
+    animationSpeed: clampAnimationSpeed(Number(input.animationSpeed ?? DEFAULT_STATE.animationSpeed)),
     updatedAt: typeof input.updatedAt === 'string' ? input.updatedAt : new Date().toISOString(),
   };
 }
