@@ -4,7 +4,9 @@ import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const MAX_VALUE = 100;
+const DEFAULT_MAX_VALUE = 100;
+const MIN_MAX_VALUE = 1;
+const MAX_MAX_VALUE = 9999;
 const TOMAL_USER_ID = 'tomal-overlay';
 const TOMAL_SETTINGS_KEY = 'tomal';
 const SAFETY_SYNC_INTERVAL = 60_000;
@@ -38,6 +40,7 @@ type OverlayAnimation = 'none' | 'fade' | 'pulse' | 'pop' | 'slide' | 'float' | 
 
 type TomalState = {
   value: number;
+  maxValue: number;
   text: string;
   color: string;
   fontSize: number;
@@ -52,6 +55,7 @@ type TomalState = {
 
 const DEFAULT_STATE: TomalState = {
   value: 0,
+  maxValue: DEFAULT_MAX_VALUE,
   text: '',
   color: DEFAULT_COLOR,
   fontSize: 120,
@@ -136,14 +140,27 @@ function getFlexDirection(position: TextPosition) {
   return 'column';
 }
 
+function clampMaxValue(value: number) {
+  if (!Number.isFinite(value)) return DEFAULT_STATE.maxValue;
+  return Math.min(MAX_MAX_VALUE, Math.max(MIN_MAX_VALUE, Math.trunc(value)));
+}
+
+function clampCounter(value: number, maxValue: number) {
+  if (!Number.isFinite(value)) return DEFAULT_STATE.value;
+  return Math.min(maxValue, Math.max(0, Math.trunc(value)));
+}
+
 function normalizeState(state: Partial<TomalState>): TomalState {
+  const rawMaxValue = Number(state.maxValue ?? DEFAULT_STATE.maxValue);
+  const maxValue = clampMaxValue(rawMaxValue);
   const rawValue = Number(state.value ?? DEFAULT_STATE.value);
   const rawFontSize = Number(state.fontSize ?? DEFAULT_STATE.fontSize);
   const rawLetterSpacing = Number(state.letterSpacing ?? DEFAULT_STATE.letterSpacing);
   const rawOutlineWidth = Number(state.outlineWidth ?? DEFAULT_STATE.outlineWidth);
 
   return {
-    value: Number.isFinite(rawValue) ? Math.min(MAX_VALUE, Math.max(0, Math.trunc(rawValue))) : DEFAULT_STATE.value,
+    value: clampCounter(rawValue, maxValue),
+    maxValue,
     text: typeof state.text === 'string' ? state.text.slice(0, 120) : '',
     color: normalizeColor(state.color),
     fontSize: Number.isFinite(rawFontSize) ? Math.min(240, Math.max(32, Math.trunc(rawFontSize))) : DEFAULT_STATE.fontSize,
@@ -372,7 +389,7 @@ export default function TomalOverlayPage() {
           style={{ ...outlineStyle, fontSize: `${state.fontSize}px` }}
           aria-live="polite"
         >
-          {state.value}/{MAX_VALUE}
+          {state.value}/{state.maxValue}
         </div>
       </div>
     </main>

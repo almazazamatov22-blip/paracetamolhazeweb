@@ -5,7 +5,9 @@ import { Copy, ExternalLink, Minus, Plus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 const MIN_VALUE = 0;
-const MAX_VALUE = 100;
+const DEFAULT_MAX_VALUE = 100;
+const MIN_MAX_VALUE = 1;
+const MAX_MAX_VALUE = 9999;
 const MIN_FONT_SIZE = 32;
 const MAX_FONT_SIZE = 240;
 const MIN_OUTLINE_WIDTH = 0;
@@ -42,6 +44,7 @@ type OverlayAnimation = 'none' | 'fade' | 'pulse' | 'pop' | 'slide' | 'float' | 
 
 type TomalState = {
   value: number;
+  maxValue: number;
   text: string;
   color: string;
   fontSize: number;
@@ -56,6 +59,7 @@ type TomalState = {
 
 const DEFAULT_STATE: TomalState = {
   value: MIN_VALUE,
+  maxValue: DEFAULT_MAX_VALUE,
   text: '',
   color: DEFAULT_COLOR,
   fontSize: 120,
@@ -112,8 +116,12 @@ function clampNumber(value: number, min: number, max: number, fallback = min, in
   return integer ? Math.trunc(clamped) : Number(clamped.toFixed(1));
 }
 
-function clampCounter(value: number) {
-  return clampNumber(value, MIN_VALUE, MAX_VALUE);
+function clampMaxValue(value: number) {
+  return clampNumber(value, MIN_MAX_VALUE, MAX_MAX_VALUE, DEFAULT_STATE.maxValue);
+}
+
+function clampCounter(value: number, maxValue = DEFAULT_STATE.maxValue) {
+  return clampNumber(value, MIN_VALUE, maxValue);
 }
 
 function clampFontSize(value: number) {
@@ -128,10 +136,16 @@ function clampOutlineWidth(value: number) {
   return clampNumber(value, MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH, DEFAULT_STATE.outlineWidth);
 }
 
-function parseCounter(rawValue: string) {
+function parseCounter(rawValue: string, maxValue = DEFAULT_STATE.maxValue) {
   const parsed = Number.parseInt(rawValue, 10);
   if (Number.isNaN(parsed)) return null;
-  return clampCounter(parsed);
+  return clampCounter(parsed, maxValue);
+}
+
+function parseMaxValue(rawValue: string) {
+  const parsed = Number.parseInt(rawValue, 10);
+  if (Number.isNaN(parsed)) return null;
+  return clampMaxValue(parsed);
 }
 
 function normalizeColor(value: unknown, fallback = DEFAULT_COLOR) {
@@ -161,8 +175,11 @@ function normalizeText(value: unknown) {
 }
 
 function normalizeState(state: Partial<TomalState>): TomalState {
+  const maxValue = clampMaxValue(Number(state.maxValue ?? DEFAULT_STATE.maxValue));
+
   return {
-    value: clampCounter(Number(state.value ?? DEFAULT_STATE.value)),
+    value: clampCounter(Number(state.value ?? DEFAULT_STATE.value), maxValue),
+    maxValue,
     text: normalizeText(state.text),
     color: normalizeColor(state.color),
     fontSize: clampFontSize(Number(state.fontSize ?? DEFAULT_STATE.fontSize)),
@@ -184,6 +201,7 @@ function getFlexDirection(position: TextPosition) {
 export default function TomalPage() {
   const [state, setState] = useState<TomalState>(DEFAULT_STATE);
   const [draftValue, setDraftValue] = useState(String(DEFAULT_STATE.value));
+  const [draftMaxValue, setDraftMaxValue] = useState(String(DEFAULT_STATE.maxValue));
   const [overlayUrl, setOverlayUrl] = useState('/tomal/overlay');
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState('Загрузка');
@@ -203,6 +221,7 @@ export default function TomalPage() {
         const nextState = normalizeState(data);
         setState(nextState);
         setDraftValue(String(nextState.value));
+        setDraftMaxValue(String(nextState.maxValue));
         setStatus('Готово');
       })
       .catch(() => {
@@ -244,6 +263,7 @@ export default function TomalPage() {
     const nextState = normalizeState({ ...state, ...patch });
     setState(nextState);
     setDraftValue(String(nextState.value));
+    setDraftMaxValue(String(nextState.maxValue));
 
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
 
@@ -267,7 +287,7 @@ export default function TomalPage() {
   };
 
   const setCounter = (nextValue: number) => {
-    const nextCounter = clampCounter(nextValue);
+    const nextCounter = clampCounter(nextValue, state.maxValue);
     if (nextCounter !== state.value) {
       triggerPreviewAnimation();
     }
@@ -280,7 +300,7 @@ export default function TomalPage() {
       return;
     }
 
-    const parsedValue = parseCounter(nextDraftValue);
+    const parsedValue = parseCounter(nextDraftValue, state.maxValue);
     if (parsedValue === null) return;
 
     if (parsedValue !== state.value) {
@@ -291,12 +311,30 @@ export default function TomalPage() {
   };
 
   const commitDraftValue = () => {
-    const parsedValue = parseCounter(draftValue);
+    const parsedValue = parseCounter(draftValue, state.maxValue);
     const nextCounter = parsedValue ?? state.value;
     if (nextCounter !== state.value) {
       triggerPreviewAnimation();
     }
     updateState({ value: nextCounter }, true);
+  };
+
+  const handleMaxValueChange = (nextDraftValue: string) => {
+    if (nextDraftValue === '') {
+      setDraftMaxValue('');
+      return;
+    }
+
+    const parsedValue = parseMaxValue(nextDraftValue);
+    if (parsedValue === null) return;
+
+    setDraftMaxValue(String(parsedValue));
+    updateState({ maxValue: parsedValue });
+  };
+
+  const commitMaxValue = () => {
+    const parsedValue = parseMaxValue(draftMaxValue);
+    updateState({ maxValue: parsedValue ?? state.maxValue }, true);
   };
 
   const previewFontFamily = useMemo(() => getFontCss(state.fontFamily), [state.fontFamily]);
@@ -736,7 +774,7 @@ export default function TomalPage() {
                 className="tomal-input"
                 type="number"
                 min={MIN_VALUE}
-                max={MAX_VALUE}
+                max={state.maxValue}
                 inputMode="numeric"
                 value={draftValue}
                 aria-label="Counter value"
@@ -747,6 +785,21 @@ export default function TomalPage() {
                 <Plus size={18} aria-hidden="true" />
               </button>
             </form>
+          </div>
+
+          <div className="tomal-section">
+            <h2 className="tomal-section-title">Конечное число</h2>
+            <input
+              className="tomal-text-input"
+              type="number"
+              min={MIN_MAX_VALUE}
+              max={MAX_MAX_VALUE}
+              inputMode="numeric"
+              value={draftMaxValue}
+              aria-label="Counter max value"
+              onBlur={commitMaxValue}
+              onChange={(event) => handleMaxValueChange(event.target.value)}
+            />
           </div>
 
           <div className="tomal-section">
@@ -924,7 +977,7 @@ export default function TomalPage() {
                 key={previewPulseKey}
                 style={{ ...outlineStyle, fontSize: `${state.fontSize}px` }}
               >
-                {state.value}/{MAX_VALUE}
+                {state.value}/{state.maxValue}
               </div>
             </div>
           </div>

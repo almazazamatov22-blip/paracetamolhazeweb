@@ -7,7 +7,9 @@ export const dynamic = 'force-dynamic';
 
 const TOMAL_USER_ID = 'tomal-overlay';
 const TOMAL_SETTINGS_KEY = 'tomal';
-const MAX_VALUE = 100;
+const DEFAULT_MAX_VALUE = 100;
+const MIN_MAX_VALUE = 1;
+const MAX_MAX_VALUE = 9999;
 const DEFAULT_COLOR = '#ffffff';
 const DEFAULT_OUTLINE_COLOR = '#000000';
 
@@ -37,6 +39,7 @@ type OverlayAnimation = 'none' | 'fade' | 'pulse' | 'pop' | 'slide' | 'float' | 
 
 type TomalState = {
   value: number;
+  maxValue: number;
   text: string;
   color: string;
   fontSize: number;
@@ -52,6 +55,7 @@ type TomalState = {
 
 const DEFAULT_STATE: TomalState = {
   value: 0,
+  maxValue: DEFAULT_MAX_VALUE,
   text: '',
   color: DEFAULT_COLOR,
   fontSize: 120,
@@ -80,9 +84,14 @@ function jsonNoStore(body: unknown, init?: ResponseInit) {
   });
 }
 
-function clampCounter(value: number) {
+function clampMaxValue(value: number) {
+  if (!Number.isFinite(value)) return DEFAULT_STATE.maxValue;
+  return Math.min(MAX_MAX_VALUE, Math.max(MIN_MAX_VALUE, Math.trunc(value)));
+}
+
+function clampCounter(value: number, maxValue = DEFAULT_STATE.maxValue) {
   if (!Number.isFinite(value)) return 0;
-  return Math.min(MAX_VALUE, Math.max(0, Math.trunc(value)));
+  return Math.min(maxValue, Math.max(0, Math.trunc(value)));
 }
 
 function clampFontSize(value: number) {
@@ -146,8 +155,11 @@ function normalizeAnimation(value: unknown): OverlayAnimation {
 }
 
 function normalizeState(input: Partial<TomalState>): TomalState {
+  const maxValue = clampMaxValue(Number(input.maxValue ?? DEFAULT_STATE.maxValue));
+
   return {
-    value: clampCounter(Number(input.value ?? DEFAULT_STATE.value)),
+    value: clampCounter(Number(input.value ?? DEFAULT_STATE.value), maxValue),
+    maxValue,
     text: typeof input.text === 'string' ? input.text.slice(0, 120) : '',
     color: normalizeColor(input.color),
     fontSize: clampFontSize(Number(input.fontSize ?? DEFAULT_STATE.fontSize)),
