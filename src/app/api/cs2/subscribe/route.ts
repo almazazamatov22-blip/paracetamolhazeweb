@@ -3,6 +3,68 @@ import { cookies } from 'next/headers';
 
 export const runtime = 'nodejs';
 
+async function getStreamerId(token: string): Promise<string | null> {
+  const clientId = process.env.TWITCH_CLIENT_ID;
+  const res = await fetch('https://api.twitch.tv/helix/users', {
+    headers: { Authorization: `Bearer ${token}`, 'Client-Id': clientId! },
+  });
+  const data = await res.json();
+  return data.data?.[0]?.id ?? null;
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('twitch_token')?.value;
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const clientId = process.env.TWITCH_CLIENT_ID!;
+    const clientSecret = process.env.TWITCH_CLIENT_SECRET!;
+
+    const userId = await getStreamerId(token);
+    if (!userId) return NextResponse.json({ error: 'Auth failed' }, { status: 401 });
+
+    // App token
+    const appTokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'client_credentials',
+      }),
+    });
+    const appTokenData = await appTokenRes.json();
+    const appToken = appTokenData.access_token;
+    if (!appToken) return NextResponse.json({ error: 'App token failed' }, { status: 500 });
+
+    // Fetch EventSub subscriptions
+    const subRes = await fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?user_id=${userId}`, {
+      headers: {
+        Authorization: `Bearer ${appToken}`,
+        'Client-Id': clientId,
+      },
+    });
+
+    if (!subRes.ok) {
+      const errData = await subRes.json().catch(() => ({}));
+      return NextResponse.json({ error: errData.message || 'Failed to check subscriptions' }, { status: subRes.status });
+    }
+
+    const subData = await subRes.json();
+    const isSubscribed = (subData.data || []).some(
+      (sub: any) =>
+        sub.type === 'channel.channel_points_custom_reward_redemption.add' &&
+        sub.status === 'enabled'
+    );
+
+    return NextResponse.json({ isSubscribed });
+  } catch (err: any) {
+    console.error('[cs2/subscribe GET]', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
 /**
  * POST /api/cs2/subscribe
  * Подписывает канал стримера на channel_points redemption события

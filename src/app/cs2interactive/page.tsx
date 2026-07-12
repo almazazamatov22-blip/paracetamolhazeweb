@@ -24,6 +24,7 @@ export default function CS2InteractivePage() {
   const [subscribing, setSubscribing] = useState(false)
   const [subscribeMsg, setSubscribeMsg] = useState('')
   const [copiedOverlay, setCopiedOverlay] = useState(false)
+  const [isSubscribed, setIsSubscribed] = useState(false)
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -35,6 +36,19 @@ export default function CS2InteractivePage() {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    if (user) {
+      fetch('/api/cs2/subscribe')
+        .then(r => r.json())
+        .then(d => {
+          if (typeof d.isSubscribed === 'boolean') {
+            setIsSubscribed(d.isSubscribed)
+          }
+        })
+        .catch(() => {})
+    }
+  }, [user])
+
   async function handleSubscribe() {
     setSubscribing(true)
     setSubscribeMsg('')
@@ -43,6 +57,7 @@ export default function CS2InteractivePage() {
       const data = await res.json()
       if (data.success) {
         setSubscribeMsg(`✅ Интеграция успешно активирована!`)
+        setIsSubscribed(true)
       } else {
         setSubscribeMsg(`❌ Ошибка подключения: ${data.error}`)
       }
@@ -117,10 +132,11 @@ export default function CS2InteractivePage() {
                       <button
                         className="cs2-btn cs2-btn-primary"
                         onClick={handleSubscribe}
-                        disabled={subscribing}
+                        disabled={subscribing || isSubscribed}
                         id="subscribe-btn"
+                        style={isSubscribed ? { background: '#22c55e', color: '#fff', cursor: 'default' } : undefined}
                       >
-                        {subscribing ? '⏳ Подключение...' : '⚡ Активировать интеграцию'}
+                        {subscribing ? '⏳ Подключение...' : isSubscribed ? '✅ Интеграция активна' : '⚡ Активировать интеграцию'}
                       </button>
                       {subscribeMsg && (
                         <span className={`cs2-step-msg-pill ${subscribeMsg.startsWith('✅') ? 'msg-ok' : 'msg-err'}`}>

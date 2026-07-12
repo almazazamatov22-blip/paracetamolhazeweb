@@ -73,7 +73,7 @@ if not exist cs2-agent.js (
 )
 
 if not exist node_modules\\@nut-tree-fork\\nut-js (
-    echo [+] Установка зависимостей (эмуляция клавиатуры/мыши)...
+    echo [+] Установка зависимостей эмуляции ввода...
     call %NPM_BIN% install @nut-tree-fork/nut-js --no-audit --no-fund
 )
 
