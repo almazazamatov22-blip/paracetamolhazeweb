@@ -99,8 +99,10 @@ call %NODE_BIN% cs2-agent.js --streamerId=%STREAMER_ID% --baseUrl=%BASE_URL%
 pause
 `;
 
+    const crlfBatContent = batContent.replace(/\r?\n/g, '\r\n');
+
     // Return the bat file as a download
-    return new NextResponse(batContent, {
+    return new NextResponse(crlfBatContent, {
       status: 200,
       headers: {
         'Content-Type': 'application/octet-stream',
