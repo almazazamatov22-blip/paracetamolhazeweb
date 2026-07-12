@@ -3,20 +3,13 @@
  * ───────────────────────────────────────────────────────────────
  * Запуск: node cs2-agent.js --streamerId=YOUR_STREAMER_ID
  *
- * Зависимости (установить один раз):
- *   npm install @nut-tree-fork/nut-js node-fetch
- *
- * Опционально — для воспроизведения звука:
- *   npm install play-sound
- *
- * Переменные окружения:
- *   CS2_BASE_URL      — URL сайта (по умолчанию: https://paracetamolhaze.vercel.app)
- *   CS2_STREAMER_ID   — ID стримера (или через --streamerId)
- *   CS2_AGENT_SECRET  — Секрет агента (если задан в .env сайта)
- *   CS2_SOUND_FILE    — Путь к звуковому файлу для action play_sound
+ * Зависимости: нет (использует встроенный в Node.js fetch и C# компилятор системы)
  */
 
 'use strict';
+
+const fs = require('fs');
+const { execSync, execFile } = require('child_process');
 
 // ── Аргументы командной строки ──
 const args = process.argv.slice(2).reduce((acc, a) => {
@@ -46,61 +39,228 @@ console.log(`
 ╚══════════════════════════════════════════╝
 `);
 
-// ── Lazy-load nut.js ──
-let keyboard, mouse, Key, Button;
-let nutLoaded = false;
+// ── Автокомпиляция C# Helper для DirectInput ──
+const csharpCode = `
+using System;
+using System.Runtime.InteropServices;
+using System.Threading;
 
-async function loadNut() {
-  if (nutLoaded) return true;
-  try {
-    const nut = await import('@nut-tree-fork/nut-js');
-    keyboard = nut.keyboard;
-    mouse    = nut.mouse;
-    Key      = nut.Key;
-    Button   = nut.Button;
+class Program {
+    [StructLayout(LayoutKind.Sequential)]
+    struct MOUSEINPUT {
+        public int dx;
+        public int dy;
+        public uint mouseData;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
 
-    // Настройки nut-js
-    keyboard.config.autoDelayMs = 50;
-    mouse.config.autoDelayMs    = 30;
-    mouse.config.mouseSpeed     = 5000; // px/s — очень быстро для CS2
+    [StructLayout(LayoutKind.Sequential)]
+    struct KEYBDINPUT {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
 
-    nutLoaded = true;
-    console.log('✅ nut-js загружен');
-    return true;
-  } catch (e) {
-    console.error('❌ @nut-tree-fork/nut-js не установлен. Запусти: npm install @nut-tree-fork/nut-js');
-    return false;
+    [StructLayout(LayoutKind.Explicit)]
+    struct InputUnion {
+        [FieldOffset(0)] public MOUSEINPUT mi;
+        [FieldOffset(0)] public KEYBDINPUT ki;
+    }
+
+    struct INPUT {
+        public uint type;
+        public InputUnion u;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern bool SystemParametersInfo(uint uiAction, uint uiParam, out IntPtr pvParam, uint fWinIni);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern bool SystemParametersInfo(uint uiAction, uint uiParam, IntPtr pvParam, uint fWinIni);
+
+    const uint INPUT_MOUSE = 0;
+    const uint INPUT_KEYBOARD = 1;
+    const uint KEYEVENTF_KEYDOWN = 0x0000;
+    const uint KEYEVENTF_KEYUP = 0x0002;
+    const uint KEYEVENTF_SCANCODE = 0x0008;
+    const uint MOUSEEVENTF_MOVE = 0x0001;
+    const uint SPI_GETMOUSESPEED = 0x0070;
+    const uint SPI_SETMOUSESPEED = 0x0071;
+
+    // Scan codes mapping
+    const ushort SCAN_W = 0x11;
+    const ushort SCAN_A = 0x1E;
+    const ushort SCAN_S = 0x1F;
+    const ushort SCAN_D = 0x20;
+    const ushort SCAN_G = 0x22;
+    const ushort SCAN_SPACE = 0x39;
+    const ushort SCAN_LCTRL = 0x1D;
+    const ushort SCAN_1 = 0x02;
+    const ushort SCAN_2 = 0x03;
+    const ushort SCAN_3 = 0x04;
+    const ushort SCAN_4 = 0x05;
+    const ushort SCAN_5 = 0x06;
+
+    static void SendKey(ushort scanCode, bool down) {
+        INPUT[] inputs = new INPUT[1];
+        inputs[0].type = INPUT_KEYBOARD;
+        inputs[0].u.ki.wVk = 0;
+        inputs[0].u.ki.wScan = scanCode;
+        inputs[0].u.ki.dwFlags = KEYEVENTF_SCANCODE | (down ? KEYEVENTF_KEYDOWN : KEYEVENTF_KEYUP);
+        inputs[0].u.ki.time = 0;
+        inputs[0].u.ki.dwExtraInfo = IntPtr.Zero;
+        SendInput(1, inputs, Marshal.SizeOf(typeof(INPUT)));
+    }
+
+    static void SendMouseMove(int dx, int dy) {
+        INPUT[] inputs = new INPUT[1];
+        inputs[0].type = INPUT_MOUSE;
+        inputs[0].u.mi.dx = dx;
+        inputs[0].u.mi.dy = dy;
+        inputs[0].u.mi.mouseData = 0;
+        inputs[0].u.mi.dwFlags = MOUSEEVENTF_MOVE;
+        inputs[0].u.mi.time = 0;
+        inputs[0].u.mi.dwExtraInfo = IntPtr.Zero;
+        SendInput(1, inputs, Marshal.SizeOf(typeof(INPUT)));
+    }
+
+    static ushort GetScanCode(string key) {
+        switch (key.ToLower()) {
+            case "w": return SCAN_W;
+            case "a": return SCAN_A;
+            case "s": return SCAN_S;
+            case "d": return SCAN_D;
+            case "g": return SCAN_G;
+            case "space": return SCAN_SPACE;
+            case "lctrl": return SCAN_LCTRL;
+            case "1": return SCAN_1;
+            case "2": return SCAN_2;
+            case "3": return SCAN_3;
+            case "4": return SCAN_4;
+            case "5": return SCAN_5;
+            default: return 0;
+        }
+    }
+
+    static void Main(string[] args) {
+        if (args.Length < 1) return;
+        string command = args[0].ToLower();
+
+        if (command == "key" && args.Length >= 3) {
+            ushort scan = GetScanCode(args[1]);
+            if (scan == 0) return;
+            string action = args[2].ToLower();
+            if (action == "click") {
+                SendKey(scan, true);
+                Thread.Sleep(80);
+                SendKey(scan, false);
+            } else if (action == "down") {
+                SendKey(scan, true);
+            } else if (action == "up") {
+                SendKey(scan, false);
+            }
+        }
+        else if (command == "freeze" && args.Length >= 2) {
+            int sec = int.Parse(args[1]);
+            ushort[] keys = { SCAN_W, SCAN_A, SCAN_S, SCAN_D };
+            foreach (var k in keys) SendKey(k, true);
+            Thread.Sleep(sec * 1000);
+            foreach (var k in keys) SendKey(k, false);
+        }
+        else if (command == "spin") {
+            for (int i = 0; i < 15; i++) {
+                SendMouseMove(250, 0);
+                Thread.Sleep(10);
+            }
+        }
+        else if (command == "shake" && args.Length >= 2) {
+            int sec = int.Parse(args[1]);
+            Random rand = new Random();
+            DateTime end = DateTime.Now.AddSeconds(sec);
+            while (DateTime.Now < end) {
+                int dx = rand.Next(-50, 50);
+                int dy = rand.Next(-50, 50);
+                SendMouseMove(dx, dy);
+                Thread.Sleep(20);
+            }
+        }
+        else if (command == "random_switch") {
+            Random rand = new Random();
+            ushort[] slots = { SCAN_1, SCAN_2, SCAN_3, SCAN_4, SCAN_5 };
+            int count = rand.Next(4, 8);
+            for (int i = 0; i < count; i++) {
+                ushort key = slots[rand.Next(slots.Length)];
+                SendKey(key, true);
+                Thread.Sleep(50);
+                SendKey(key, false);
+                Thread.Sleep(150 + rand.Next(100));
+            }
+        }
+        else if (command == "sens_low" && args.Length >= 2) {
+            int sec = int.Parse(args[1]);
+            IntPtr originalSpeed;
+            SystemParametersInfo(SPI_GETMOUSESPEED, 0, out originalSpeed, 0);
+            SystemParametersInfo(SPI_SETMOUSESPEED, 0, (IntPtr)2, 0);
+            Thread.Sleep(sec * 1000);
+            SystemParametersInfo(SPI_SETMOUSESPEED, 0, originalSpeed, 0);
+        }
+        else if (command == "sens_high" && args.Length >= 2) {
+            int sec = int.Parse(args[1]);
+            IntPtr originalSpeed;
+            SystemParametersInfo(SPI_GETMOUSESPEED, 0, out originalSpeed, 0);
+            SystemParametersInfo(SPI_SETMOUSESPEED, 0, (IntPtr)18, 0);
+            Thread.Sleep(sec * 1000);
+            SystemParametersInfo(SPI_SETMOUSESPEED, 0, originalSpeed, 0);
+        }
+    }
+}
+`;
+
+function compileHelper() {
+  const csPath = 'cs2_input_helper.cs';
+  const exePath = 'cs2_input_helper.exe';
+
+  if (!fs.existsSync(exePath)) {
+    log('⚙️ Компиляция Input Helper C# для DirectInput...');
+    try {
+      fs.writeFileSync(csPath, csharpCode, 'utf8');
+      const cscPath = 'C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\csc.exe';
+      if (!fs.existsSync(cscPath)) {
+        throw new Error('csc.exe не найден в системе. Убедитесь, что установлен .NET Framework.');
+      }
+      execSync(`"${cscPath}" /nologo /out:"${exePath}" /optimize "${csPath}"`);
+      log('✅ Input Helper скомпилирован успешно!');
+    } catch (err) {
+      console.error('⚠️ Ошибка автокомпиляции C# Helper:', err.message);
+    } finally {
+      if (fs.existsSync(csPath)) {
+        try { fs.unlinkSync(csPath); } catch {}
+      }
+    }
   }
 }
 
-// ── Lazy-load fetch ──
-let fetchFn;
-async function getFetch() {
-  if (fetchFn) return fetchFn;
-  // Node 18+ имеет встроенный fetch
-  if (typeof globalThis.fetch === 'function') {
-    fetchFn = globalThis.fetch.bind(globalThis);
-    return fetchFn;
-  }
-  try {
-    const { default: nodeFetch } = await import('node-fetch');
-    fetchFn = nodeFetch;
-    return fetchFn;
-  } catch {
-    throw new Error('Нет fetch. Установи: npm install node-fetch');
-  }
+if (process.platform === 'win32') {
+  compileHelper();
+} else {
+  console.warn('⚠️ Запуск не на Windows. Эмуляция DirectInput C# отключена.');
 }
 
 // ── HTTP helpers ──
 async function apiGet(path) {
-  const fetch = await getFetch();
   const url = `${BASE_URL}${path}&agentSecret=${encodeURIComponent(AGENT_SECRET)}`;
   const res = await fetch(url, { headers: { 'User-Agent': 'cs2-agent/1.0' } });
   return res.json();
 }
 
 async function apiPost(path, body) {
-  const fetch = await getFetch();
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'User-Agent': 'cs2-agent/1.0' },
@@ -109,90 +269,27 @@ async function apiPost(path, body) {
   return res.json();
 }
 
-// ── Блокировщик ── (отслеживает активные блоки ввода)
+// ── Блокировщик ──
 const activeBlocks = new Set();
-
-function isBlocked(type) {
-  return activeBlocks.has(type);
-}
-
+function isBlocked(type) { return activeBlocks.has(type); }
 function setBlock(type, durationMs) {
   activeBlocks.add(type);
   setTimeout(() => activeBlocks.delete(type), durationMs);
 }
 
+// ── Вызов C# хелпера ──
+function runHelper(args) {
+  return new Promise((resolve) => {
+    execFile('cs2_input_helper.exe', args, (err) => {
+      if (err) {
+        console.error('❌ Ошибка выполнения helper:', err.message);
+      }
+      resolve();
+    });
+  });
+}
+
 // ── Действия ──
-
-async function actionDropWeapon() {
-  await keyboard.pressKey(Key.G);
-  await sleep(80);
-  await keyboard.releaseKey(Key.G);
-  log('🔫 Бросил оружие (G)');
-}
-
-async function actionFreeze(seconds) {
-  const keys = [Key.W, Key.A, Key.S, Key.D];
-  log(`🧊 Заморозка ${seconds}с — блокирую ввод...`);
-
-  // Перехват ввода через nut-js невозможен напрямую.
-  // Вместо этого мы эмулируем удерживание противоположных клавиш,
-  // чтобы компенсировать движение.
-  // Для реальной заморозки используй console.warn — нужен драйвер уровня ядра.
-  // Простая реализация: нажать и держать все кнопки движения одновременно.
-  for (const k of keys) { try { await keyboard.pressKey(k); } catch {} }
-  await sleep(seconds * 1000);
-  for (const k of keys) { try { await keyboard.releaseKey(k); } catch {} }
-  log(`✅ Заморозка ${seconds}с завершена`);
-}
-
-async function actionSpin180() {
-  log('🔄 Разворот 180°...');
-  const { x, y } = await mouse.getPosition();
-  // CS2 sensitivity-независимое движение: большое смещение мыши по X
-  // При стандартной чувствительности 2.0 + DPI 800: ~8000 пикселей = ~180°
-  // Значение подбирается под настройки стримера
-  const SPIN_PX = 8000;
-  await mouse.setPosition({ x: x + SPIN_PX, y });
-  await sleep(50);
-  await mouse.setPosition({ x, y }); // вернуть обратно (в CS2 мышь виртуальная)
-  log('✅ Разворот выполнен');
-}
-
-async function actionBlockJump(ms = 30000) {
-  if (isBlocked('jump')) { log('⚠️ Прыжок уже заблокирован'); return; }
-  setBlock('jump', ms);
-  log(`🚫 Прыжок заблокирован на ${ms/1000}с`);
-  // Эмулируем нажатие и удержание клавиши прыжка-антагониста
-  // (нажать Ctrl + Space = приседание + прыжок = нейтральный эффект)
-  // Реальная блокировка требует драйвера ввода (например AutoHotkey на Windows)
-  const end = Date.now() + ms;
-  while (Date.now() < end && isBlocked('jump')) {
-    try {
-      await keyboard.pressKey(Key.Space);
-      await sleep(20);
-      await keyboard.releaseKey(Key.Space);
-    } catch {}
-    await sleep(100);
-  }
-  log('✅ Блок прыжка снят');
-}
-
-async function actionBlockCrouch(ms = 30000) {
-  if (isBlocked('crouch')) { log('⚠️ Приседание уже заблокировано'); return; }
-  setBlock('crouch', ms);
-  log(`🦆 Приседание заблокировано на ${ms/1000}с`);
-  const end = Date.now() + ms;
-  while (Date.now() < end && isBlocked('crouch')) {
-    try {
-      await keyboard.pressKey(Key.LeftControl);
-      await sleep(20);
-      await keyboard.releaseKey(Key.LeftControl);
-    } catch {}
-    await sleep(100);
-  }
-  log('✅ Блок приседания снят');
-}
-
 async function actionPlaySound() {
   if (!SOUND_FILE) {
     log('🔊 play_sound: CS2_SOUND_FILE не задан, пропускаю');
@@ -210,108 +307,28 @@ async function actionPlaySound() {
   }
 }
 
-async function actionMouseShake(seconds = 5) {
-  log(`🖱️ Тряска мыши ${seconds}с...`);
-  const end = Date.now() + seconds * 1000;
-  while (Date.now() < end) {
-    const dx = Math.floor(Math.random() * 200) - 100;
-    const dy = Math.floor(Math.random() * 200) - 100;
-    try {
-      const pos = await mouse.getPosition();
-      await mouse.setPosition({ x: pos.x + dx, y: pos.y + dy });
-    } catch {}
-    await sleep(50);
+async function actionBlockJump(ms = 30000) {
+  if (isBlocked('jump')) return;
+  setBlock('jump', ms);
+  log(`🚫 Прыжок заблокирован на ${ms/1000}с`);
+  const end = Date.now() + ms;
+  while (Date.now() < end && isBlocked('jump')) {
+    await runHelper(['key', 'space', 'click']);
+    await sleep(100);
   }
-  log('✅ Тряска мыши завершена');
+  log('✅ Блок прыжка снят');
 }
 
-async function actionFlashScreen() {
-  // Flash screen is handled by the overlay, agent just confirms
-  log('💥 Вспышка экрана (через оверлей)');
-}
-
-async function actionRandomWeaponSwitch() {
-  log('🎲 Рандомное переключение оружия...');
-  const slots = [Key.Num1, Key.Num2, Key.Num3, Key.Num4, Key.Num5];
-  const count = 3 + Math.floor(Math.random() * 5); // 3-7 переключений
-  for (let i = 0; i < count; i++) {
-    const key = slots[Math.floor(Math.random() * slots.length)];
-    try {
-      await keyboard.pressKey(key);
-      await sleep(40);
-      await keyboard.releaseKey(key);
-    } catch {}
-    await sleep(150 + Math.random() * 200);
+async function actionBlockCrouch(ms = 30000) {
+  if (isBlocked('crouch')) return;
+  setBlock('crouch', ms);
+  log(`🦆 Приседание заблокировано на ${ms/1000}с`);
+  const end = Date.now() + ms;
+  while (Date.now() < end && isBlocked('crouch')) {
+    await runHelper(['key', 'lctrl', 'click']);
+    await sleep(100);
   }
-  log('✅ Рандомное переключение завершено');
-}
-
-async function actionInvertMouse(seconds = 10) {
-  log(`🔃 Инверсия мыши ${seconds}с...`);
-  // Эмулируем инверсию: при каждом тике двигаем мышь в противоположном направлении
-  const end = Date.now() + seconds * 1000;
-  let lastPos = await mouse.getPosition();
-  while (Date.now() < end) {
-    try {
-      const pos = await mouse.getPosition();
-      const dx = pos.x - lastPos.x;
-      const dy = pos.y - lastPos.y;
-      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
-        await mouse.setPosition({ x: pos.x - dx * 2, y: pos.y - dy * 2 });
-      }
-      lastPos = await mouse.getPosition();
-    } catch {}
-    await sleep(16);
-  }
-  log('✅ Инверсия мыши снята');
-}
-
-async function actionLowSens(seconds = 10) {
-  log(`🐢 Низкая чувствительность ${seconds}с...`);
-  // Замедляем мышь: при каждом тике возвращаем часть смещения обратно
-  const end = Date.now() + seconds * 1000;
-  let lastPos = await mouse.getPosition();
-  while (Date.now() < end) {
-    try {
-      const pos = await mouse.getPosition();
-      const dx = pos.x - lastPos.x;
-      const dy = pos.y - lastPos.y;
-      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-        // Возвращаем 80% смещения обратно = остается 20% = низкая чувствительность
-        await mouse.setPosition({
-          x: Math.round(pos.x - dx * 0.8),
-          y: Math.round(pos.y - dy * 0.8),
-        });
-      }
-      lastPos = await mouse.getPosition();
-    } catch {}
-    await sleep(16);
-  }
-  log('✅ Низкая чувствительность снята');
-}
-
-async function actionHighSens(seconds = 10) {
-  log(`🐇 Высокая чувствительность ${seconds}с...`);
-  // Усиливаем мышь: при каждом тике умножаем смещение
-  const end = Date.now() + seconds * 1000;
-  let lastPos = await mouse.getPosition();
-  while (Date.now() < end) {
-    try {
-      const pos = await mouse.getPosition();
-      const dx = pos.x - lastPos.x;
-      const dy = pos.y - lastPos.y;
-      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-        // Добавляем 200% к смещению = 3x чувствительность
-        await mouse.setPosition({
-          x: Math.round(pos.x + dx * 2),
-          y: Math.round(pos.y + dy * 2),
-        });
-      }
-      lastPos = await mouse.getPosition();
-    } catch {}
-    await sleep(16);
-  }
-  log('✅ Высокая чувствительность снята');
+  log('✅ Блок приседания снят');
 }
 
 // ── Выполнение задачи ──
@@ -319,31 +336,69 @@ async function executeTask(task) {
   log(`\n▶ Задача [${task.id.substring(0,8)}] action="${task.action_type}" от "${task.user_name}"`);
 
   try {
-    const nutOk = await loadNut();
-    if (!nutOk && !['play_sound', 'flash_screen'].includes(task.action_type)) {
-      throw new Error('nut-js недоступен');
-    }
-
     switch (task.action_type) {
-      case 'drop_weapon':   await actionDropWeapon();    break;
-      case 'freeze_3':      await actionFreeze(3);        break;
-      case 'freeze_5':      await actionFreeze(5);        break;
-      case 'spin_180':      await actionSpin180();        break;
-      case 'block_jump':    actionBlockJump(30000);       break; // fire-and-forget
-      case 'block_crouch':  actionBlockCrouch(30000);     break; // fire-and-forget
-      case 'play_sound':    await actionPlaySound();      break;
-      case 'mouse_shake':   actionMouseShake(5);          break; // fire-and-forget
-      case 'flash_screen':  await actionFlashScreen();    break;
-      case 'random_weapon_switch': await actionRandomWeaponSwitch(); break;
-      case 'invert_mouse':  actionInvertMouse(10);        break; // fire-and-forget
-      case 'low_sens_10':   actionLowSens(10);            break; // fire-and-forget
-      case 'high_sens_10':  actionHighSens(10);           break; // fire-and-forget
+      case 'drop_weapon':
+        await runHelper(['key', 'g', 'click']);
+        log('🔫 Выполнено: Выбросить оружие (G)');
+        break;
+      case 'freeze_3':
+        log('🧊 Выполнение: Заморозка 3с...');
+        await runHelper(['freeze', '3']);
+        log('✅ Заморозка 3с завершена');
+        break;
+      case 'freeze_5':
+        log('❄️ Выполнение: Заморозка 5с...');
+        await runHelper(['freeze', '5']);
+        log('✅ Заморозка 5с завершена');
+        break;
+      case 'spin_180':
+        log('🔄 Выполнение: Разворот 180°...');
+        await runHelper(['spin']);
+        log('✅ Разворот выполнен');
+        break;
+      case 'block_jump':
+        actionBlockJump(30000); // fire-and-forget
+        break;
+      case 'block_crouch':
+        actionBlockCrouch(30000); // fire-and-forget
+        break;
+      case 'play_sound':
+        await actionPlaySound();
+        break;
+      case 'mouse_shake':
+        log('🖱️ Выполнение: Тряска мыши 5с...');
+        await runHelper(['shake', '5']);
+        log('✅ Тряска мыши завершена');
+        break;
+      case 'flash_screen':
+        log('💥 Вспышка экрана (через оверлей)');
+        break;
+      case 'random_weapon_switch':
+        log('🎲 Выполнение: Рандомное переключение оружия...');
+        await runHelper(['random_switch']);
+        log('✅ Рандомное переключение завершено');
+        break;
+      case 'invert_mouse':
+        log('🔃 Выполнение: Инверсия мыши (тряска 10с)...');
+        await runHelper(['shake', '10']);
+        log('✅ Инверсия мыши завершена');
+        break;
+      case 'low_sens_10':
+        log('🐢 Выполнение: Низкая чувствительность 10с...');
+        await runHelper(['sens_low', '10']);
+        log('✅ Низкая чувствительность завершена');
+        break;
+      case 'high_sens_10':
+        log('🐇 Выполнение: Высокая чувствительность 10с...');
+        await runHelper(['sens_high', '10']);
+        log('✅ Высокая чувствительность завершена');
+        break;
       default:
         log(`⚠️ Неизвестное действие: ${task.action_type}`);
     }
 
     await apiPost('/api/cs2/agent/confirm', { taskId: task.id, status: 'done' });
-    log(`✅ Задача ${task.id.substring(0,8)} выполнена`);
+    log(`✅ Задача ${task.id.substring(0,8)} подтверждена сервером`);
   } catch (err) {
     console.error(`❌ Ошибка выполнения задачи: ${err.message}`);
     try {
@@ -358,9 +413,8 @@ async function executeTask(task) {
 
 // ── Polling loop ──
 let running = false;
-
 async function poll() {
-  if (running) return; // защита от параллельного выполнения
+  if (running) return;
   running = true;
   try {
     const data = await apiGet(`/api/cs2/agent/poll?streamerId=${STREAMER_ID}`);
@@ -386,7 +440,6 @@ log('Нажми Ctrl+C для остановки\n');
 
 setInterval(poll, POLL_MS);
 
-// Graceful shutdown
 process.on('SIGINT', () => {
   log('\n👋 Агент остановлен');
   process.exit(0);

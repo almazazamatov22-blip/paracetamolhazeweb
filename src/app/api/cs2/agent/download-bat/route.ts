@@ -32,8 +32,7 @@ where node >nul 2>nul
 if %errorlevel% equ 0 (
     echo [+] Найден установленный Node.js в системе.
     set NODE_BIN=node
-    set NPM_BIN=npm
-    goto :npm_install
+    goto :download_agent
 )
 
 echo [!] Node.js не найден в системе.
@@ -60,9 +59,9 @@ move node_temp\\node-v20.11.0-win-x64 node_portable
 rmdir /s /q node_temp
 
 set NODE_BIN=node_portable\\node.exe
-set NPM_BIN=node_portable\\npm.cmd
 
-:npm_install
+:download_agent
+
 echo [+] Загрузка скрипта агента...
 powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%BASE_URL%/cs2-agent.js' -OutFile 'cs2-agent.js'"
 
@@ -70,11 +69,6 @@ if not exist cs2-agent.js (
     echo [❌] Не удалось скачать cs2-agent.js.
     pause
     exit /b 1
-)
-
-if not exist node_modules\\@nut-tree-fork\\nut-js (
-    echo [+] Установка зависимостей эмуляции ввода...
-    call %NPM_BIN% install @nut-tree-fork/nut-js --no-audit --no-fund
 )
 
 :: Create a start.bat shortcut for future quick runs
