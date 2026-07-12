@@ -120,12 +120,18 @@ export default function CS2AdminPage() {
   }
 
   async function handleSave() {
-    if (!form.name.trim()) return flash('Введите название', true)
+    if (!form.twitch_reward_id) return flash('Выберите награду Twitch', true)
+    
+    const selectedTwitch = twitchRewards.find(tr => tr.id === form.twitch_reward_id)
+    if (!selectedTwitch) return flash('Выбранная награда Twitch не найдена', true)
+
     setLoading(true)
     try {
       const body = {
         ...form,
-        twitch_reward_id: form.twitch_reward_id || null,
+        name: selectedTwitch.title,
+        cost: selectedTwitch.cost,
+        twitch_reward_id: form.twitch_reward_id,
         ...(editingId ? { id: editingId } : {}),
       }
       const method = editingId ? 'PUT' : 'POST'
@@ -249,27 +255,7 @@ export default function CS2AdminPage() {
             {editingId ? 'Редактировать награду' : 'Новая награда'}
           </h2>
           <div className="adm-form">
-            <div className="adm-field">
-              <label className="adm-label">Название *</label>
-              <input
-                className="adm-input"
-                id="reward-name"
-                placeholder="Например: Выбросить оружие"
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              />
-            </div>
-            <div className="adm-field">
-              <label className="adm-label">Описание</label>
-              <input
-                className="adm-input"
-                id="reward-desc"
-                placeholder="Описание для зрителей"
-                value={form.description}
-                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              />
-            </div>
-            <div className="adm-field">
+             <div className="adm-field">
               <label className="adm-label">Тип действия *</label>
               <select
                 className="adm-input"
@@ -289,9 +275,9 @@ export default function CS2AdminPage() {
                   className="adm-input"
                   id="reward-cost"
                   type="number"
-                  min={0}
+                  disabled
                   value={form.cost}
-                  onChange={e => setForm(f => ({ ...f, cost: parseInt(e.target.value) || 0 }))}
+                  style={{ opacity: 0.7, cursor: 'not-allowed' }}
                 />
               </div>
               <div className="adm-field">
@@ -304,6 +290,9 @@ export default function CS2AdminPage() {
                   value={form.cooldown_seconds}
                   onChange={e => setForm(f => ({ ...f, cooldown_seconds: parseInt(e.target.value) || 0 }))}
                 />
+                <span className="adm-hint" style={{ color: '#fbbf24', marginTop: '4px' }}>
+                  ⚠️ Важно: Укажите этот же кулдаун в настройках награды на самом Twitch.
+                </span>
               </div>
             </div>
 
@@ -319,7 +308,15 @@ export default function CS2AdminPage() {
                   className="adm-input"
                   id="reward-twitch-id"
                   value={form.twitch_reward_id ?? ''}
-                  onChange={e => setForm(f => ({ ...f, twitch_reward_id: e.target.value }))}
+                  onChange={e => {
+                    const selected = twitchRewards.find(tr => tr.id === e.target.value);
+                    setForm(f => ({
+                      ...f,
+                      twitch_reward_id: e.target.value,
+                      name: selected ? selected.title : '',
+                      cost: selected ? selected.cost : 0
+                    }));
+                  }}
                 >
                   <option value="">— Выберите награду Twitch —</option>
                   {twitchRewards.map(tr => (
