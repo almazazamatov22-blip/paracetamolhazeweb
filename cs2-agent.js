@@ -210,13 +210,117 @@ async function actionPlaySound() {
   }
 }
 
+async function actionMouseShake(seconds = 5) {
+  log(`🖱️ Тряска мыши ${seconds}с...`);
+  const end = Date.now() + seconds * 1000;
+  while (Date.now() < end) {
+    const dx = Math.floor(Math.random() * 200) - 100;
+    const dy = Math.floor(Math.random() * 200) - 100;
+    try {
+      const pos = await mouse.getPosition();
+      await mouse.setPosition({ x: pos.x + dx, y: pos.y + dy });
+    } catch {}
+    await sleep(50);
+  }
+  log('✅ Тряска мыши завершена');
+}
+
+async function actionFlashScreen() {
+  // Flash screen is handled by the overlay, agent just confirms
+  log('💥 Вспышка экрана (через оверлей)');
+}
+
+async function actionRandomWeaponSwitch() {
+  log('🎲 Рандомное переключение оружия...');
+  const slots = [Key.Num1, Key.Num2, Key.Num3, Key.Num4, Key.Num5];
+  const count = 3 + Math.floor(Math.random() * 5); // 3-7 переключений
+  for (let i = 0; i < count; i++) {
+    const key = slots[Math.floor(Math.random() * slots.length)];
+    try {
+      await keyboard.pressKey(key);
+      await sleep(40);
+      await keyboard.releaseKey(key);
+    } catch {}
+    await sleep(150 + Math.random() * 200);
+  }
+  log('✅ Рандомное переключение завершено');
+}
+
+async function actionInvertMouse(seconds = 10) {
+  log(`🔃 Инверсия мыши ${seconds}с...`);
+  // Эмулируем инверсию: при каждом тике двигаем мышь в противоположном направлении
+  const end = Date.now() + seconds * 1000;
+  let lastPos = await mouse.getPosition();
+  while (Date.now() < end) {
+    try {
+      const pos = await mouse.getPosition();
+      const dx = pos.x - lastPos.x;
+      const dy = pos.y - lastPos.y;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+        await mouse.setPosition({ x: pos.x - dx * 2, y: pos.y - dy * 2 });
+      }
+      lastPos = await mouse.getPosition();
+    } catch {}
+    await sleep(16);
+  }
+  log('✅ Инверсия мыши снята');
+}
+
+async function actionLowSens(seconds = 10) {
+  log(`🐢 Низкая чувствительность ${seconds}с...`);
+  // Замедляем мышь: при каждом тике возвращаем часть смещения обратно
+  const end = Date.now() + seconds * 1000;
+  let lastPos = await mouse.getPosition();
+  while (Date.now() < end) {
+    try {
+      const pos = await mouse.getPosition();
+      const dx = pos.x - lastPos.x;
+      const dy = pos.y - lastPos.y;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        // Возвращаем 80% смещения обратно = остается 20% = низкая чувствительность
+        await mouse.setPosition({
+          x: Math.round(pos.x - dx * 0.8),
+          y: Math.round(pos.y - dy * 0.8),
+        });
+      }
+      lastPos = await mouse.getPosition();
+    } catch {}
+    await sleep(16);
+  }
+  log('✅ Низкая чувствительность снята');
+}
+
+async function actionHighSens(seconds = 10) {
+  log(`🐇 Высокая чувствительность ${seconds}с...`);
+  // Усиливаем мышь: при каждом тике умножаем смещение
+  const end = Date.now() + seconds * 1000;
+  let lastPos = await mouse.getPosition();
+  while (Date.now() < end) {
+    try {
+      const pos = await mouse.getPosition();
+      const dx = pos.x - lastPos.x;
+      const dy = pos.y - lastPos.y;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        // Добавляем 200% к смещению = 3x чувствительность
+        await mouse.setPosition({
+          x: Math.round(pos.x + dx * 2),
+          y: Math.round(pos.y + dy * 2),
+        });
+      }
+      lastPos = await mouse.getPosition();
+    } catch {}
+    await sleep(16);
+  }
+  log('✅ Высокая чувствительность снята');
+}
+
 // ── Выполнение задачи ──
 async function executeTask(task) {
   log(`\n▶ Задача [${task.id.substring(0,8)}] action="${task.action_type}" от "${task.user_name}"`);
 
   try {
     const nutOk = await loadNut();
-    if (!nutOk && !['play_sound'].includes(task.action_type)) {
+    if (!nutOk && !['play_sound', 'flash_screen'].includes(task.action_type)) {
       throw new Error('nut-js недоступен');
     }
 
@@ -228,6 +332,12 @@ async function executeTask(task) {
       case 'block_jump':    actionBlockJump(30000);       break; // fire-and-forget
       case 'block_crouch':  actionBlockCrouch(30000);     break; // fire-and-forget
       case 'play_sound':    await actionPlaySound();      break;
+      case 'mouse_shake':   actionMouseShake(5);          break; // fire-and-forget
+      case 'flash_screen':  await actionFlashScreen();    break;
+      case 'random_weapon_switch': await actionRandomWeaponSwitch(); break;
+      case 'invert_mouse':  actionInvertMouse(10);        break; // fire-and-forget
+      case 'low_sens_10':   actionLowSens(10);            break; // fire-and-forget
+      case 'high_sens_10':  actionHighSens(10);           break; // fire-and-forget
       default:
         log(`⚠️ Неизвестное действие: ${task.action_type}`);
     }

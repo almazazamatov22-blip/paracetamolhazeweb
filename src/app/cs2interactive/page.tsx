@@ -3,13 +3,19 @@
 import { useState, useEffect } from 'react'
 
 const ACTION_LABELS: Record<string, { label: string; icon: string; color: string; desc: string }> = {
-  drop_weapon:   { label: 'Выбросить оружие',          icon: '🔫', color: '#1ed760', desc: 'Автоматически нажимает клавишу "G", выбрасывая активное оружие в игре.' },
-  freeze_3:      { label: 'Заморозка 3 сек',            icon: '🧊', color: '#60d4f5', desc: 'Блокирует клавиши передвижения стримера на 3 секунды.' },
-  freeze_5:      { label: 'Заморозка 5 сек',            icon: '❄️', color: '#38bdf8', desc: 'Блокирует клавиши передвижения стримера на 5 секунд.' },
-  spin_180:      { label: 'Разворот 180°',              icon: '🔄', color: '#a78bfa', desc: 'Мгновенно разворачивает камеру игрока на 180 градусов.' },
-  block_jump:    { label: 'Блок прыжка 30 сек',         icon: '🚫', color: '#fb7185', desc: 'Запрещает прыгать в течение 30 секунд (спамит кнопку прыжка).' },
-  block_crouch:  { label: 'Блок приседания 30 сек',     icon: '🦆', color: '#fbbf24', desc: 'Запрещает приседать на 30 секунд (спамит кнопку приседания).' },
-  play_sound:    { label: 'Звук на стриме',             icon: '🔊', color: '#34d399', desc: 'Проигрывает выбранный звуковой эффект на ПК стримера.' },
+  drop_weapon:   { label: 'Выбросить оружие',          icon: '🔫', color: '#ef4444', desc: 'Нажимает клавишу G — выбрасывает активное оружие.' },
+  freeze_3:      { label: 'Заморозка 3 сек',            icon: '🧊', color: '#60a5fa', desc: 'Блокирует передвижение на 3 секунды.' },
+  freeze_5:      { label: 'Заморозка 5 сек',            icon: '❄️', color: '#38bdf8', desc: 'Блокирует передвижение на 5 секунд.' },
+  spin_180:      { label: 'Разворот 180°',              icon: '🔄', color: '#a78bfa', desc: 'Мгновенный разворот камеры на 180°.' },
+  block_jump:    { label: 'Блок прыжка 30 сек',         icon: '🚫', color: '#f87171', desc: 'Блокирует прыжок на 30 секунд.' },
+  block_crouch:  { label: 'Блок приседания 30 сек',     icon: '🦆', color: '#fbbf24', desc: 'Блокирует приседание на 30 секунд.' },
+  play_sound:    { label: 'Звук на стриме',             icon: '🔊', color: '#34d399', desc: 'Воспроизводит звуковой эффект.' },
+  mouse_shake:   { label: 'Тряска мыши 5 сек',          icon: '🖱️', color: '#fb923c', desc: 'Хаотично трясёт прицел 5 секунд.' },
+  flash_screen:  { label: 'Вспышка экрана',             icon: '💥', color: '#fcd34d', desc: 'Белая вспышка на оверлее на 1 секунду.' },
+  random_weapon_switch: { label: 'Рандомное оружие',    icon: '🎲', color: '#c084fc', desc: 'Случайно переключает слоты оружия.' },
+  invert_mouse:  { label: 'Инверсия мыши 10 сек',       icon: '🔃', color: '#22d3ee', desc: 'Инвертирует движение мыши на 10 секунд.' },
+  low_sens_10:   { label: 'Низкая чувств. 10 сек',      icon: '🐢', color: '#86efac', desc: 'Снижает чувствительность мыши на 10 сек.' },
+  high_sens_10:  { label: 'Высокая чувств. 10 сек',     icon: '🐇', color: '#fca5a5', desc: 'Резко повышает чувствительность на 10 сек.' },
 }
 
 export default function CS2InteractivePage() {
@@ -55,13 +61,6 @@ export default function CS2InteractivePage() {
 
   return (
     <main className="cs2-page">
-      {/* Background particles */}
-      <div className="cs2-bg">
-        {Array.from({ length: 30 }).map((_, i) => (
-          <div key={i} className="cs2-particle" style={{ '--i': i } as React.CSSProperties} />
-        ))}
-      </div>
-
       <div className="cs2-container">
         {/* Header */}
         <header className="cs2-header animate-fade-in">
@@ -171,7 +170,7 @@ export default function CS2InteractivePage() {
                         {typeof window !== 'undefined' ? window.location.origin : 'https://paracetamolhaze.ru'}/overlays/cs2.html?streamerId={user.id}
                       </div>
                       <button
-                        onClick={() => copyToClipboard(`${typeof window !== 'undefined' ? window.location.origin : 'https://paracetamolhaze.ru'}/overlays/cs2.html?streamerId={user.id}`)}
+                        onClick={() => copyToClipboard(`${typeof window !== 'undefined' ? window.location.origin : 'https://paracetamolhaze.ru'}/overlays/cs2.html?streamerId=${user.id}`)}
                         className={`cs2-btn ${copiedOverlay ? 'cs2-btn-copied' : 'cs2-btn-copy'}`}
                       >
                         {copiedOverlay ? '✅ Скопировано!' : '📋 Копировать'}
@@ -266,49 +265,26 @@ export default function CS2InteractivePage() {
       <style>{`
         .cs2-page {
           min-height: 100vh;
-          background: radial-gradient(ellipse at 20% 0%, rgba(30,215,96,0.08) 0%, transparent 50%),
-                      radial-gradient(ellipse at 80% 100%, rgba(30,215,96,0.06) 0%, transparent 50%),
-                      #08090d;
-          color: #f1f3f9;
+          background: #0f1117;
+          color: #e5e7eb;
           font-family: 'Inter', system-ui, -apple-system, sans-serif;
           position: relative;
           overflow-x: hidden;
         }
-        .cs2-bg {
-          position: fixed;
-          inset: 0;
-          pointer-events: none;
-          z-index: 0;
-          overflow: hidden;
-        }
-        .cs2-particle {
-          position: absolute;
-          width: 2px;
-          height: 2px;
-          border-radius: 50%;
-          background: rgba(30,215,96,0.25);
-          left: calc(var(--i, 0) * 3.3% + 1%);
-          top: calc(var(--i, 0) * 3.1% + 2%);
-          animation: cs2-float calc(12s + var(--i, 0) * 0.5s) ease-in-out infinite alternate;
-        }
-        @keyframes cs2-float {
-          from { transform: translateY(0) scale(1); opacity: 0.1; }
-          to { transform: translateY(-80px) scale(2.5); opacity: 0.5; }
-        }
-        
+
         /* Animations */
         .animate-fade-in {
-          animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: fadeIn 0.5s ease forwards;
         }
         .animate-slide-up {
-          animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: slideUp 0.5s ease forwards;
         }
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
         }
         @keyframes slideUp {
-          from { opacity: 0; transform: translateY(20px); }
+          from { opacity: 0; transform: translateY(16px); }
           to { opacity: 1; transform: translateY(0); }
         }
 
@@ -341,7 +317,7 @@ export default function CS2InteractivePage() {
           gap: 0.1em;
         }
         .cs2-logo-cs {
-          background: linear-gradient(135deg, #1ed760, #1db954);
+          background: linear-gradient(135deg, #6366f1, #818cf8);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
@@ -358,7 +334,7 @@ export default function CS2InteractivePage() {
           background-clip: text;
         }
         .cs2-tagline {
-          color: rgba(241,243,249,0.6);
+          color: rgba(229,231,235,0.5);
           font-size: 17px;
           line-height: 1.5;
           letter-spacing: -0.01em;
@@ -378,7 +354,6 @@ export default function CS2InteractivePage() {
           gap: 12px;
           background: rgba(255, 255, 255, 0.03);
           border: 1px solid rgba(255, 255, 255, 0.06);
-          backdrop-filter: blur(8px);
           border-radius: 50px;
           padding: 6px 16px 6px 8px;
           font-size: 14px;
@@ -388,11 +363,11 @@ export default function CS2InteractivePage() {
           height: 32px;
           border-radius: 50%;
           object-fit: cover;
-          border: 1.5px solid #1ed760;
+          border: 1.5px solid #6366f1;
         }
         .cs2-user-name {
           font-weight: 600;
-          color: #fff;
+          color: #e5e7eb;
         }
         
         .cs2-btn {
@@ -401,12 +376,12 @@ export default function CS2InteractivePage() {
           justify-content: center;
           gap: 10px;
           padding: 12px 24px;
-          border-radius: 10px;
+          border-radius: 8px;
           font-weight: 600;
           font-size: 14px;
           cursor: pointer;
           border: none;
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: all 0.2s ease;
           text-decoration: none;
           white-space: nowrap;
         }
@@ -418,34 +393,27 @@ export default function CS2InteractivePage() {
         .cs2-btn-twitch {
           background: #9146ff;
           color: #fff;
-          box-shadow: 0 4px 20px rgba(145, 70, 255, 0.25);
         }
         .cs2-btn-twitch:hover {
-          background: #772ce8;
-          transform: translateY(-2px);
-          box-shadow: 0 6px 24px rgba(145, 70, 255, 0.4);
+          background: #a970ff;
         }
         
         .cs2-btn-primary {
-          background: linear-gradient(135deg, #1ed760, #1db954);
-          color: #050608;
-          box-shadow: 0 4px 16px rgba(30, 215, 96, 0.2);
+          background: #6366f1;
+          color: #fff;
         }
         .cs2-btn-primary:hover {
-          opacity: 0.95;
-          transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(30, 215, 96, 0.35);
+          background: #818cf8;
         }
 
         .cs2-btn-download {
-          background: rgba(255, 255, 255, 0.06);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: #fff;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          color: #e5e7eb;
         }
         .cs2-btn-download:hover {
-          background: rgba(255, 255, 255, 0.12);
-          border-color: #1ed760;
-          transform: translateY(-2px);
+          background: rgba(255, 255, 255, 0.08);
+          border-color: #6366f1;
         }
 
         /* Wizard Cards */
@@ -454,14 +422,13 @@ export default function CS2InteractivePage() {
           font-weight: 800;
           letter-spacing: -0.02em;
           margin-bottom: 24px;
-          position: relative;
+          color: #e5e7eb;
         }
         
         .cs2-wizard-card {
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          backdrop-filter: blur(16px);
-          border-radius: 20px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 10px;
           padding: 32px 40px;
         }
         
@@ -478,7 +445,7 @@ export default function CS2InteractivePage() {
           top: 8px;
           bottom: 8px;
           width: 2px;
-          background: linear-gradient(to bottom, #1ed760 0%, rgba(255, 255, 255, 0.05) 100%);
+          background: rgba(255, 255, 255, 0.08);
           z-index: 0;
         }
         
@@ -493,20 +460,19 @@ export default function CS2InteractivePage() {
           width: 36px;
           height: 36px;
           border-radius: 50%;
-          background: #08090d;
+          background: #0f1117;
           border: 2px solid rgba(255, 255, 255, 0.15);
           display: flex;
           align-items: center;
           justify-content: center;
           font-weight: 700;
-          color: rgba(255, 255, 255, 0.5);
+          color: rgba(229, 231, 235, 0.5);
           flex-shrink: 0;
-          transition: all 0.3s ease;
+          transition: all 0.2s ease;
         }
         .cs2-wizard-step:hover .cs2-step-node {
-          border-color: #1ed760;
-          box-shadow: 0 0 12px rgba(30, 215, 96, 0.4);
-          color: #1ed760;
+          border-color: #6366f1;
+          color: #818cf8;
         }
         
         .cs2-step-content {
@@ -518,13 +484,13 @@ export default function CS2InteractivePage() {
         .cs2-step-title {
           font-size: 18px;
           font-weight: 700;
-          color: #fff;
+          color: #e5e7eb;
           margin-top: 6px;
         }
         .cs2-step-desc {
           font-size: 14px;
           line-height: 1.6;
-          color: rgba(241, 243, 249, 0.65);
+          color: rgba(229, 231, 235, 0.5);
         }
         .cs2-step-actions {
           display: flex;
@@ -541,9 +507,9 @@ export default function CS2InteractivePage() {
           font-weight: 550;
         }
         .msg-ok {
-          background: rgba(30, 215, 96, 0.08);
-          color: #1ed760;
-          border: 1px solid rgba(30, 215, 96, 0.2);
+          background: rgba(34, 197, 94, 0.08);
+          color: #22c55e;
+          border: 1px solid rgba(34, 197, 94, 0.2);
         }
         .msg-err {
           background: rgba(239, 68, 68, 0.08);
@@ -552,13 +518,13 @@ export default function CS2InteractivePage() {
         }
 
         .cs2-tip-box {
-          background: rgba(30, 215, 96, 0.03);
-          border: 1px solid rgba(30, 215, 96, 0.1);
+          background: rgba(99, 102, 241, 0.05);
+          border: 1px solid rgba(99, 102, 241, 0.15);
           border-radius: 8px;
           padding: 12px 16px;
           font-size: 13px;
           line-height: 1.6;
-          color: rgba(255, 255, 255, 0.8);
+          color: rgba(229, 231, 235, 0.7);
           margin-top: 6px;
         }
         .cs2-tip-box code {
@@ -567,7 +533,7 @@ export default function CS2InteractivePage() {
           padding: 2px 6px;
           border-radius: 4px;
           font-family: monospace;
-          color: #1ed760;
+          color: #818cf8;
         }
 
         /* Copy link inputs */
@@ -585,7 +551,7 @@ export default function CS2InteractivePage() {
           flex: 1;
           background: transparent;
           border: none;
-          color: #1ed760;
+          color: #818cf8;
           font-family: monospace;
           font-size: 13px;
           padding: 10px 14px;
@@ -596,7 +562,7 @@ export default function CS2InteractivePage() {
         }
         .cs2-btn-copy {
           background: rgba(255, 255, 255, 0.05);
-          color: #fff;
+          color: #e5e7eb;
           border-radius: 8px;
           padding: 8px 16px;
         }
@@ -604,11 +570,11 @@ export default function CS2InteractivePage() {
           background: rgba(255, 255, 255, 0.1);
         }
         .cs2-btn-copied {
-          background: rgba(30, 215, 96, 0.15);
-          color: #1ed760;
+          background: rgba(34, 197, 94, 0.15);
+          color: #22c55e;
           border-radius: 8px;
           padding: 8px 16px;
-          border: 1px solid rgba(30, 215, 96, 0.3);
+          border: 1px solid rgba(34, 197, 94, 0.3);
         }
 
         /* Actions Grid */
@@ -618,21 +584,20 @@ export default function CS2InteractivePage() {
           gap: 20px;
         }
         .cs2-action-card {
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          border-radius: 16px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 10px;
           padding: 24px;
           display: flex;
           flex-direction: column;
           gap: 12px;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: all 0.2s ease;
           position: relative;
         }
         .cs2-action-card:hover {
-          transform: translateY(-4px);
-          background: rgba(255, 255, 255, 0.04);
-          border-color: var(--accent, #1ed760);
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 15px rgba(30, 215, 96, 0.05);
+          background: rgba(255, 255, 255, 0.05);
+          border-color: var(--accent, #6366f1);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
         }
         .cs2-action-header {
           display: flex;
@@ -645,21 +610,21 @@ export default function CS2InteractivePage() {
         .cs2-action-key {
           font-size: 11px;
           font-family: monospace;
-          color: var(--accent, #1ed760);
-          background: rgba(30, 215, 96, 0.05);
-          border: 1px solid rgba(30, 215, 96, 0.15);
+          color: var(--accent, #6366f1);
+          background: rgba(99, 102, 241, 0.06);
+          border: 1px solid rgba(99, 102, 241, 0.15);
           padding: 2px 8px;
           border-radius: 4px;
         }
         .cs2-action-title {
           font-size: 16px;
           font-weight: 700;
-          color: #fff;
+          color: #e5e7eb;
         }
         .cs2-action-desc {
           font-size: 13px;
           line-height: 1.6;
-          color: rgba(241, 243, 249, 0.55);
+          color: rgba(229, 231, 235, 0.5);
         }
 
         /* How it works for guests */
@@ -669,9 +634,9 @@ export default function CS2InteractivePage() {
           gap: 24px;
         }
         .cs2-step-card {
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          border-radius: 16px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 10px;
           padding: 32px 24px;
           display: flex;
           flex-direction: column;
@@ -681,27 +646,27 @@ export default function CS2InteractivePage() {
         .cs2-step-card-num {
           font-size: 40px;
           font-weight: 900;
-          color: rgba(30, 215, 96, 0.15);
+          color: rgba(99, 102, 241, 0.2);
           line-height: 1;
         }
         .cs2-step-card h4 {
           font-size: 18px;
           font-weight: 700;
-          color: #fff;
+          color: #e5e7eb;
         }
         .cs2-step-card p {
           font-size: 14px;
           line-height: 1.6;
-          color: rgba(241, 243, 249, 0.6);
+          color: rgba(229, 231, 235, 0.5);
         }
         
         .cs2-guest-cta {
           text-align: center;
           margin-top: 48px;
-          background: rgba(30, 215, 96, 0.03);
-          border: 1px solid rgba(30, 215, 96, 0.15);
+          background: rgba(99, 102, 241, 0.04);
+          border: 1px solid rgba(99, 102, 241, 0.12);
           padding: 32px;
-          border-radius: 16px;
+          border-radius: 10px;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -710,7 +675,7 @@ export default function CS2InteractivePage() {
         .cs2-guest-cta p {
           font-size: 18px;
           font-weight: 600;
-          color: #fff;
+          color: #e5e7eb;
         }
 
         /* Navigation */
@@ -724,27 +689,27 @@ export default function CS2InteractivePage() {
         }
         .cs2-nav-link {
           font-size: 14px;
-          color: rgba(241, 243, 249, 0.6);
+          color: rgba(229, 231, 235, 0.5);
           text-decoration: none;
           padding: 8px 18px;
           border-radius: 8px;
-          transition: all 0.2s;
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.04);
+          transition: all 0.2s ease;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.06);
         }
         .cs2-nav-link:hover {
-          color: #fff;
+          color: #e5e7eb;
           background: rgba(255, 255, 255, 0.06);
           border-color: rgba(255, 255, 255, 0.1);
         }
         .cs2-nav-back {
-          color: rgba(255, 255, 255, 0.4);
+          color: rgba(229, 231, 235, 0.35);
           background: transparent;
           border: none;
         }
         .cs2-nav-back:hover {
           background: transparent;
-          color: #fff;
+          color: #e5e7eb;
         }
 
         @media (max-width: 768px) {

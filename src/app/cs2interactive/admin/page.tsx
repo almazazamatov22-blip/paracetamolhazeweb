@@ -10,6 +10,12 @@ const ACTION_OPTIONS = [
   { value: 'block_jump',   label: '🚫 Блок прыжка 30 сек' },
   { value: 'block_crouch', label: '🦆 Блок приседания 30 сек' },
   { value: 'play_sound',   label: '🔊 Звук на стриме' },
+  { value: 'mouse_shake',  label: '🖱️ Тряска мыши 5 сек' },
+  { value: 'flash_screen', label: '💥 Вспышка экрана' },
+  { value: 'random_weapon_switch', label: '🎲 Рандомное оружие' },
+  { value: 'invert_mouse', label: '🔃 Инверсия мыши 10 сек' },
+  { value: 'low_sens_10',  label: '🐢 Низкая чувств. 10 сек' },
+  { value: 'high_sens_10', label: '🐇 Высокая чувств. 10 сек' },
 ]
 
 type Reward = {
@@ -21,6 +27,15 @@ type Reward = {
   cooldown_seconds: number
   enabled: boolean
   twitch_reward_id: string | null
+}
+
+type TwitchReward = {
+  id: string
+  title: string
+  cost: number
+  is_enabled: boolean
+  background_color: string | null
+  image_url: string | null
 }
 
 type FormState = Omit<Reward, 'id'>
@@ -37,6 +52,9 @@ const EMPTY_FORM: FormState = {
 
 export default function CS2AdminPage() {
   const [rewards, setRewards] = useState<Reward[]>([])
+  const [twitchRewards, setTwitchRewards] = useState<TwitchReward[]>([])
+  const [twitchRewardsLoading, setTwitchRewardsLoading] = useState(false)
+  const [twitchRewardsWarning, setTwitchRewardsWarning] = useState('')
   const [user, setUser] = useState<{ login: string; id: string; avatar?: string } | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -71,9 +89,30 @@ export default function CS2AdminPage() {
     }
   }, [user])
 
+  const loadTwitchRewards = useCallback(async () => {
+    setTwitchRewardsLoading(true)
+    setTwitchRewardsWarning('')
+    try {
+      const res = await fetch('/api/cs2/twitch-rewards')
+      const data = await res.json()
+      if (data.rewards) {
+        setTwitchRewards(data.rewards)
+        if (data.warning) setTwitchRewardsWarning(data.warning)
+      }
+    } catch {
+      setTwitchRewardsWarning('Не удалось загрузить награды Twitch')
+    } finally {
+      setTwitchRewardsLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadRewards()
   }, [loadRewards])
+
+  useEffect(() => {
+    if (user) loadTwitchRewards()
+  }, [user, loadTwitchRewards])
 
   function flash(msg: string, isErr = false) {
     if (isErr) { setError(msg); setTimeout(() => setError(''), 4000) }
@@ -100,7 +139,7 @@ export default function CS2AdminPage() {
 
       setForm(EMPTY_FORM)
       setEditingId(null)
-      flash(editingId ? '✅ Награда обновлена' : '✅ Награда создана')
+      flash(editingId ? 'Награда обновлена' : 'Награда создана')
       loadRewards()
     } catch {
       flash('Сетевая ошибка', true)
@@ -120,7 +159,7 @@ export default function CS2AdminPage() {
       const data = await res.json()
       if (!res.ok) return flash(data.error || 'Ошибка удаления', true)
       setDeleteConfirm(null)
-      flash('🗑️ Удалено')
+      flash('Удалено')
       loadRewards()
     } catch {
       flash('Сетевая ошибка', true)
@@ -158,6 +197,7 @@ export default function CS2AdminPage() {
     return (
       <main className="adm-page">
         <div className="adm-loading">Загрузка...</div>
+        <style>{adminStyles}</style>
       </main>
     )
   }
@@ -166,7 +206,8 @@ export default function CS2AdminPage() {
     return (
       <main className="adm-page">
         <div className="adm-unauth">
-          <h1>🔐 Требуется авторизация</h1>
+          <h1>Требуется авторизация</h1>
+          <p className="adm-unauth-desc">Войдите через Twitch, чтобы настроить награды CS2 Interactive.</p>
           <a href="/auth/twitch?source=cs2interactive" className="adm-btn adm-btn-twitch">
             <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
               <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
@@ -180,13 +221,16 @@ export default function CS2AdminPage() {
     )
   }
 
+  // Find which twitch rewards are already used by existing rewards
+  const usedTwitchIds = new Set(rewards.map(r => r.twitch_reward_id).filter(Boolean))
+
   return (
     <main className="adm-page">
       {/* Header */}
       <header className="adm-header">
         <div className="adm-header-left">
-          <a href="/cs2interactive" className="adm-back-link">← CS2Interactive</a>
-          <h1 className="adm-title">⚙️ Настройки CS2 наград</h1>
+          <a href="/cs2interactive" className="adm-back-link">← CS2 Interactive</a>
+          <h1 className="adm-title">Настройка наград</h1>
         </div>
         <div className="adm-user">
           {user.avatar && <img src={user.avatar} alt={user.login} className="adm-avatar" />}
@@ -202,7 +246,7 @@ export default function CS2AdminPage() {
         {/* Form */}
         <section className="adm-form-section">
           <h2 className="adm-section-title">
-            {editingId ? '✏️ Редактировать награду' : '➕ Новая награда'}
+            {editingId ? 'Редактировать награду' : 'Новая награда'}
           </h2>
           <div className="adm-form">
             <div className="adm-field">
@@ -262,19 +306,48 @@ export default function CS2AdminPage() {
                 />
               </div>
             </div>
+
+            {/* Twitch Reward Selector */}
             <div className="adm-field">
-              <label className="adm-label">Twitch Reward ID</label>
-              <input
-                className="adm-input"
-                id="reward-twitch-id"
-                placeholder="ID из настроек Channel Points на Twitch"
-                value={form.twitch_reward_id ?? ''}
-                onChange={e => setForm(f => ({ ...f, twitch_reward_id: e.target.value }))}
-              />
-              <span className="adm-hint">
-                Найди в Twitch → Канал → Channel Points → Управление наградами → ID награды
-              </span>
+              <label className="adm-label">Награда Twitch</label>
+              {twitchRewardsLoading ? (
+                <div className="adm-hint">Загрузка наград Twitch...</div>
+              ) : twitchRewardsWarning && twitchRewards.length === 0 ? (
+                <div className="adm-warning-box">{twitchRewardsWarning}</div>
+              ) : (
+                <select
+                  className="adm-input"
+                  id="reward-twitch-id"
+                  value={form.twitch_reward_id ?? ''}
+                  onChange={e => setForm(f => ({ ...f, twitch_reward_id: e.target.value }))}
+                >
+                  <option value="">— Выберите награду Twitch —</option>
+                  {twitchRewards.map(tr => (
+                    <option
+                      key={tr.id}
+                      value={tr.id}
+                      disabled={usedTwitchIds.has(tr.id) && form.twitch_reward_id !== tr.id}
+                    >
+                      {tr.title} — {tr.cost} баллов{usedTwitchIds.has(tr.id) && form.twitch_reward_id !== tr.id ? ' (уже привязана)' : ''}{!tr.is_enabled ? ' (выключена)' : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="adm-hint-row">
+                <span className="adm-hint">
+                  Выберите награду Channel Points, которую зрители будут покупать для активации этого действия.
+                </span>
+                <button
+                  type="button"
+                  className="adm-btn adm-btn-sm adm-btn-ghost"
+                  onClick={loadTwitchRewards}
+                  disabled={twitchRewardsLoading}
+                >
+                  ↻ Обновить
+                </button>
+              </div>
             </div>
+
             <div className="adm-checkbox-row">
               <input
                 type="checkbox"
@@ -292,7 +365,7 @@ export default function CS2AdminPage() {
                 onClick={handleSave}
                 disabled={loading}
               >
-                {loading ? '⏳' : editingId ? '💾 Сохранить' : '➕ Создать'}
+                {loading ? '⏳' : editingId ? 'Сохранить' : 'Создать'}
               </button>
               {editingId && (
                 <button
@@ -308,7 +381,7 @@ export default function CS2AdminPage() {
 
         {/* Rewards list */}
         <section className="adm-list-section">
-          <h2 className="adm-section-title">📋 Мои награды ({rewards.length})</h2>
+          <h2 className="adm-section-title">Мои награды ({rewards.length})</h2>
 
           {loading && rewards.length === 0 && (
             <div className="adm-loading-small">Загрузка...</div>
@@ -316,68 +389,77 @@ export default function CS2AdminPage() {
 
           {!loading && rewards.length === 0 && (
             <div className="adm-empty">
-              Наград пока нет. Создай первую →
+              Наград пока нет. Создайте первую с помощью формы выше.
             </div>
           )}
 
           <div className="adm-rewards-list">
-            {rewards.map(r => (
-              <div key={r.id} className={`adm-reward-item ${!r.enabled ? 'is-disabled' : ''}`}>
-                <div className="adm-reward-main">
-                  <div className="adm-reward-info">
-                    <span className="adm-reward-name">{r.name}</span>
-                    <span className="adm-reward-action">
-                      {ACTION_OPTIONS.find(a => a.value === r.action_type)?.label ?? r.action_type}
-                    </span>
-                    {r.description && (
-                      <span className="adm-reward-desc">{r.description}</span>
-                    )}
-                  </div>
-                  <div className="adm-reward-meta">
-                    <span className="adm-badge adm-badge-cost">💜 {r.cost} pts</span>
-                    <span className="adm-badge">⏱ {r.cooldown_seconds}s</span>
-                    {r.twitch_reward_id && (
-                      <span className="adm-badge adm-badge-id" title={r.twitch_reward_id}>
-                        ID: {r.twitch_reward_id.substring(0, 8)}…
+            {rewards.map(r => {
+              const linkedTwitch = twitchRewards.find(tr => tr.id === r.twitch_reward_id)
+              return (
+                <div key={r.id} className={`adm-reward-item ${!r.enabled ? 'is-disabled' : ''}`}>
+                  <div className="adm-reward-main">
+                    <div className="adm-reward-info">
+                      <span className="adm-reward-name">{r.name}</span>
+                      <span className="adm-reward-action">
+                        {ACTION_OPTIONS.find(a => a.value === r.action_type)?.label ?? r.action_type}
                       </span>
+                      {r.description && (
+                        <span className="adm-reward-desc">{r.description}</span>
+                      )}
+                    </div>
+                    <div className="adm-reward-meta">
+                      <span className="adm-badge adm-badge-cost">{r.cost} pts</span>
+                      <span className="adm-badge">⏱ {r.cooldown_seconds}s</span>
+                      {linkedTwitch ? (
+                        <span className="adm-badge adm-badge-twitch" title={`Twitch: ${linkedTwitch.title}`}>
+                          🟣 {linkedTwitch.title}
+                        </span>
+                      ) : r.twitch_reward_id ? (
+                        <span className="adm-badge adm-badge-id" title={r.twitch_reward_id}>
+                          ID: {r.twitch_reward_id.substring(0, 8)}…
+                        </span>
+                      ) : (
+                        <span className="adm-badge adm-badge-warn">⚠ Не привязана</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="adm-reward-actions">
+                    <button
+                      className={`adm-toggle ${r.enabled ? 'adm-toggle-on' : 'adm-toggle-off'}`}
+                      onClick={() => toggleEnabled(r)}
+                      title={r.enabled ? 'Отключить' : 'Включить'}
+                    >
+                      {r.enabled ? '✅' : '⭕'}
+                    </button>
+                    <button className="adm-btn adm-btn-sm adm-btn-ghost" onClick={() => startEdit(r)}>
+                      ✏️
+                    </button>
+                    {deleteConfirm === r.id ? (
+                      <div className="adm-delete-confirm">
+                        <button className="adm-btn adm-btn-sm adm-btn-danger" onClick={() => handleDelete(r.id)}>
+                          Удалить
+                        </button>
+                        <button className="adm-btn adm-btn-sm adm-btn-ghost" onClick={() => setDeleteConfirm(null)}>
+                          Нет
+                        </button>
+                      </div>
+                    ) : (
+                      <button className="adm-btn adm-btn-sm adm-btn-ghost" onClick={() => setDeleteConfirm(r.id)}>
+                        🗑️
+                      </button>
                     )}
                   </div>
                 </div>
-                <div className="adm-reward-actions">
-                  <button
-                    className={`adm-toggle ${r.enabled ? 'adm-toggle-on' : 'adm-toggle-off'}`}
-                    onClick={() => toggleEnabled(r)}
-                    title={r.enabled ? 'Отключить' : 'Включить'}
-                  >
-                    {r.enabled ? '✅' : '⭕'}
-                  </button>
-                  <button className="adm-btn adm-btn-sm adm-btn-ghost" onClick={() => startEdit(r)}>
-                    ✏️
-                  </button>
-                  {deleteConfirm === r.id ? (
-                    <div className="adm-delete-confirm">
-                      <button className="adm-btn adm-btn-sm adm-btn-danger" onClick={() => handleDelete(r.id)}>
-                        Удалить
-                      </button>
-                      <button className="adm-btn adm-btn-sm adm-btn-ghost" onClick={() => setDeleteConfirm(null)}>
-                        Нет
-                      </button>
-                    </div>
-                  ) : (
-                    <button className="adm-btn adm-btn-sm adm-btn-ghost" onClick={() => setDeleteConfirm(r.id)}>
-                      🗑️
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </section>
 
         {/* Links */}
         <nav className="adm-nav">
-          <a href="/cs2interactive/history" className="adm-nav-link">📜 История активаций</a>
-          <a href="/cs2interactive" className="adm-nav-link">← Назад к CS2Interactive</a>
+          <a href="/cs2interactive/history" className="adm-nav-link">История активаций</a>
+          <a href="/cs2interactive" className="adm-nav-link">← CS2 Interactive</a>
         </nav>
       </div>
 
@@ -389,9 +471,9 @@ export default function CS2AdminPage() {
 const adminStyles = `
   .adm-page {
     min-height: 100vh;
-    background: #080808;
-    color: #fff;
-    font-family: 'Inter', sans-serif;
+    background: #0f1117;
+    color: #e5e7eb;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
   .adm-loading, .adm-unauth {
     display: flex;
@@ -400,31 +482,31 @@ const adminStyles = `
     justify-content: center;
     min-height: 100vh;
     gap: 20px;
-    color: rgba(255,255,255,0.4);
+    color: rgba(229,231,235,0.4);
   }
-  .adm-unauth h1 { font-size: 24px; color: #fff; }
+  .adm-unauth h1 { font-size: 22px; color: #e5e7eb; font-weight: 700; }
+  .adm-unauth-desc { font-size: 14px; color: rgba(229,231,235,0.5); max-width: 360px; text-align: center; line-height: 1.5; }
   .adm-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 20px 32px;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
     background: rgba(255,255,255,0.02);
-    backdrop-filter: blur(8px);
     position: sticky;
     top: 0;
     z-index: 10;
   }
   .adm-header-left { display: flex; flex-direction: column; gap: 4px; }
-  .adm-back-link { font-size: 12px; color: rgba(255,255,255,0.35); text-decoration: none; }
-  .adm-back-link:hover { color: rgba(255,255,255,0.7); }
-  .adm-title { font-size: 20px; font-weight: 700; }
+  .adm-back-link { font-size: 12px; color: rgba(229,231,235,0.35); text-decoration: none; transition: color 0.2s; }
+  .adm-back-link:hover { color: rgba(229,231,235,0.7); }
+  .adm-title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
   .adm-user {
     display: flex;
     align-items: center;
     gap: 8px;
     font-size: 14px;
-    color: rgba(255,255,255,0.6);
+    color: rgba(229,231,235,0.6);
   }
   .adm-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
   .adm-flash {
@@ -432,8 +514,8 @@ const adminStyles = `
     font-size: 14px;
     font-weight: 500;
   }
-  .adm-flash-err { background: rgba(239,68,68,0.15); color: #f87171; border-bottom: 1px solid rgba(239,68,68,0.2); }
-  .adm-flash-ok { background: rgba(30,215,96,0.1); color: #1ed760; border-bottom: 1px solid rgba(30,215,96,0.15); }
+  .adm-flash-err { background: rgba(239,68,68,0.1); color: #f87171; border-bottom: 1px solid rgba(239,68,68,0.15); }
+  .adm-flash-ok { background: rgba(34,197,94,0.08); color: #22c55e; border-bottom: 1px solid rgba(34,197,94,0.12); }
   .adm-body {
     max-width: 860px;
     margin: 0 auto;
@@ -442,24 +524,24 @@ const adminStyles = `
     flex-direction: column;
     gap: 48px;
   }
-  .adm-section-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+  .adm-section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #e5e7eb; }
   .adm-form {
     background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 16px;
-    padding: 28px;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 24px;
     display: flex;
     flex-direction: column;
     gap: 18px;
   }
   .adm-field { display: flex; flex-direction: column; gap: 6px; }
-  .adm-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.45); }
+  .adm-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(229,231,235,0.45); font-weight: 500; }
   .adm-input {
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px;
     padding: 10px 14px;
-    color: #fff;
+    color: #e5e7eb;
     font-size: 14px;
     outline: none;
     transition: border-color 0.2s;
@@ -467,12 +549,22 @@ const adminStyles = `
     width: 100%;
     box-sizing: border-box;
   }
-  .adm-input:focus { border-color: rgba(30,215,96,0.5); }
-  .adm-input option { background: #1a1a1a; }
-  .adm-hint { font-size: 11px; color: rgba(255,255,255,0.3); line-height: 1.5; }
+  .adm-input:focus { border-color: rgba(99,102,241,0.5); }
+  .adm-input option { background: #1a1b23; color: #e5e7eb; }
+  .adm-hint { font-size: 11px; color: rgba(229,231,235,0.3); line-height: 1.5; }
+  .adm-hint-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .adm-warning-box {
+    font-size: 13px;
+    color: #fbbf24;
+    background: rgba(251,191,36,0.06);
+    border: 1px solid rgba(251,191,36,0.15);
+    border-radius: 8px;
+    padding: 10px 14px;
+    line-height: 1.5;
+  }
   .adm-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .adm-checkbox-row { display: flex; align-items: center; gap: 10px; }
-  .adm-checkbox { width: 16px; height: 16px; accent-color: #1ed760; cursor: pointer; }
+  .adm-checkbox { width: 16px; height: 16px; accent-color: #6366f1; cursor: pointer; }
   .adm-form-actions { display: flex; gap: 12px; }
   .adm-btn {
     display: inline-flex;
@@ -484,69 +576,87 @@ const adminStyles = `
     font-size: 14px;
     cursor: pointer;
     border: none;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
     text-decoration: none;
     white-space: nowrap;
+    font-family: inherit;
   }
   .adm-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .adm-btn-primary { background: linear-gradient(135deg, #1ed760, #0aad48); color: #000; }
-  .adm-btn-primary:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+  .adm-btn-primary { background: #6366f1; color: #fff; }
+  .adm-btn-primary:hover:not(:disabled) { background: #818cf8; }
   .adm-btn-twitch { background: #9146ff; color: #fff; }
-  .adm-btn-twitch:hover { background: #772ce8; }
+  .adm-btn-twitch:hover { background: #a970ff; }
   .adm-btn-ghost {
-    background: rgba(255,255,255,0.06);
-    color: rgba(255,255,255,0.7);
-    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: rgba(229,231,235,0.7);
+    border: 1px solid rgba(255,255,255,0.08);
   }
-  .adm-btn-ghost:hover { background: rgba(255,255,255,0.1); }
-  .adm-btn-danger { background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
-  .adm-btn-danger:hover { background: rgba(239,68,68,0.3); }
+  .adm-btn-ghost:hover { background: rgba(255,255,255,0.08); }
+  .adm-btn-danger { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+  .adm-btn-danger:hover { background: rgba(239,68,68,0.25); }
   .adm-btn-sm { padding: 6px 12px; font-size: 13px; }
-  .adm-loading-small { color: rgba(255,255,255,0.3); padding: 20px 0; }
-  .adm-empty { color: rgba(255,255,255,0.3); padding: 32px; text-align: center; border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px; }
-  .adm-rewards-list { display: flex; flex-direction: column; gap: 12px; }
+  .adm-loading-small { color: rgba(229,231,235,0.3); padding: 20px 0; }
+  .adm-empty {
+    color: rgba(229,231,235,0.3);
+    padding: 32px;
+    text-align: center;
+    border: 1px dashed rgba(255,255,255,0.08);
+    border-radius: 10px;
+    font-size: 14px;
+  }
+  .adm-rewards-list { display: flex; flex-direction: column; gap: 10px; }
   .adm-reward-item {
     background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 18px 20px;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 16px 20px;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
     transition: border-color 0.2s;
   }
-  .adm-reward-item:hover { border-color: rgba(255,255,255,0.15); }
+  .adm-reward-item:hover { border-color: rgba(255,255,255,0.12); }
   .adm-reward-item.is-disabled { opacity: 0.4; }
   .adm-reward-main { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .adm-reward-info { display: flex; flex-direction: column; gap: 3px; }
-  .adm-reward-name { font-weight: 600; font-size: 15px; }
-  .adm-reward-action { font-size: 13px; color: rgba(255,255,255,0.5); }
-  .adm-reward-desc { font-size: 12px; color: rgba(255,255,255,0.35); }
+  .adm-reward-name { font-weight: 600; font-size: 15px; color: #e5e7eb; }
+  .adm-reward-action { font-size: 13px; color: rgba(229,231,235,0.5); }
+  .adm-reward-desc { font-size: 12px; color: rgba(229,231,235,0.35); }
   .adm-reward-meta { display: flex; gap: 8px; flex-wrap: wrap; }
   .adm-badge {
     font-size: 11px;
     padding: 3px 8px;
     border-radius: 4px;
-    background: rgba(255,255,255,0.06);
-    color: rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.05);
+    color: rgba(229,231,235,0.5);
     white-space: nowrap;
   }
   .adm-badge-cost { color: #a78bfa; }
+  .adm-badge-twitch { color: #c084fc; background: rgba(145,70,255,0.08); }
   .adm-badge-id { font-family: monospace; }
+  .adm-badge-warn { color: #fbbf24; background: rgba(251,191,36,0.08); }
   .adm-reward-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .adm-toggle { background: none; border: none; cursor: pointer; font-size: 18px; padding: 4px; transition: transform 0.15s; }
-  .adm-toggle:hover { transform: scale(1.2); }
+  .adm-toggle:hover { transform: scale(1.1); }
   .adm-delete-confirm { display: flex; gap: 6px; }
-  .adm-back { color: rgba(255,255,255,0.4); text-decoration: none; font-size: 14px; }
-  .adm-back:hover { color: #fff; }
-  .adm-nav { display: flex; gap: 16px; flex-wrap: wrap; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.07); }
-  .adm-nav-link { font-size: 14px; color: rgba(255,255,255,0.4); text-decoration: none; padding: 8px 12px; border-radius: 6px; transition: all 0.2s; }
-  .adm-nav-link:hover { color: #fff; background: rgba(255,255,255,0.05); }
+  .adm-back { color: rgba(229,231,235,0.4); text-decoration: none; font-size: 14px; transition: color 0.2s; }
+  .adm-back:hover { color: #e5e7eb; }
+  .adm-nav { display: flex; gap: 16px; flex-wrap: wrap; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
+  .adm-nav-link {
+    font-size: 14px;
+    color: rgba(229,231,235,0.4);
+    text-decoration: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .adm-nav-link:hover { color: #e5e7eb; background: rgba(255,255,255,0.04); }
   @media (max-width: 600px) {
     .adm-header { padding: 16px; }
     .adm-body { padding: 24px 16px 60px; }
     .adm-row { grid-template-columns: 1fr; }
     .adm-reward-item { flex-direction: column; }
+    .adm-form { padding: 18px; }
   }
 `
