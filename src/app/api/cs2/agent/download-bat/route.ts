@@ -72,9 +72,9 @@ if not exist cs2-agent.js (
     exit /b 1
 )
 
-if not exist node_modules\\@nut-tree\\nut-js (
+if not exist node_modules\\@nut-tree-fork\\nut-js (
     echo [+] Установка зависимостей (эмуляция клавиатуры/мыши)...
-    call %NPM_BIN% install @nut-tree/nut-js --no-audit --no-fund
+    call %NPM_BIN% install @nut-tree-fork/nut-js --no-audit --no-fund
 )
 
 :: Create a start.bat shortcut for future quick runs

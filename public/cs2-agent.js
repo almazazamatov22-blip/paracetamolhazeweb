@@ -4,7 +4,7 @@
  * Запуск: node cs2-agent.js --streamerId=YOUR_STREAMER_ID
  *
  * Зависимости (установить один раз):
- *   npm install @nut-tree/nut-js node-fetch
+ *   npm install @nut-tree-fork/nut-js node-fetch
  *
  * Опционально — для воспроизведения звука:
  *   npm install play-sound
@@ -53,7 +53,7 @@ let nutLoaded = false;
 async function loadNut() {
   if (nutLoaded) return true;
   try {
-    const nut = await import('@nut-tree/nut-js');
+    const nut = await import('@nut-tree-fork/nut-js');
     keyboard = nut.keyboard;
     mouse    = nut.mouse;
     Key      = nut.Key;
@@ -68,7 +68,7 @@ async function loadNut() {
     console.log('✅ nut-js загружен');
     return true;
   } catch (e) {
-    console.error('❌ @nut-tree/nut-js не установлен. Запусти: npm install @nut-tree/nut-js');
+    console.error('❌ @nut-tree-fork/nut-js не установлен. Запусти: npm install @nut-tree-fork/nut-js');
     return false;
   }
 }
