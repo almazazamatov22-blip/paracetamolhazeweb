@@ -131,7 +131,7 @@ async function actionDropWeapon() {
 }
 
 async function actionFreeze(seconds) {
-  const keys = [Key.W, Key.A, Key.S, Key.D, Key.Space, Key.LeftControl];
+  const keys = [Key.W, Key.A, Key.S, Key.D];
   log(`🧊 Заморозка ${seconds}с — блокирую ввод...`);
 
   // Перехват ввода через nut-js невозможен напрямую.
