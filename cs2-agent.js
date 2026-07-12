@@ -119,6 +119,19 @@ class Program {
         SendInput(1, inputs, Marshal.SizeOf(typeof(INPUT)));
     }
 
+    static void SendKeys(ushort[] scanCodes, bool down) {
+        INPUT[] inputs = new INPUT[scanCodes.Length];
+        for (int i = 0; i < scanCodes.Length; i++) {
+            inputs[i].type = INPUT_KEYBOARD;
+            inputs[i].u.ki.wVk = 0;
+            inputs[i].u.ki.wScan = scanCodes[i];
+            inputs[i].u.ki.dwFlags = KEYEVENTF_SCANCODE | (down ? KEYEVENTF_KEYDOWN : KEYEVENTF_KEYUP);
+            inputs[i].u.ki.time = 0;
+            inputs[i].u.ki.dwExtraInfo = IntPtr.Zero;
+        }
+        SendInput((uint)scanCodes.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
+    }
+
     static void SendMouseMove(int dx, int dy) {
         INPUT[] inputs = new INPUT[1];
         inputs[0].type = INPUT_MOUSE;
@@ -169,10 +182,10 @@ class Program {
         }
         else if (command == "freeze" && args.Length >= 2) {
             int sec = int.Parse(args[1]);
-            ushort[] keys = { SCAN_W, SCAN_A, SCAN_S, SCAN_D };
-            foreach (var k in keys) SendKey(k, true);
+            ushort[] keys = { SCAN_W, SCAN_S, SCAN_A, SCAN_D };
+            SendKeys(keys, true);
             Thread.Sleep(sec * 1000);
-            foreach (var k in keys) SendKey(k, false);
+            SendKeys(keys, false);
         }
         else if (command == "spin") {
             for (int i = 0; i < 15; i++) {

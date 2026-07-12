@@ -71,6 +71,8 @@ if not exist cs2-agent.js (
     exit /b 1
 )
 
+if exist cs2_input_helper.exe del cs2_input_helper.exe
+
 :: Create a start.bat shortcut for future quick runs
 echo @echo off > start.bat
 echo chcp 65001 ^>nul >> start.bat
