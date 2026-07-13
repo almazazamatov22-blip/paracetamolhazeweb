@@ -210,6 +210,9 @@ export default function CS2AdminPage() {
         <div className="adm-user">
           {user.avatar && <img src={user.avatar} alt={user.login} className="adm-avatar" />}
           <span>{user.login}</span>
+          <a href="/auth/twitch?source=cs2interactive" className="adm-btn adm-btn-sm adm-btn-ghost" style={{ marginLeft: 8 }} title="Обновить права">
+            🔄 Перезайти
+          </a>
         </div>
       </header>
 
@@ -324,7 +327,6 @@ export default function CS2AdminPage() {
 
           <div className="adm-rewards-list">
             {rewards.map(r => {
-              const linkedTwitch = twitchRewards.find(tr => tr.id === r.twitch_reward_id)
               return (
                 <div key={r.id} className={`adm-reward-item ${!r.enabled ? 'is-disabled' : ''}`}>
                   <div className="adm-reward-main">
