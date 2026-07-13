@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const normalizedSource = normalizeSource(source);
   const origin = getRequestBaseUrl(request);
   const redirectUri = `${origin}/callback`;
-  const scope = 'user:read:email chat:read chat:edit channel:read:redemptions';
+  const scope = 'user:read:email chat:read chat:edit channel:read:redemptions channel:manage:redemptions';
   
   if (!clientId) {
     return NextResponse.redirect(`${origin}${sourcePath(normalizedSource)}?error=twitch_client_id_missing`);

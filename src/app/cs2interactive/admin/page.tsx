@@ -52,9 +52,6 @@ const EMPTY_FORM: FormState = {
 
 export default function CS2AdminPage() {
   const [rewards, setRewards] = useState<Reward[]>([])
-  const [twitchRewards, setTwitchRewards] = useState<TwitchReward[]>([])
-  const [twitchRewardsLoading, setTwitchRewardsLoading] = useState(false)
-  const [twitchRewardsWarning, setTwitchRewardsWarning] = useState('')
   const [user, setUser] = useState<{ login: string; id: string; avatar?: string } | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -89,30 +86,9 @@ export default function CS2AdminPage() {
     }
   }, [user])
 
-  const loadTwitchRewards = useCallback(async () => {
-    setTwitchRewardsLoading(true)
-    setTwitchRewardsWarning('')
-    try {
-      const res = await fetch('/api/cs2/twitch-rewards')
-      const data = await res.json()
-      if (data.rewards) {
-        setTwitchRewards(data.rewards)
-        if (data.warning) setTwitchRewardsWarning(data.warning)
-      }
-    } catch {
-      setTwitchRewardsWarning('Не удалось загрузить награды Twitch')
-    } finally {
-      setTwitchRewardsLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
     loadRewards()
   }, [loadRewards])
-
-  useEffect(() => {
-    if (user) loadTwitchRewards()
-  }, [user, loadTwitchRewards])
 
   function flash(msg: string, isErr = false) {
     if (isErr) { setError(msg); setTimeout(() => setError(''), 4000) }
@@ -120,18 +96,13 @@ export default function CS2AdminPage() {
   }
 
   async function handleSave() {
-    if (!form.twitch_reward_id) return flash('Выберите награду Twitch', true)
-    
-    const selectedTwitch = twitchRewards.find(tr => tr.id === form.twitch_reward_id)
-    if (!selectedTwitch) return flash('Выбранная награда Twitch не найдена', true)
+    if (!form.name.trim()) return flash('Введите название награды', true)
+    if (form.cost <= 0) return flash('Стоимость должна быть больше 0', true)
 
     setLoading(true)
     try {
       const body = {
         ...form,
-        name: selectedTwitch.title,
-        cost: selectedTwitch.cost,
-        twitch_reward_id: form.twitch_reward_id,
         ...(editingId ? { id: editingId } : {}),
       }
       const method = editingId ? 'PUT' : 'POST'
@@ -227,10 +198,7 @@ export default function CS2AdminPage() {
     )
   }
 
-  // Find which twitch rewards are already used by existing rewards
-  const usedTwitchIds = new Set(rewards.map(r => r.twitch_reward_id).filter(Boolean))
-
-  return (
+  // 
     <main className="adm-page">
       {/* Header */}
       <header className="adm-header">
@@ -270,14 +238,27 @@ export default function CS2AdminPage() {
             </div>
             <div className="adm-row">
               <div className="adm-field">
-                <label className="adm-label">Стоимость (баллы)</label>
+                <label className="adm-label">Название награды *</label>
+                <input
+                  className="adm-input"
+                  id="reward-name"
+                  type="text"
+                  placeholder="Например: Бросить оружие"
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="adm-row">
+              <div className="adm-field">
+                <label className="adm-label">Стоимость (баллы) *</label>
                 <input
                   className="adm-input"
                   id="reward-cost"
                   type="number"
-                  disabled
+                  min={1}
                   value={form.cost}
-                  style={{ opacity: 0.7, cursor: 'not-allowed' }}
+                  onChange={e => setForm(f => ({ ...f, cost: parseInt(e.target.value) || 0 }))}
                 />
               </div>
               <div className="adm-field">
@@ -290,60 +271,10 @@ export default function CS2AdminPage() {
                   value={form.cooldown_seconds}
                   onChange={e => setForm(f => ({ ...f, cooldown_seconds: parseInt(e.target.value) || 0 }))}
                 />
-                <span className="adm-hint" style={{ color: '#fbbf24', marginTop: '4px' }}>
-                  ⚠️ Важно: Укажите этот же кулдаун в настройках награды на самом Twitch.
-                </span>
               </div>
             </div>
 
-            {/* Twitch Reward Selector */}
-            <div className="adm-field">
-              <label className="adm-label">Награда Twitch</label>
-              {twitchRewardsLoading ? (
-                <div className="adm-hint">Загрузка наград Twitch...</div>
-              ) : twitchRewardsWarning && twitchRewards.length === 0 ? (
-                <div className="adm-warning-box">{twitchRewardsWarning}</div>
-              ) : (
-                <select
-                  className="adm-input"
-                  id="reward-twitch-id"
-                  value={form.twitch_reward_id ?? ''}
-                  onChange={e => {
-                    const selected = twitchRewards.find(tr => tr.id === e.target.value);
-                    setForm(f => ({
-                      ...f,
-                      twitch_reward_id: e.target.value,
-                      name: selected ? selected.title : '',
-                      cost: selected ? selected.cost : 0
-                    }));
-                  }}
-                >
-                  <option value="">— Выберите награду Twitch —</option>
-                  {twitchRewards.map(tr => (
-                    <option
-                      key={tr.id}
-                      value={tr.id}
-                      disabled={usedTwitchIds.has(tr.id) && form.twitch_reward_id !== tr.id}
-                    >
-                      {tr.title} — {tr.cost} баллов{usedTwitchIds.has(tr.id) && form.twitch_reward_id !== tr.id ? ' (уже привязана)' : ''}{!tr.is_enabled ? ' (выключена)' : ''}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <div className="adm-hint-row">
-                <span className="adm-hint">
-                  Выберите награду Channel Points, которую зрители будут покупать для активации этого действия.
-                </span>
-                <button
-                  type="button"
-                  className="adm-btn adm-btn-sm adm-btn-ghost"
-                  onClick={loadTwitchRewards}
-                  disabled={twitchRewardsLoading}
-                >
-                  ↻ Обновить
-                </button>
-              </div>
-            </div>
+
 
             <div className="adm-checkbox-row">
               <input
@@ -408,16 +339,9 @@ export default function CS2AdminPage() {
                     <div className="adm-reward-meta">
                       <span className="adm-badge adm-badge-cost">{r.cost} pts</span>
                       <span className="adm-badge">⏱ {r.cooldown_seconds}s</span>
-                      {linkedTwitch ? (
-                        <span className="adm-badge adm-badge-twitch" title={`Twitch: ${linkedTwitch.title}`}>
-                          🟣 {linkedTwitch.title}
-                        </span>
-                      ) : r.twitch_reward_id ? (
+                      {r.twitch_reward_id ? (
                         <span className="adm-badge adm-badge-id" title={r.twitch_reward_id}>
                           ID: {r.twitch_reward_id.substring(0, 8)}…
-                        </span>
-                      ) : (
-                        <span className="adm-badge adm-badge-warn">⚠ Не привязана</span>
                       )}
                     </div>
                   </div>

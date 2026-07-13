@@ -298,10 +298,29 @@
         block_jump:    '🚫',
         block_crouch:  '🦆',
         play_sound:    '🔊',
+        flash_screen:  '💥',
+        random_weapon_switch: '🎲',
+        invert_mouse:  '🔃',
+        low_sens_10:   '🐢',
+        high_sens_10:  '🐇',
       };
 
       const queueEl = document.getElementById('queue-container');
       const bannerEl = document.getElementById('banner-container');
+
+      // Create flash overlay div
+      const flashOverlay = document.createElement('div');
+      flashOverlay.style.position = 'fixed';
+      flashOverlay.style.inset = '0';
+      flashOverlay.style.backgroundColor = 'white';
+      flashOverlay.style.zIndex = '9999';
+      flashOverlay.style.opacity = '0';
+      flashOverlay.style.pointerEvents = 'none';
+      flashOverlay.style.transition = 'opacity 0.1s ease-out';
+      document.body.appendChild(flashOverlay);
+
+      const flashSound = new Audio('/sounds/flash.mp3');
+      const streamSound = new Audio('/sounds/stream.mp3');
 
       // Sound effect (Web Audio API — короткий позывной)
       let audioCtx = null;
@@ -339,6 +358,22 @@
         } catch(e) {}
       }
 
+      function triggerFlash() {
+        flashSound.currentTime = 0;
+        flashSound.play().catch(console.error);
+        flashOverlay.style.transition = 'opacity 0.1s ease-out';
+        flashOverlay.style.opacity = '1';
+        setTimeout(() => {
+          flashOverlay.style.transition = 'opacity 3s ease-in';
+          flashOverlay.style.opacity = '0';
+        }, 2000);
+      }
+
+      function triggerStreamSound() {
+        streamSound.currentTime = 0;
+        streamSound.play().catch(console.error);
+      }
+
       // Particle burst on completion
       function spawnParticles(x, y) {
         const burst = document.createElement('div');
@@ -364,7 +399,8 @@
       // ── State ──
       const shown = new Map(); // id → { el, status }
       let bannerTimer = null;
-      let lastSince = new Date(Date.now() - 30000).toISOString();
+      // We look back 60 seconds to ensure no events drop off while processing
+      let lastSince = new Date(Date.now() - 60000).toISOString();
 
       // ── Queue card management ──
       function getStatusIcon(status) {
@@ -450,7 +486,6 @@
       function showBanner(event) {
         if (bannerTimer) {
           clearTimeout(bannerTimer);
-          // remove existing
           const old = bannerEl.querySelector('.banner-card');
           if (old) { old.remove(); }
         }
@@ -485,23 +520,34 @@
 
       // ── Polling ──
       const seenForBanner = new Set();
+      const seenForEffects = new Set();
 
       async function poll() {
         if (!STREAMER_ID) return;
         try {
+          // Always fetch recent 60 seconds to avoid missing any events that took a while to process
+          lastSince = new Date(Date.now() - 60000).toISOString();
           const res = await fetch(`${BASE_URL}/api/cs2/overlay/events?streamerId=${STREAMER_ID}&since=${encodeURIComponent(lastSince)}`);
           if (!res.ok) return;
-          const { events, serverTime } = await res.json();
-
-          if (serverTime) lastSince = new Date(Date.now() - 5000).toISOString();
+          const { events } = await res.json();
 
           for (const ev of (events || [])) {
             addOrUpdateCard(ev);
 
-            // Show banner only for fresh pending events
+            // Banner on pending
             if (!seenForBanner.has(ev.id) && ev.status === 'pending') {
               seenForBanner.add(ev.id);
               showBanner(ev);
+            }
+
+            // Visual/Audio effects on processing or done
+            if (!seenForEffects.has(ev.id) && (ev.status === 'processing' || ev.status === 'done')) {
+              seenForEffects.add(ev.id);
+              if (ev.action_type === 'flash_screen') {
+                triggerFlash();
+              } else if (ev.action_type === 'play_sound') {
+                triggerStreamSound();
+              }
             }
           }
         } catch(e) {

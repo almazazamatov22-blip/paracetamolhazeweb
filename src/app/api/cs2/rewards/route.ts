@@ -46,6 +46,22 @@ export async function GET(req: NextRequest) {
   }
 }
 
+const ACTION_DESCRIPTIONS: Record<string, string> = {
+  drop_weapon: 'Выбрасывает активное оружие в руках.',
+  freeze_3: 'Замораживает на 3 секунды.',
+  freeze_5: 'Замораживает на 5 секунд.',
+  spin_180: 'Мгновенный разворот на 180 градусов.',
+  block_jump: 'Блокирует прыжок на 30 секунд.',
+  block_crouch: 'Блокирует приседание на 30 секунд.',
+  play_sound: 'Проигрывает звук на стриме.',
+  mouse_shake: 'Трясет прицел 5 секунд.',
+  flash_screen: 'Белая вспышка на экране стрима.',
+  random_weapon_switch: 'Случайное переключение оружия.',
+  invert_mouse: 'Инверсия мыши на 10 секунд.',
+  low_sens_10: 'Очень низкая чувствительность на 10 секунд.',
+  high_sens_10: 'Очень высокая чувствительность на 10 секунд.',
+};
+
 // POST — создать награду
 export async function POST(req: NextRequest) {
   try {
@@ -57,24 +73,57 @@ export async function POST(req: NextRequest) {
     if (!streamerId) return NextResponse.json({ error: 'Auth failed' }, { status: 401 });
 
     const body = await req.json();
-    const { name, description, action_type, cost, cooldown_seconds, enabled } = body;
+    const { name, action_type, cost, cooldown_seconds } = body;
 
-    if (!name || !action_type) {
-      return NextResponse.json({ error: 'name and action_type required' }, { status: 400 });
+    if (!name || !action_type || !cost) {
+      return NextResponse.json({ error: 'name, action_type, cost required' }, { status: 400 });
     }
 
+    const desc = ACTION_DESCRIPTIONS[action_type] || '';
+    const prompt = `${desc}\n\nby paracetamolhaze.ru`;
+    const cd = Number(cooldown_seconds) || 0;
+
+    // Create on Twitch
+    const clientId = process.env.TWITCH_CLIENT_ID;
+    const twitchRes = await fetch(`https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${streamerId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Client-Id': clientId!,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        title: name,
+        cost: Number(cost),
+        prompt: prompt,
+        is_enabled: true,
+        background_color: '#6366f1',
+        is_global_cooldown_enabled: cd > 0,
+        global_cooldown_seconds: cd > 0 ? cd : undefined
+      })
+    });
+
+    const twitchData = await twitchRes.json();
+    if (!twitchRes.ok) {
+      console.error('Twitch Create Reward Error:', twitchData);
+      return NextResponse.json({ error: twitchData.message || 'Twitch API Error' }, { status: twitchRes.status });
+    }
+
+    const twitchRewardId = twitchData.data[0].id;
+
+    // Save in Supabase
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('cs2_rewards')
       .insert({
         streamer_id: streamerId,
         name,
-        description: description ?? '',
+        description: prompt,
         action_type,
-        cost: cost ?? 100,
-        cooldown_seconds: cooldown_seconds ?? 30,
-        enabled: enabled ?? true,
-        twitch_reward_id: body.twitch_reward_id ?? null,
+        cost: Number(cost),
+        cooldown_seconds: cd,
+        enabled: true,
+        twitch_reward_id: twitchRewardId,
       })
       .select()
       .single();
@@ -146,6 +195,26 @@ export async function DELETE(req: NextRequest) {
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
     const supabase = getSupabase();
+    // Get twitch_reward_id before deleting
+    const { data: reward } = await supabase
+      .from('cs2_rewards')
+      .select('twitch_reward_id')
+      .eq('id', id)
+      .eq('streamer_id', streamerId)
+      .single();
+
+    if (reward?.twitch_reward_id) {
+      // Try to delete from Twitch
+      const clientId = process.env.TWITCH_CLIENT_ID;
+      await fetch(`https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${streamerId}&id=${reward.twitch_reward_id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Client-Id': clientId!
+        }
+      }).catch(e => console.error('Failed to delete on twitch:', e));
+    }
+
     const { error } = await supabase
       .from('cs2_rewards')
       .delete()
