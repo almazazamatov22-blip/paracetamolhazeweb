@@ -199,6 +199,7 @@ export default function CS2AdminPage() {
   }
 
   // 
+  return (
     <main className="adm-page">
       {/* Header */}
       <header className="adm-header">
