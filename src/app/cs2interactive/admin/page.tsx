@@ -16,6 +16,7 @@ const ACTION_OPTIONS = [
   { value: 'invert_mouse', label: '🔃 Инверсия мыши 10 сек' },
   { value: 'low_sens_10',  label: '🐢 Низкая чувств. 10 сек' },
   { value: 'high_sens_10', label: '🐇 Высокая чувств. 10 сек' },
+  { value: 'spinbot',      label: '🌪️ Крутилка (Spinbot) 10 сек' },
 ]
 
 type Reward = {
