@@ -250,7 +250,7 @@
       height: 3px;
       background: linear-gradient(90deg, #1ed760, #0aad48);
       border-radius: 0 0 20px 20px;
-      animation: cs2-progress 4s linear forwards;
+      animation: cs2-progress var(--banner-dur, 4s) linear forwards;
     }
 
     @keyframes cs2-progress {
@@ -280,7 +280,6 @@
   </style>
 </head>
 <body>
-  <div id="queue-container"></div>
   <div id="banner-container"></div>
 
   <script>
@@ -305,7 +304,22 @@
         high_sens_10:  '🐇',
       };
 
-      const queueEl = document.getElementById('queue-container');
+      const ACTION_DURATIONS = {
+        drop_weapon: 2000,
+        freeze_3: 3000,
+        freeze_5: 5000,
+        spin_180: 2000,
+        block_jump: 30000,
+        block_crouch: 30000,
+        play_sound: 5000,
+        mouse_shake: 5000,
+        flash_screen: 2000,
+        random_weapon_switch: 2000,
+        invert_mouse: 10000,
+        low_sens_10: 10000,
+        high_sens_10: 10000
+      };
+
       const bannerEl = document.getElementById('banner-container');
 
       // Create flash overlay div
@@ -321,42 +335,6 @@
 
       const flashSound = new Audio('/sounds/flash.mp3');
       const streamSound = new Audio('/sounds/stream.mp3');
-
-      // Sound effect (Web Audio API — короткий позывной)
-      let audioCtx = null;
-      function getAudioCtx() {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        return audioCtx;
-      }
-
-      function playActivationSound() {
-        try {
-          const ctx = getAudioCtx();
-          const osc1 = ctx.createOscillator();
-          const osc2 = ctx.createOscillator();
-          const gain = ctx.createGain();
-
-          osc1.connect(gain);
-          osc2.connect(gain);
-          gain.connect(ctx.destination);
-
-          osc1.type = 'sine';
-          osc1.frequency.setValueAtTime(880, ctx.currentTime);
-          osc1.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.15);
-
-          osc2.type = 'triangle';
-          osc2.frequency.setValueAtTime(440, ctx.currentTime);
-          osc2.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.2);
-
-          gain.gain.setValueAtTime(0.2, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-
-          osc1.start(ctx.currentTime);
-          osc1.stop(ctx.currentTime + 0.4);
-          osc2.start(ctx.currentTime);
-          osc2.stop(ctx.currentTime + 0.4);
-        } catch(e) {}
-      }
 
       function triggerFlash() {
         flashSound.currentTime = 0;
@@ -396,91 +374,10 @@
         setTimeout(() => burst.remove(), 900);
       }
 
-      // ── State ──
-      const shown = new Map(); // id → { el, status }
+
+
       let bannerTimer = null;
-      // We look back 60 seconds to ensure no events drop off while processing
       let lastSince = new Date(Date.now() - 60000).toISOString();
-
-      // ── Queue card management ──
-      function getStatusIcon(status) {
-        if (status === 'pending')    return '⏳';
-        if (status === 'processing') return '⚡';
-        if (status === 'done')       return '✅';
-        if (status === 'error')      return '❌';
-        return '❓';
-      }
-
-      function createCard(event) {
-        const card = document.createElement('div');
-        card.className = `notif-card status-${event.status}`;
-        card.id = 'card-' + event.id;
-
-        const icon = ACTION_ICONS[event.action_type] || '🎮';
-
-        card.innerHTML = `
-          ${event.user_avatar
-            ? `<img class="notif-avatar" src="${event.user_avatar}" alt="${event.user_name}" onerror="this.style.display='none'" />`
-            : `<div class="notif-avatar-placeholder">${icon}</div>`
-          }
-          <div class="notif-info">
-            <div class="notif-user">${event.user_name}</div>
-            <div class="notif-reward">${event.reward_name || event.action_type}</div>
-            <div class="notif-action">${event.action_type}</div>
-          </div>
-          <div class="notif-status-icon">${getStatusIcon(event.status)}</div>
-        `;
-
-        return card;
-      }
-
-      function addOrUpdateCard(event) {
-        const existing = shown.get(event.id);
-
-        if (existing) {
-          // Обновить статус
-          if (existing.status === event.status) return;
-          existing.status = event.status;
-          existing.el.className = `notif-card status-${event.status} enter`;
-          const si = existing.el.querySelector('.notif-status-icon');
-          if (si) si.textContent = getStatusIcon(event.status);
-
-          if (event.status === 'done') {
-            const rect = existing.el.getBoundingClientRect();
-            spawnParticles(rect.left + rect.width / 2, rect.top + rect.height / 2);
-            setTimeout(() => removeCard(event.id), 3000);
-          } else if (event.status === 'error') {
-            setTimeout(() => removeCard(event.id), 5000);
-          }
-          return;
-        }
-
-        // Новая карточка
-        const card = createCard(event);
-        queueEl.prepend(card);
-
-        // Trigger enter animation next frame
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => { card.classList.add('enter'); });
-        });
-
-        shown.set(event.id, { el: card, status: event.status });
-
-        // Auto-remove after timeout
-        const removeDelay = event.status === 'done' ? 3000 : event.status === 'error' ? 5000 : 20000;
-        setTimeout(() => removeCard(event.id), removeDelay);
-      }
-
-      function removeCard(id) {
-        const entry = shown.get(id);
-        if (!entry) return;
-        entry.el.classList.remove('enter');
-        entry.el.classList.add('exit');
-        setTimeout(() => {
-          entry.el.remove();
-          shown.delete(id);
-        }, 400);
-      }
 
       // ── Banner (big central notification) ──
       function showBanner(event) {
@@ -490,12 +387,13 @@
           if (old) { old.remove(); }
         }
 
-        playActivationSound();
-
         const icon = ACTION_ICONS[event.action_type] || '🎮';
+        const durationMs = ACTION_DURATIONS[event.action_type] || 4000;
+
         const card = document.createElement('div');
         card.className = 'banner-card enter';
         card.style.position = 'relative';
+        card.style.setProperty('--banner-dur', (durationMs / 1000) + 's');
         card.innerHTML = `
           ${event.user_avatar
             ? `<img class="banner-avatar" src="${event.user_avatar}" alt="" onerror="this.style.display='none'" />`
@@ -515,7 +413,7 @@
           card.classList.remove('enter');
           card.classList.add('exit');
           setTimeout(() => card.remove(), 450);
-        }, 4000);
+        }, durationMs);
       }
 
       // ── Polling ──
@@ -532,8 +430,6 @@
           const { events } = await res.json();
 
           for (const ev of (events || [])) {
-            addOrUpdateCard(ev);
-
             // Banner on pending
             if (!seenForBanner.has(ev.id) && ev.status === 'pending') {
               seenForBanner.add(ev.id);
@@ -556,7 +452,7 @@
       }
 
       if (!STREAMER_ID) {
-        queueEl.innerHTML = '<div style="color:rgba(255,255,255,0.3);padding:12px;font-size:13px;">⚠️ streamerId не задан в URL</div>';
+        console.warn('⚠️ streamerId не задан в URL');
       } else {
         poll();
         setInterval(poll, POLL_INTERVAL);
