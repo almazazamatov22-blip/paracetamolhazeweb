@@ -339,9 +339,10 @@ export default function CS2AdminPage() {
                     <div className="adm-reward-meta">
                       <span className="adm-badge adm-badge-cost">{r.cost} pts</span>
                       <span className="adm-badge">⏱ {r.cooldown_seconds}s</span>
-                      {r.twitch_reward_id ? (
+                      {r.twitch_reward_id && (
                         <span className="adm-badge adm-badge-id" title={r.twitch_reward_id}>
                           ID: {r.twitch_reward_id.substring(0, 8)}…
+                        </span>
                       )}
                     </div>
                   </div>
