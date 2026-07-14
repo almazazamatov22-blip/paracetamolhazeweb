@@ -70,9 +70,9 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
     actionType: 'play_sound',
     label: 'Звук на стриме',
     icon: '🔊',
-    durationMs: 5000,
+    durationMs: 2000,
     effectType: 'audio',
-    description: 'Воспроизводит звуковой эффект.',
+    description: 'Воспроизводит звук; уведомление показывается 2 секунды.',
   },
   mouse_shake: {
     actionType: 'mouse_shake',
@@ -88,7 +88,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
     icon: '💥',
     durationMs: 2000,
     effectType: 'overlay',
-    description: 'Белая вспышка на оверлее на 1 секунду.',
+    description: 'Сильная белая вспышка поверх окна CS2 на 2 секунды.',
   },
   random_weapon_switch: {
     actionType: 'random_weapon_switch',
