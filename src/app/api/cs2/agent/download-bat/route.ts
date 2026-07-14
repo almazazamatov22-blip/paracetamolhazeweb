@@ -63,44 +63,26 @@ set NODE_BIN=node_portable\\node.exe
 :download_agent
 
 echo [+] Загрузка скрипта агента...
+set UPDATER_URL=%BASE_URL%/api/cs2/agent/updater?t=%RANDOM%
+powershell -NoProfile -Command "$ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -ErrorAction Stop -Uri '%UPDATER_URL%' -OutFile 'update-cs2-agent.ps1.tmp'"
 
-echo $ErrorActionPreference = 'Stop' > download.ps1
-echo [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 >> download.ps1
-echo $health = $null >> download.ps1
-echo try { $health = Invoke-RestMethod -Uri '%BASE_URL%/api/cs2/agent/health' -UseBasicParsing; Write-Host '[+] Ожидаемая версия:' $health.agentVersion } catch { Write-Host '[!] Health check недоступен.' } >> download.ps1
-echo $urls = @('%BASE_URL%/api/cs2/agent/download?t=%RANDOM%', '%BASE_URL%/cs2-agent.js?t=%RANDOM%') >> download.ps1
-echo $success = $false >> download.ps1
-echo foreach ($url in $urls) { >> download.ps1
-echo     try { >> download.ps1
-echo         Write-Host '[+] Пробуем скачать с:' $url >> download.ps1
-echo         Invoke-WebRequest -Uri $url -OutFile 'cs2-agent.js.tmp' -UseBasicParsing >> download.ps1
-echo         if ((Get-Item 'cs2-agent.js.tmp').Length -lt 10240) { throw 'Файл слишком мал' } >> download.ps1
-echo         $content = Get-Content 'cs2-agent.js.tmp' -Raw >> download.ps1
-echo         if ($content -notmatch 'CS2 Interactive Local Agent' -or $content -notmatch 'AGENT_VERSION') { throw 'Файл не прошел проверку содержимого' } >> download.ps1
-echo         if ($health -and $health.sha256) { >> download.ps1
-echo             $hash = (Get-FileHash 'cs2-agent.js.tmp' -Algorithm SHA256).Hash.ToLower() >> download.ps1
-echo             if ($hash -ne $health.sha256.ToLower()) { throw 'SHA-256 хеш не совпадает' } >> download.ps1
-echo         } >> download.ps1
-echo         $success = $true >> download.ps1
-echo         break >> download.ps1
-echo     } catch { >> download.ps1
-echo         Write-Host '[!] Ошибка:' $_.Exception.Message >> download.ps1
-echo     } >> download.ps1
-echo } >> download.ps1
-echo if (-not $success) { exit 1 } >> download.ps1
-echo if (Test-Path 'cs2-agent.js') { Copy-Item 'cs2-agent.js' 'cs2-agent.js.backup' -Force } >> download.ps1
-echo Move-Item 'cs2-agent.js.tmp' 'cs2-agent.js' -Force >> download.ps1
+if exist update-cs2-agent.ps1.tmp (
+    move /y update-cs2-agent.ps1.tmp update-cs2-agent.ps1 >nul
+) else (
+    if not exist update-cs2-agent.ps1 (
+        echo [ERROR] Не удалось скачать скрипт обновления и локальная копия отсутствует.
+        pause
+        exit /b 1
+    )
+)
 
-powershell -ExecutionPolicy Bypass -File download.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\\update-cs2-agent.ps1" -BaseUrl "%BASE_URL%"
 set PSERR=%errorlevel%
-del download.ps1
 
 if %PSERR% neq 0 (
-    echo [❌] Не удалось обновить cs2-agent.js
-    if exist cs2-agent.js (
-        echo [!] Использую старую рабочую копию.
-    ) else (
-        echo [❌] Агент не найден. Остановка.
+    echo [ERROR] Ошибка при обновлении cs2-agent.js
+    if not exist cs2-agent.js (
+        echo [ERROR] Агент не найден. Остановка.
         pause
         exit /b 1
     )
@@ -113,8 +95,11 @@ echo title CS2 Interactive Agent Setup >> start.bat
 echo set STREAMER_ID=%STREAMER_ID% >> start.bat
 echo set BASE_URL=%BASE_URL% >> start.bat
 echo echo [+] Проверка обновлений... >> start.bat
-echo copy /y "%%~f0" start.bat.tmp ^>nul >> start.bat
-echo :: Shortcut to run script directly since download happens dynamically above if needed >> start.bat
+echo set UPDATER_URL=%%BASE_URL%%/api/cs2/agent/updater?t=%%RANDOM%% >> start.bat
+echo powershell -NoProfile -Command "$ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -ErrorAction SilentlyContinue -Uri '%%UPDATER_URL%%' -OutFile 'update-cs2-agent.ps1.tmp'" >> start.bat
+echo if exist update-cs2-agent.ps1.tmp move /y update-cs2-agent.ps1.tmp update-cs2-agent.ps1 ^>nul >> start.bat
+echo if exist update-cs2-agent.ps1 powershell -NoProfile -ExecutionPolicy Bypass -File ".\\update-cs2-agent.ps1" -BaseUrl "%%BASE_URL%%" >> start.bat
+echo if not exist cs2-agent.js exit /b 1 >> start.bat
 if "%NODE_BIN%"=="node" (
     echo node cs2-agent.js --streamerId=%STREAMER_ID% --baseUrl=%BASE_URL% >> start.bat
 ) else (

@@ -350,6 +350,11 @@ class HookApp : Form
                                 {
                                     SendMouseMove(sendX, sendY, INJECTED_TAG);
                                 }
+                            } else {
+                                IntPtr cs2Wnd = GetCs2Handle();
+                                if (cs2Wnd != IntPtr.Zero && GetForegroundWindow() == cs2Wnd) {
+                                    SendMouseMove(-lLastX, -lLastY, INJECTED_TAG);
+                                }
                             }
                         }
                     }
@@ -907,7 +912,7 @@ async function apiGetTask() {
 
 async function setTaskStatus(taskId, status, errorMsg = null, requirePending = false) {
   if (taskId.startsWith('test_')) {
-    return { duration_ms: 2000 };
+    return {};
   }
   
   let url = `${supabaseUrl}/rest/v1/cs2_reward_queue?id=eq.${taskId}`;
