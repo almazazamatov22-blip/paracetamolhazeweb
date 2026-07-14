@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/download/cs2haze",
-        destination: "https://github.com/almazazamatov22-blip/paracetamolhazeweb/releases/download/cs2haze-v2.0.6.2/CS2Haze-Setup.exe",
+        destination: "https://github.com/almazazamatov22-blip/paracetamolhazeweb/releases/download/cs2haze-v2.0.6.3/CS2Haze-Setup.exe",
         permanent: false,
       },
       {
