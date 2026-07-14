@@ -63,19 +63,47 @@ set NODE_BIN=node_portable\\node.exe
 :download_agent
 
 echo [+] Загрузка скрипта агента...
-set AGENT_URL=%BASE_URL%/api/cs2/agent/download?t=%RANDOM%
-powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%AGENT_URL%' -OutFile 'cs2-agent.js.tmp'"
 
-if not exist cs2-agent.js.tmp (
-    echo [❌] Не удалось скачать cs2-agent.js.tmp
+echo $ErrorActionPreference = 'Stop' > download.ps1
+echo [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 >> download.ps1
+echo $health = $null >> download.ps1
+echo try { $health = Invoke-RestMethod -Uri '%BASE_URL%/api/cs2/agent/health' -UseBasicParsing; Write-Host '[+] Ожидаемая версия:' $health.agentVersion } catch { Write-Host '[!] Health check недоступен.' } >> download.ps1
+echo $urls = @('%BASE_URL%/api/cs2/agent/download?t=%RANDOM%', '%BASE_URL%/cs2-agent.js?t=%RANDOM%') >> download.ps1
+echo $success = $false >> download.ps1
+echo foreach ($url in $urls) { >> download.ps1
+echo     try { >> download.ps1
+echo         Write-Host '[+] Пробуем скачать с:' $url >> download.ps1
+echo         Invoke-WebRequest -Uri $url -OutFile 'cs2-agent.js.tmp' -UseBasicParsing >> download.ps1
+echo         if ((Get-Item 'cs2-agent.js.tmp').Length -lt 10240) { throw 'Файл слишком мал' } >> download.ps1
+echo         $content = Get-Content 'cs2-agent.js.tmp' -Raw >> download.ps1
+echo         if ($content -notmatch 'CS2 Interactive Local Agent' -or $content -notmatch 'AGENT_VERSION') { throw 'Файл не прошел проверку содержимого' } >> download.ps1
+echo         if ($health -and $health.sha256) { >> download.ps1
+echo             $hash = (Get-FileHash 'cs2-agent.js.tmp' -Algorithm SHA256).Hash.ToLower() >> download.ps1
+echo             if ($hash -ne $health.sha256.ToLower()) { throw 'SHA-256 хеш не совпадает' } >> download.ps1
+echo         } >> download.ps1
+echo         $success = $true >> download.ps1
+echo         break >> download.ps1
+echo     } catch { >> download.ps1
+echo         Write-Host '[!] Ошибка:' $_.Exception.Message >> download.ps1
+echo     } >> download.ps1
+echo } >> download.ps1
+echo if (-not $success) { exit 1 } >> download.ps1
+echo if (Test-Path 'cs2-agent.js') { Copy-Item 'cs2-agent.js' 'cs2-agent.js.backup' -Force } >> download.ps1
+echo Move-Item 'cs2-agent.js.tmp' 'cs2-agent.js' -Force >> download.ps1
+
+powershell -ExecutionPolicy Bypass -File download.ps1
+set PSERR=%errorlevel%
+del download.ps1
+
+if %PSERR% neq 0 (
+    echo [❌] Не удалось обновить cs2-agent.js
     if exist cs2-agent.js (
-        echo [!] Использую старую закэшированную версию.
+        echo [!] Использую старую рабочую копию.
     ) else (
+        echo [❌] Агент не найден. Остановка.
         pause
         exit /b 1
     )
-) else (
-    move /y cs2-agent.js.tmp cs2-agent.js >nul
 )
 
 :: Create a start.bat shortcut for future quick runs
@@ -85,9 +113,8 @@ echo title CS2 Interactive Agent Setup >> start.bat
 echo set STREAMER_ID=%STREAMER_ID% >> start.bat
 echo set BASE_URL=%BASE_URL% >> start.bat
 echo echo [+] Проверка обновлений... >> start.bat
-echo set AGENT_URL=%%BASE_URL%%/api/cs2/agent/download?t=%%RANDOM%% >> start.bat
-echo powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%%AGENT_URL%%' -OutFile 'cs2-agent.js.tmp' -UseBasicParsing" >> start.bat
-echo if exist cs2-agent.js.tmp move /y cs2-agent.js.tmp cs2-agent.js ^>nul >> start.bat
+echo copy /y "%%~f0" start.bat.tmp ^>nul >> start.bat
+echo :: Shortcut to run script directly since download happens dynamically above if needed >> start.bat
 if "%NODE_BIN%"=="node" (
     echo node cs2-agent.js --streamerId=%STREAMER_ID% --baseUrl=%BASE_URL% >> start.bat
 ) else (
