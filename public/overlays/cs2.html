@@ -164,6 +164,19 @@
       width: 28px;
       text-align: center;
     }
+    /* ── Full-screen flash for OBS ──
+       Kept below the notification banner so the notification remains visible. */
+    #flash-overlay {
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 5;
+      will-change: opacity;
+    }
+
+
 
     /* ── Big activation banner (center-bottom) ── */
     #banner-container {
@@ -280,6 +293,7 @@
   </style>
 </head>
 <body>
+  <div id="flash-overlay"></div>
   <div id="banner-container"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -292,12 +306,39 @@
         let ACTION_REGISTRY = {};
 
         const bannerEl = document.getElementById('banner-container');
+        const flashOverlayEl = document.getElementById('flash-overlay');
         const flashSound = new Audio('/sounds/flash.mp3');
         const streamSound = new Audio('/sounds/stream.mp3');
 
-        function triggerFlash() {
+        let flashVisualTimer = null;
+        let flashFadeTimer = null;
+
+        function triggerFlash(durationMs = 3000) {
           flashSound.currentTime = 0;
           flashSound.play().catch(console.error);
+
+          const totalMs = Math.max(3000, Number(durationMs) || 3000);
+          const holdMs = Math.min(1200, Math.max(1000, Math.round(totalMs / 3)));
+          const fadeMs = Math.max(300, totalMs - holdMs);
+
+          if (flashVisualTimer) clearTimeout(flashVisualTimer);
+          if (flashFadeTimer) clearTimeout(flashFadeTimer);
+
+          flashOverlayEl.style.transition = 'none';
+          flashOverlayEl.style.opacity = '1';
+
+          // Force style application so repeated rewards restart the flash.
+          void flashOverlayEl.offsetWidth;
+
+          flashVisualTimer = setTimeout(() => {
+            flashOverlayEl.style.transition = `opacity ${fadeMs}ms linear`;
+            flashOverlayEl.style.opacity = '0';
+          }, holdMs);
+
+          flashFadeTimer = setTimeout(() => {
+            flashOverlayEl.style.transition = 'none';
+            flashOverlayEl.style.opacity = '0';
+          }, totalMs + 100);
         }
 
         function triggerStreamSound() {
@@ -411,7 +452,7 @@
           if (effectHasStarted && !seenForEffects.has(ev.id)) {
             seenForEffects.add(ev.id);
             if (ev.action_type === 'flash_screen') {
-              triggerFlash();
+              triggerFlash(getDurationMs(ev));
             } else if (ev.action_type === 'play_sound') {
               triggerStreamSound();
             }

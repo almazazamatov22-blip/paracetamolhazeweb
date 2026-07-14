@@ -18,7 +18,7 @@ const STREAMER_ID = String(process.env.CS2_STREAMER_ID || args.streamerId || '')
 const AGENT_SECRET = process.env.CS2_AGENT_SECRET || args.agentSecret || '';
 const POLL_MS = parseInt(process.env.CS2_POLL_MS || args.pollMs || '500');
 
-const AGENT_VERSION = "2.0.4";
+const AGENT_VERSION = "2.0.5";
 console.log(`[CS2 Agent] Запуск версии ${AGENT_VERSION}`);
 
 if (!STREAMER_ID) {
@@ -443,7 +443,6 @@ class HookApp : Form
 
     class NoActivateFlashForm : Form
     {
-        const int WS_EX_LAYERED = 0x00080000;
         const int WS_EX_TRANSPARENT = 0x00000020;
         const int WS_EX_TOOLWINDOW = 0x00000080;
         const int WS_EX_NOACTIVATE = 0x08000000;
@@ -460,7 +459,11 @@ class HookApp : Form
             get
             {
                 CreateParams cp = base.CreateParams;
-                cp.ExStyle |= WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
+
+                // Do not add WS_EX_LAYERED here. A manually-layered window without
+                // SetLayeredWindowAttributes/UpdateLayeredWindow may be fully invisible.
+                // WinForms will add layered rendering itself when Opacity drops below 1.
+                cp.ExStyle |= WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
                 return cp;
             }
         }
@@ -503,39 +506,49 @@ class HookApp : Form
 
         if (activeFlashForm != null && !activeFlashForm.IsDisposed) {
             try {
-                activeFlashForm.Invoke((MethodInvoker)delegate {
+                activeFlashForm.BeginInvoke((MethodInvoker)delegate {
                     activeFlashForm.Close();
                 });
             } catch {}
         }
 
-        ThreadPool.QueueUserWorkItem(_ => {
-            NoActivateFlashForm flashForm = new NoActivateFlashForm();
-            activeFlashForm = flashForm;
-            flashForm.FormBorderStyle = FormBorderStyle.None;
-            flashForm.StartPosition = FormStartPosition.Manual;
-            flashForm.BackColor = Color.White;
-            flashForm.ShowInTaskbar = false;
-            flashForm.Location = new Point(pt.X, pt.Y);
-            flashForm.Size = new Size(rect.Width, rect.Height);
-            flashForm.Opacity = 1.0;
+        Thread flashThread = new Thread(() => {
+            try {
+                NoActivateFlashForm flashForm = new NoActivateFlashForm();
+                activeFlashForm = flashForm;
+                flashForm.FormBorderStyle = FormBorderStyle.None;
+                flashForm.StartPosition = FormStartPosition.Manual;
+                flashForm.BackColor = Color.White;
+                flashForm.ShowInTaskbar = false;
+                flashForm.Location = new Point(pt.X, pt.Y);
+                flashForm.Size = new Size(rect.Width, rect.Height);
 
-            // Creating and showing the window with explicit NOACTIVATE flags avoids
-            // the alt-tab-like focus/cursor flash caused by Form.Show()/TopMost.
-            IntPtr flashHandle = flashForm.Handle;
-            ShowWindow(flashHandle, SW_SHOWNOACTIVATE);
-            SetWindowPos(
-                flashHandle,
-                HWND_TOPMOST,
-                pt.X,
-                pt.Y,
-                rect.Width,
-                rect.Height,
-                SWP_NOACTIVATE | SWP_SHOWWINDOW
-            );
+                // Accessing Handle creates the native window on this STA thread.
+                IntPtr flashHandle = flashForm.Handle;
 
-            Application.Run(new FlashApplicationContext(flashForm, cmdId, this, durationMs));
+                // Keep CS2 foreground: show without activation and make the window
+                // click-through. No Form.Show(), no Activate(), no focus stealing.
+                ShowWindow(flashHandle, SW_SHOWNOACTIVATE);
+                SetWindowPos(
+                    flashHandle,
+                    HWND_TOPMOST,
+                    pt.X,
+                    pt.Y,
+                    rect.Width,
+                    rect.Height,
+                    SWP_NOACTIVATE | SWP_SHOWWINDOW
+                );
+
+                Application.Run(new FlashApplicationContext(flashForm, cmdId, this, durationMs));
+            } catch (Exception ex) {
+                Console.WriteLine("ERROR " + cmdId + " " + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(ex.Message)));
+                Console.Out.Flush();
+            }
         });
+
+        flashThread.IsBackground = true;
+        flashThread.SetApartmentState(ApartmentState.STA);
+        flashThread.Start();
     }
 
     class FlashApplicationContext : ApplicationContext {
@@ -552,12 +565,13 @@ class HookApp : Form
             f = form;
             cmdId = commandId;
             app = mainApp;
-
-            // Slower and stronger than v2.0.3:
-            // at least 1 second fully white, then a long smooth fade.
             totalMs = Math.Max(3000, durationMs);
             holdMs = Math.Min(1200, Math.Max(1000, totalMs / 3));
             startedAt = DateTime.UtcNow;
+
+            // The first phase is an ordinary opaque white window. Once fading
+            // begins, WinForms enables layered opacity automatically.
+            f.Opacity = 1.0;
 
             fadeTimer = new System.Windows.Forms.Timer();
             fadeTimer.Interval = 16;
@@ -584,13 +598,13 @@ class HookApp : Form
             }
 
             if (elapsedMs <= holdMs) {
-                f.Opacity = 1.0;
+                if (f.Opacity != 1.0) f.Opacity = 1.0;
                 return;
             }
 
             double fadeDuration = Math.Max(1.0, totalMs - holdMs);
             double progress = (elapsedMs - holdMs) / fadeDuration;
-            f.Opacity = Math.Max(0.0, 1.0 - progress);
+            f.Opacity = Math.Max(0.01, 1.0 - progress);
         }
     }
 
