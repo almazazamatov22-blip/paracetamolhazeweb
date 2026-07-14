@@ -33,75 +33,46 @@ public sealed class AuthService(HttpClient http, LauncherConfig config, StorageS
         CancellationToken cancellationToken
     )
     {
-        var deviceId = GetDeviceId();
-        using var startResponse = await http.PostAsJsonAsync(
-            $"{config.ApiBaseUrl}/api/cs2/launcher/auth/start",
-            new { deviceId, app = "cs2haze" },
-            cancellationToken
-        );
-        startResponse.EnsureSuccessStatusCode();
-
-        var flow = await startResponse.Content.ReadFromJsonAsync<DeviceStartResponse>(
-            cancellationToken: cancellationToken
-        ) ?? throw new InvalidOperationException("Сервер не вернул данные авторизации.");
-
+        var connectUrl = "https://paracetamolhaze.ru/cs2haze/connect";
         Process.Start(new ProcessStartInfo
         {
-            FileName = flow.VerificationUrl,
+            FileName = connectUrl,
             UseShellExecute = true,
         });
 
         setStatus("Подтвердите вход на открывшемся сайте…");
 
-        while (DateTimeOffset.UtcNow < flow.ExpiresAt)
+        var tokenPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "cs2haze", "pending-connect-token.txt");
+        if (File.Exists(tokenPath)) File.Delete(tokenPath);
+
+        var expireTime = DateTimeOffset.UtcNow.AddMinutes(5);
+
+        while (DateTimeOffset.UtcNow < expireTime)
         {
-            await Task.Delay(TimeSpan.FromSeconds(Math.Max(1, flow.IntervalSeconds)), cancellationToken);
+            await Task.Delay(1000, cancellationToken);
 
-            using var pollResponse = await http.PostAsJsonAsync(
-                $"{config.ApiBaseUrl}/api/cs2/launcher/auth/poll",
-                new { deviceCode = flow.DeviceCode, deviceId },
-                cancellationToken
-            );
+            if (File.Exists(tokenPath))
+            {
+                var token = await File.ReadAllTextAsync(tokenPath, cancellationToken);
+                try { File.Delete(tokenPath); } catch { }
 
-            if (!pollResponse.IsSuccessStatusCode) continue;
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    using var request = new HttpRequestMessage(
+                        HttpMethod.Post,
+                        $"{config.ApiBaseUrl}/api/cs2/launcher/auth/claim"
+                    );
+                    request.Content = JsonContent.Create(new { token });
+                    using var response = await http.SendAsync(request, cancellationToken);
+                    response.EnsureSuccessStatusCode();
 
-            var poll = await pollResponse.Content.ReadFromJsonAsync<DevicePollResponse>(
-                cancellationToken: cancellationToken
-            );
-            if (poll is null || poll.Status == "pending") continue;
-            if (poll.Status == "denied") throw new InvalidOperationException("Вход отклонён.");
-            if (poll.Status != "approved" || string.IsNullOrWhiteSpace(poll.AccessToken))
-                continue;
-
-            using var sessionRequest = new HttpRequestMessage(
-                HttpMethod.Get,
-                $"{config.ApiBaseUrl}/api/cs2/launcher/session"
-            );
-            sessionRequest.Headers.Authorization =
-                new AuthenticationHeaderValue("Bearer", poll.AccessToken);
-
-            using var sessionResponse = await http.SendAsync(sessionRequest, cancellationToken);
-            sessionResponse.EnsureSuccessStatusCode();
-
-            var session = await sessionResponse.Content.ReadFromJsonAsync<LauncherSession>(
-                cancellationToken: cancellationToken
-            ) ?? throw new InvalidOperationException("Не удалось получить сессию.");
-
-            session.AccessToken = poll.AccessToken;
-            session.RefreshToken = poll.RefreshToken;
-            return session;
+                    return await response.Content.ReadFromJsonAsync<LauncherSession>(
+                        cancellationToken: cancellationToken
+                    ) ?? throw new InvalidOperationException("Сервер не вернул данные сессии.");
+                }
+            }
         }
 
         throw new TimeoutException("Время подтверждения входа истекло.");
-    }
-
-    private static string GetDeviceId()
-    {
-        var raw = $"{Environment.MachineName}|{Environment.UserName}|cs2haze";
-        return Convert.ToHexString(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(raw)
-            )
-        ).ToLowerInvariant();
     }
 }

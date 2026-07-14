@@ -31,6 +31,12 @@ Source: "..\dist\runtime\*"; DestDir: "{app}\runtime"; Flags: ignoreversion recu
 Source: "..\assets\cs2haze.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
 Source: "..\launcher\launcher-config.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
 
+[Registry]
+Root: HKCU; Subkey: "Software\Classes\cs2haze"; ValueType: string; ValueData: "URL:cs2haze Protocol"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\cs2haze"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\cs2haze\DefaultIcon"; ValueType: string; ValueData: "{app}\cs2haze.exe,0"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\cs2haze\shell\open\command"; ValueType: string; ValueData: """{app}\cs2haze.exe"" ""%1"""; Flags: uninsdeletekey
+
 [Icons]
 Name: "{autodesktop}\cs2haze"; Filename: "{app}\cs2haze.exe"; IconFilename: "{app}\Assets\cs2haze.ico"
 Name: "{group}\cs2haze"; Filename: "{app}\cs2haze.exe"; IconFilename: "{app}\Assets\cs2haze.ico"
