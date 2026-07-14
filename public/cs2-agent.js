@@ -18,7 +18,7 @@ const STREAMER_ID = String(process.env.CS2_STREAMER_ID || args.streamerId || '')
 const AGENT_SECRET = process.env.CS2_AGENT_SECRET || args.agentSecret || '';
 const POLL_MS = parseInt(process.env.CS2_POLL_MS || args.pollMs || '500');
 
-const AGENT_VERSION = "2.0.5";
+const AGENT_VERSION = "2.0.6";
 console.log(`[CS2 Agent] Запуск версии ${AGENT_VERSION}`);
 
 if (!STREAMER_ID) {
@@ -438,7 +438,28 @@ class HookApp : Form
     [DllImport("user32.dll")]
     static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+    [DllImport("user32.dll")]
+    static extern bool UpdateWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
+    static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLong", SetLastError = true)]
+    static extern IntPtr SetWindowLongPtr32(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    static IntPtr SetWindowLongPtrSafe(IntPtr hWnd, int nIndex, IntPtr value)
+    {
+        return IntPtr.Size == 8
+            ? SetWindowLongPtr64(hWnd, nIndex, value)
+            : SetWindowLongPtr32(hWnd, nIndex, value);
+    }
+
+
     const int SW_SHOWNOACTIVATE = 4;
+    const int GWL_HWNDPARENT = -8;
     const uint SWP_SHOWWINDOW = 0x0040;
 
     class NoActivateFlashForm : Form
@@ -522,12 +543,21 @@ class HookApp : Form
                 flashForm.ShowInTaskbar = false;
                 flashForm.Location = new Point(pt.X, pt.Y);
                 flashForm.Size = new Size(rect.Width, rect.Height);
+                flashForm.Opacity = 1.0;
 
-                // Accessing Handle creates the native window on this STA thread.
+                IntPtr foregroundBefore = GetForegroundWindow();
                 IntPtr flashHandle = flashForm.Handle;
 
-                // Keep CS2 foreground: show without activation and make the window
-                // click-through. No Form.Show(), no Activate(), no focus stealing.
+                // Make the flash an owned top-level window of CS2. Owned windows stay
+                // above their owner and do not appear in Alt+Tab/taskbar.
+                SetWindowLongPtrSafe(flashHandle, GWL_HWNDPARENT, cs2Wnd);
+
+                // v2.0.5 only called native ShowWindow. WinForms still considered the
+                // form hidden, so it could remain unpainted. Show() synchronizes the
+                // managed Visible state; ShowWithoutActivation + WS_EX_NOACTIVATE keep
+                // CS2 focused.
+                flashForm.Show();
+
                 ShowWindow(flashHandle, SW_SHOWNOACTIVATE);
                 SetWindowPos(
                     flashHandle,
@@ -538,6 +568,16 @@ class HookApp : Form
                     rect.Height,
                     SWP_NOACTIVATE | SWP_SHOWWINDOW
                 );
+
+                // Force the initial white frame to paint immediately.
+                flashForm.Refresh();
+                UpdateWindow(flashHandle);
+
+                // Safety net: if Windows changed foreground despite NOACTIVATE,
+                // immediately return foreground to the game.
+                if (foregroundBefore == cs2Wnd && GetForegroundWindow() != cs2Wnd) {
+                    SetForegroundWindow(cs2Wnd);
+                }
 
                 Application.Run(new FlashApplicationContext(flashForm, cmdId, this, durationMs));
             } catch (Exception ex) {
