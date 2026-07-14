@@ -167,18 +167,18 @@ export default function CS2InteractivePage() {
                   <div className="cs2-step-content">
                     <h3 className="cs2-step-title">Скачивание и запуск Агента</h3>
                     <p className="cs2-step-desc">
-                      Загрузите наш готовый скрипт авто-запуска. Он сам проверит наличие Node.js на компьютере, скачает портативную версию (если её нет), установит необходимые библиотеки для эмуляции ввода и запустит агент.
+                      Установите CS2Haze с помощью нашего удобного инсталлятора.
                     </p>
-                    <div className="cs2-step-actions">
+                    <div className="cs2-step-actions" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                       <a
-                        href={`/api/cs2/agent/download-bat?streamerId=${user.id}`}
+                        href="/api/cs2/download"
                         className="cs2-btn cs2-btn-download"
                       >
-                        📥 Скачать авто-запуск (.bat)
+                        📥 Скачать cs2haze
                       </a>
-                    </div>
-                    <div className="cs2-tip-box">
-                      💡 <strong>Как запустить:</strong> Переместите скачанный файл в любую удобную пустую папку и запустите двойным кликом. В этой папке также появится файл <code>start.bat</code> для удобного запуска в будущем.
+                      <span className="cs2-step-hint" style={{ color: 'rgba(229,231,235,0.5)', fontSize: '0.9em' }}>
+                        Windows 10/11 · Node.js не требуется
+                      </span>
                     </div>
                   </div>
                 </div>
