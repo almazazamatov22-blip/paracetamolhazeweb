@@ -22,6 +22,7 @@ dotnet publish (Join-Path $KitRoot "updater\CS2Haze.Updater.csproj") `
   -c Release -r win-x64 --self-contained true `
   -o $LauncherOut
 
+New-Item (Join-Path $LauncherOut "Assets") -ItemType Directory -Force | Out-Null
 Copy-Item (Join-Path $KitRoot "assets\cs2haze.ico") `
   (Join-Path $LauncherOut "Assets\cs2haze.ico") -Force
 
