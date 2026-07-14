@@ -9,14 +9,28 @@ export default function ConnectPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.user) {
-          setUser(data.user);
+    fetch("/api/auth/me", {
+      credentials: "include",
+      cache: "no-store"
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          setUser(null);
+          return;
+        }
+
+        const data = await res.json();
+
+        if (data?.id && data?.login) {
+          setUser(data);
+        } else {
+          setUser(null);
         }
       })
-      .catch((err) => console.error(err))
+      .catch((err) => {
+        console.error(err);
+        setUser(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
