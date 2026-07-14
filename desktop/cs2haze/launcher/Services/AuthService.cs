@@ -1,6 +1,7 @@
 using System.Diagnostics;
-using System.Net.Http.Headers;
+using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using CS2Haze.Launcher.Models;
 
 namespace CS2Haze.Launcher.Services;
@@ -33,21 +34,9 @@ public sealed class AuthService(HttpClient http, LauncherConfig config, StorageS
         CancellationToken cancellationToken
     )
     {
-        var tokenPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "cs2haze", "pending-connect-token.txt");
-        var startTime = DateTime.UtcNow;
-
-        if (File.Exists(tokenPath))
-        {
-            try
-            {
-                var fileInfo = new FileInfo(tokenPath);
-                if (fileInfo.CreationTimeUtc < startTime)
-                {
-                    File.Delete(tokenPath);
-                }
-            }
-            catch { }
-        }
+        var tokenStore = new PendingConnectTokenStore(storage.DataDirectory);
+        var pendingSession = await TryClaimPendingTokenAsync(tokenStore, cancellationToken);
+        if (pendingSession is not null) return pendingSession;
 
         var connectUrl = "https://paracetamolhaze.ru/cs2haze/connect";
         Process.Start(new ProcessStartInfo
@@ -63,45 +52,76 @@ public sealed class AuthService(HttpClient http, LauncherConfig config, StorageS
         while (DateTimeOffset.UtcNow < expireTime)
         {
             await Task.Delay(1000, cancellationToken);
-
-            if (File.Exists(tokenPath))
-            {
-                try
-                {
-                    var fileInfo = new FileInfo(tokenPath);
-                    if (fileInfo.CreationTimeUtc < startTime) continue;
-                }
-                catch { continue; }
-
-                string token;
-                try
-                {
-                    token = await File.ReadAllTextAsync(tokenPath, cancellationToken);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                if (!string.IsNullOrWhiteSpace(token))
-                {
-                    try { File.Delete(tokenPath); } catch { }
-
-                    using var request = new HttpRequestMessage(
-                        HttpMethod.Post,
-                        $"{config.ApiBaseUrl}/api/cs2/launcher/auth/claim"
-                    );
-                    request.Content = JsonContent.Create(new { token });
-                    using var response = await http.SendAsync(request, cancellationToken);
-                    response.EnsureSuccessStatusCode();
-
-                    return await response.Content.ReadFromJsonAsync<LauncherSession>(
-                        cancellationToken: cancellationToken
-                    ) ?? throw new InvalidOperationException("Сервер не вернул данные сессии.");
-                }
-            }
+            pendingSession = await TryClaimPendingTokenAsync(tokenStore, cancellationToken);
+            if (pendingSession is not null) return pendingSession;
         }
 
         throw new TimeoutException("Время подтверждения входа истекло.");
+    }
+
+    private async Task<LauncherSession?> TryClaimPendingTokenAsync(
+        PendingConnectTokenStore tokenStore,
+        CancellationToken cancellationToken
+    )
+    {
+        var token = tokenStore.Read();
+        if (string.IsNullOrWhiteSpace(token)) return null;
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"{config.ApiBaseUrl}/api/cs2/launcher/auth/claim"
+        );
+        request.Content = JsonContent.Create(new { token });
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await http.SendAsync(request, cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+
+        using (response)
+        {
+            if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized)
+            {
+                tokenStore.DeleteIfMatches(token);
+                return null;
+            }
+
+            if (response.StatusCode is HttpStatusCode.TooManyRequests
+                || (int)response.StatusCode >= 500)
+            {
+                return null;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            LauncherSession? session;
+            try
+            {
+                session = await response.Content.ReadFromJsonAsync<LauncherSession>(
+                    cancellationToken: cancellationToken
+                );
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+
+            if (session is null) return null;
+            tokenStore.DeleteIfMatches(token);
+            return session;
+        }
     }
 }

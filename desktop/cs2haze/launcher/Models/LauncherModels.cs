@@ -5,7 +5,7 @@ namespace CS2Haze.Launcher.Models;
 public sealed class LauncherConfig
 {
     public string ApiBaseUrl { get; set; } = "https://paracetamolhaze.ru";
-    public string AgentBaseUrl { get; set; } = "https://paracetamolhaze.vercel.app";
+    public string AgentBaseUrl { get; set; } = "https://paracetamolhaze.ru";
     public string ManifestPath { get; set; } = "/api/cs2/launcher/manifest";
     public bool RequireAuthentication { get; set; } = false;
     public bool RequireSubscription { get; set; } = false;

@@ -12,7 +12,7 @@ const args = process.argv.slice(2).reduce((acc, a) => {
   return acc;
 }, {});
 
-const BASE_URL_RAW = process.env.CS2_BASE_URL || args.baseUrl || 'https://paracetamolhaze.vercel.app';
+const BASE_URL_RAW = process.env.CS2_BASE_URL || args.baseUrl || 'https://paracetamolhaze.ru';
 const BASE_URL = String(BASE_URL_RAW).trim().replace(/\/+$/, '');
 const STREAMER_ID = String(process.env.CS2_STREAMER_ID || args.streamerId || '').trim();
 const AGENT_SECRET = process.env.CS2_AGENT_SECRET || args.agentSecret || '';

@@ -254,8 +254,28 @@ public sealed class MainForm : Form
             return defaults;
         }
 
-        return JsonSerializer.Deserialize<LauncherConfig>(File.ReadAllText(path))
+        var loaded = JsonSerializer.Deserialize<LauncherConfig>(File.ReadAllText(path))
             ?? new LauncherConfig();
+
+        var legacyAgentOrigin = "https://paracetamolhaze.vercel.app";
+        if (string.IsNullOrWhiteSpace(loaded.AgentBaseUrl)
+            || string.Equals(
+                loaded.AgentBaseUrl.TrimEnd('/'),
+                legacyAgentOrigin,
+                StringComparison.OrdinalIgnoreCase
+            ))
+        {
+            loaded.AgentBaseUrl = loaded.ApiBaseUrl.TrimEnd('/');
+            File.WriteAllText(
+                path,
+                JsonSerializer.Serialize(
+                    loaded,
+                    new JsonSerializerOptions { WriteIndented = true }
+                )
+            );
+        }
+
+        return loaded;
     }
 
     private void SetState(string heading, string message, bool marquee)

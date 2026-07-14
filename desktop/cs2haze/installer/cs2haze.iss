@@ -1,5 +1,5 @@
 #define MyAppName "cs2haze"
-#define MyAppVersion "1.0.2"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "Paracetamol Haze"
 #define MyAppExeName "cs2haze.exe"
 
@@ -26,7 +26,7 @@ CloseApplications=yes
 RestartApplications=no
 
 [Files]
-Source: "..\dist\launcher\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\launcher\*"; DestDir: "{app}"; Excludes: "launcher-config.json"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\dist\runtime\*"; DestDir: "{app}\runtime"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\assets\cs2haze.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
 Source: "..\launcher\launcher-config.json"; DestDir: "{app}"; Flags: onlyifdoesntexist

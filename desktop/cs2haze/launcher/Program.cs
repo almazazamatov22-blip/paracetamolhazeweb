@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using CS2Haze.Launcher.Services;
 
 namespace CS2Haze.Launcher;
 
@@ -65,12 +66,14 @@ internal static class Program
 
         if (!string.IsNullOrWhiteSpace(connectToken))
         {
-            var tokenPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "cs2haze", "pending-connect-token.txt");
-            Directory.CreateDirectory(Path.GetDirectoryName(tokenPath)!);
-            File.WriteAllText(tokenPath, connectToken);
+            new PendingConnectTokenStore().Write(connectToken);
         }
 
-        using var mutex = new Mutex(true, @"Local\cs2haze-launcher", out var createdNew);
+        using var mutex = new Mutex(
+            true,
+            PendingConnectTokenStore.LauncherMutexName,
+            out var createdNew
+        );
         
         if (!string.IsNullOrWhiteSpace(connectToken))
         {

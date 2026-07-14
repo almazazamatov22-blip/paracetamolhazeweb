@@ -17,8 +17,8 @@ export async function generateMetadata(
   
   // Dynamic OG image generated based on score and user info
   const ogImage = score !== '0' 
-    ? `https://paracetamolhaze.vercel.app/api/og/record?game=kinokadr&score=${score}&user=${encodeURIComponent(user)}`
-    : 'https://paracetamolhaze.vercel.app/kinokadr_og.png'; 
+    ? `https://paracetamolhaze.ru/api/og/record?game=kinokadr&score=${score}&user=${encodeURIComponent(user)}`
+    : 'https://paracetamolhaze.ru/kinokadr_og.png';
 
   return {
     title,

@@ -15,8 +15,8 @@ export async function generateMetadata(
   const description = 'Проверь свою ловкость в интерактивной игре 67! Управляй движениями рук через камеру и устанавливай мировые рекорды.';
   
   const ogImage = score !== '0' 
-    ? `https://paracetamolhaze.vercel.app/api/og/record?game=67&score=${score}&user=${encodeURIComponent(user)}`
-    : 'https://paracetamolhaze.vercel.app/67_og.png'; 
+    ? `https://paracetamolhaze.ru/api/og/record?game=67&score=${score}&user=${encodeURIComponent(user)}`
+    : 'https://paracetamolhaze.ru/67_og.png';
 
   return {
     title,

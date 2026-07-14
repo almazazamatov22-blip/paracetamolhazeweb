@@ -162,13 +162,13 @@ export default function CS2Page() {
               <div className="cs2-code-row">
                 <span className="cs2-code-label">Poll URL:</span>
                 <code className="cs2-code-val">
-                  {typeof window !== 'undefined' ? window.location.origin : 'https://paracetamolhaze.vercel.app'}/api/cs2/agent/poll?streamerId={user.id}
+                  {typeof window !== 'undefined' ? window.location.origin : 'https://paracetamolhaze.ru'}/api/cs2/agent/poll?streamerId={user.id}
                 </code>
               </div>
               <div className="cs2-code-row">
                 <span className="cs2-code-label">Overlay URL:</span>
                 <code className="cs2-code-val">
-                  {typeof window !== 'undefined' ? window.location.origin : 'https://paracetamolhaze.vercel.app'}/overlays/cs2.html?streamerId={user.id}
+                  {typeof window !== 'undefined' ? window.location.origin : 'https://paracetamolhaze.ru'}/overlays/cs2.html?streamerId={user.id}
                 </code>
               </div>
               <div className="cs2-info-box">

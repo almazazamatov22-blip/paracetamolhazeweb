@@ -25,6 +25,10 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Test protocol token store
+        shell: powershell
+        run: dotnet run --project .\desktop\cs2haze\tests\CS2Haze.TokenStoreSmoke.csproj -c Release
+
       - name: Install Inno Setup
         shell: powershell
         run: choco install innosetup --yes --no-progress
@@ -56,3 +60,52 @@ jobs:
             desktop/cs2haze/dist/CS2Haze-Setup.exe
             desktop/cs2haze/dist/cs2haze-runtime.zip
             desktop/cs2haze/dist/cs2haze-runtime.sha256
+
+      - name: Verify published installer
+        if: startsWith(github.ref, 'refs/tags/cs2haze-v')
+        shell: powershell
+        run: |
+          $tag = [Uri]::EscapeDataString($env:GITHUB_REF_NAME)
+          $tagUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/CS2Haze-Setup.exe"
+          $latestUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/latest/download/CS2Haze-Setup.exe"
+          $expectedLatestPath = "/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/CS2Haze-Setup.exe"
+
+          for ($attempt = 1; $attempt -le 12; $attempt++) {
+            $allDownloadable = $true
+
+            foreach ($url in @($tagUrl, $latestUrl)) {
+              $headers = (& curl.exe -fsSIL --max-redirs 5 $url 2>&1) -join "`n"
+              if (
+                $LASTEXITCODE -ne 0 -or
+                $headers -notmatch '(?im)^HTTP/\S+ 200\b' -or
+                $headers -notmatch '(?im)^content-disposition:\s*attachment;.*filename=CS2Haze-Setup\.exe'
+              ) {
+                $allDownloadable = $false
+                break
+              }
+            }
+
+            $latestHeaders = (& curl.exe -fsSI --max-redirs 0 $latestUrl 2>&1) -join "`n"
+            $latestLocation = [regex]::Match(
+              $latestHeaders,
+              '(?im)^location:\s*(.+)\s*$'
+            ).Groups[1].Value.Trim()
+            $latestPointsToTag = $false
+            if ($latestLocation) {
+              try {
+                $latestPath = [Uri]::UnescapeDataString(([Uri]$latestLocation).AbsolutePath)
+                $latestPointsToTag = $latestPath -eq $expectedLatestPath
+              } catch {
+                $latestPointsToTag = $false
+              }
+            }
+
+            if ($allDownloadable -and $latestPointsToTag) {
+              Write-Host "Published installer is downloadable."
+              exit 0
+            }
+
+            Start-Sleep -Seconds 5
+          }
+
+          throw "Published installer did not become downloadable through both tag and latest URLs."
