@@ -33,6 +33,22 @@ public sealed class AuthService(HttpClient http, LauncherConfig config, StorageS
         CancellationToken cancellationToken
     )
     {
+        var tokenPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "cs2haze", "pending-connect-token.txt");
+        var startTime = DateTime.UtcNow;
+
+        if (File.Exists(tokenPath))
+        {
+            try
+            {
+                var fileInfo = new FileInfo(tokenPath);
+                if (fileInfo.CreationTimeUtc < startTime)
+                {
+                    File.Delete(tokenPath);
+                }
+            }
+            catch { }
+        }
+
         var connectUrl = "https://paracetamolhaze.ru/cs2haze/connect";
         Process.Start(new ProcessStartInfo
         {
@@ -42,9 +58,6 @@ public sealed class AuthService(HttpClient http, LauncherConfig config, StorageS
 
         setStatus("Подтвердите вход на открывшемся сайте…");
 
-        var tokenPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "cs2haze", "pending-connect-token.txt");
-        if (File.Exists(tokenPath)) File.Delete(tokenPath);
-
         var expireTime = DateTimeOffset.UtcNow.AddMinutes(5);
 
         while (DateTimeOffset.UtcNow < expireTime)
@@ -53,11 +66,27 @@ public sealed class AuthService(HttpClient http, LauncherConfig config, StorageS
 
             if (File.Exists(tokenPath))
             {
-                var token = await File.ReadAllTextAsync(tokenPath, cancellationToken);
-                try { File.Delete(tokenPath); } catch { }
+                try
+                {
+                    var fileInfo = new FileInfo(tokenPath);
+                    if (fileInfo.CreationTimeUtc < startTime) continue;
+                }
+                catch { continue; }
+
+                string token;
+                try
+                {
+                    token = await File.ReadAllTextAsync(tokenPath, cancellationToken);
+                }
+                catch
+                {
+                    continue;
+                }
 
                 if (!string.IsNullOrWhiteSpace(token))
                 {
+                    try { File.Delete(tokenPath); } catch { }
+
                     using var request = new HttpRequestMessage(
                         HttpMethod.Post,
                         $"{config.ApiBaseUrl}/api/cs2/launcher/auth/claim"

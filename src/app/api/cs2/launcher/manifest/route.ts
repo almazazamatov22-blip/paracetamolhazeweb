@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   return NextResponse.json({
-    launcherVersion: "1.0.1",
+    launcherVersion: "1.0.2",
     runtimeVersion: "2.0.6",
     mandatory: true,
     runtimeUrl: null,
