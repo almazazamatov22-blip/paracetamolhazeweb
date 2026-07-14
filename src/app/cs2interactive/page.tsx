@@ -171,7 +171,7 @@ export default function CS2InteractivePage() {
                     </p>
                     <div className="cs2-step-actions" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                       <a
-                        href="/api/cs2/download"
+                        href="/download/cs2haze"
                         className="cs2-btn cs2-btn-download"
                       >
                         📥 Скачать cs2haze
