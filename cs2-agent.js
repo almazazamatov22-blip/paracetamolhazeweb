@@ -29,7 +29,6 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Threading;
 using System.Diagnostics;
-using System.Drawing;
 
 class HookApp : Form
 {
@@ -105,6 +104,29 @@ class HookApp : Form
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     static extern IntPtr GetModuleHandle(string lpModuleName);
 
+    [DllImport("user32.dll")]
+    static extern IntPtr GetDC(IntPtr hWnd);
+
+    [DllImport("gdi32.dll")]
+    static extern bool SetDeviceGammaRamp(IntPtr hDC, ref RAMP lpRamp);
+    
+    [DllImport("gdi32.dll")]
+    static extern bool GetDeviceGammaRamp(IntPtr hDC, ref RAMP lpRamp);
+
+    [DllImport("user32.dll")]
+    static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+    struct RAMP
+    {
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+        public ushort[] Red;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+        public ushort[] Green;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+        public ushort[] Blue;
+    }
+
     const uint RID_INPUT = 0x10000003;
     const uint RIM_TYPEMOUSE = 0;
     const int WM_INPUT = 0x00FF;
@@ -127,13 +149,15 @@ class HookApp : Form
     
     public bool BlockJumpActive = false;
     public bool BlockCrouchActive = false;
+    public bool PacifistActive = false;
 
     IntPtr kbHookId = IntPtr.Zero;
     IntPtr msHookId = IntPtr.Zero;
     LowLevelHookProc kbProc;
     LowLevelHookProc msProc;
 
-    Form flashForm;
+    RAMP origRamp = new RAMP();
+    bool hasOrigRamp = false;
 
     public HookApp()
     {
@@ -168,16 +192,22 @@ class HookApp : Form
             int wm = wParam.ToInt32();
             bool isKeyDown = wm == 0x0100 || wm == 0x0104;
             
-            if (BlockJumpActive && vkCode == 0x20 && isKeyDown)
+            if (BlockJumpActive && vkCode == 0x20) // Space
             {
-                SendKey(0x1D, true);
-                ThreadPool.QueueUserWorkItem(_ => { Thread.Sleep(500); SendKey(0x1D, false); });
+                if (isKeyDown) {
+                    SendKey(0x1D, true);
+                    ThreadPool.QueueUserWorkItem(_ => { Thread.Sleep(300); SendKey(0x1D, false); });
+                }
+                return (IntPtr)1; // Block original space
             }
             
-            if (BlockCrouchActive && (vkCode == 0xA2 || vkCode == 0xA3 || vkCode == 0x11 || vkCode == 0x43) && isKeyDown) 
+            if (BlockCrouchActive && (vkCode == 0xA2 || vkCode == 0xA3 || vkCode == 0x11 || vkCode == 0x43)) // Ctrl/C
             {
-                SendKey(0x39, true);
-                ThreadPool.QueueUserWorkItem(_ => { Thread.Sleep(50); SendKey(0x39, false); });
+                if (isKeyDown) {
+                    SendKey(0x39, true);
+                    ThreadPool.QueueUserWorkItem(_ => { Thread.Sleep(50); SendKey(0x39, false); });
+                }
+                return (IntPtr)1; // Block original crouch
             }
         }
         return CallNextHookEx(kbHookId, nCode, wParam, lParam);
@@ -188,10 +218,17 @@ class HookApp : Form
         if (nCode >= 0)
         {
             int wm = wParam.ToInt32();
-            if (BlockJumpActive && (wm == 0x020A))
+            
+            if (BlockJumpActive && wm == 0x020A) // Scroll
             {
                 SendKey(0x1D, true);
-                ThreadPool.QueueUserWorkItem(_ => { Thread.Sleep(500); SendKey(0x1D, false); });
+                ThreadPool.QueueUserWorkItem(_ => { Thread.Sleep(300); SendKey(0x1D, false); });
+                return (IntPtr)1; // Block scroll
+            }
+            
+            if (PacifistActive && (wm == 0x0201 || wm == 0x0202)) // LBUTTONDOWN / LBUTTONUP
+            {
+                return (IntPtr)1; // Block shooting
             }
         }
         return CallNextHookEx(msHookId, nCode, wParam, lParam);
@@ -273,42 +310,45 @@ class HookApp : Form
         SendInput(1, inputs, Marshal.SizeOf(typeof(INPUT)));
     }
 
-    void ShowFlash()
-    {
-        if (flashForm != null) return;
-        flashForm = new Form();
-        flashForm.FormBorderStyle = FormBorderStyle.None;
-        flashForm.BackColor = Color.White;
-        flashForm.TopMost = true;
-        flashForm.ShowInTaskbar = false;
-        flashForm.StartPosition = FormStartPosition.Manual;
-        flashForm.Bounds = Screen.PrimaryScreen.Bounds;
-        flashForm.Opacity = 1.0;
-        
-        int exStyle = (int)GetWindowLong(flashForm.Handle, -20);
-        SetWindowLong(flashForm.Handle, -20, (IntPtr)(exStyle | 0x80000 | 0x20));
-        
-        flashForm.Show();
-
-        System.Windows.Forms.Timer fadeTimer = new System.Windows.Forms.Timer();
-        fadeTimer.Interval = 50;
-        fadeTimer.Tick += (s, e) => {
-            if (flashForm.Opacity > 0.05) {
-                flashForm.Opacity -= 0.05;
-            } else {
-                fadeTimer.Stop();
-                flashForm.Close();
-                flashForm.Dispose();
-                flashForm = null;
-            }
-        };
-        fadeTimer.Start();
+    void ReleaseMovementKeys() {
+        SendKey(0x11, false); // W
+        SendKey(0x1E, false); // A
+        SendKey(0x1F, false); // S
+        SendKey(0x20, false); // D
+        SendKey(0x39, false); // Space
+        SendKey(0x1D, false); // Ctrl
+        SendKey(0x2A, false); // Shift
     }
 
-    [DllImport("user32.dll", SetLastError = true)]
-    static extern int GetWindowLong(IntPtr hWnd, int nIndex);
-    [DllImport("user32.dll")]
-    static extern int SetWindowLong(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+    void FlashScreen()
+    {
+        IntPtr hDC = GetDC(IntPtr.Zero);
+        if (!hasOrigRamp) {
+            origRamp = new RAMP();
+            origRamp.Red = new ushort[256];
+            origRamp.Green = new ushort[256];
+            origRamp.Blue = new ushort[256];
+            GetDeviceGammaRamp(hDC, ref origRamp);
+            hasOrigRamp = true;
+        }
+
+        RAMP whiteRamp = new RAMP();
+        whiteRamp.Red = new ushort[256];
+        whiteRamp.Green = new ushort[256];
+        whiteRamp.Blue = new ushort[256];
+        for (int i = 0; i < 256; i++) {
+            whiteRamp.Red[i] = 65535;
+            whiteRamp.Green[i] = 65535;
+            whiteRamp.Blue[i] = 65535;
+        }
+        SetDeviceGammaRamp(hDC, ref whiteRamp);
+
+        ThreadPool.QueueUserWorkItem(_ => {
+            Thread.Sleep(1500);
+            SetDeviceGammaRamp(hDC, ref origRamp);
+            ReleaseDC(IntPtr.Zero, hDC);
+        });
+    }
 
     void ProcessCommand(string line)
     {
@@ -344,9 +384,14 @@ class HookApp : Form
         else if (cmd == "block_crouch" && parts.Length >= 2) {
             BlockCrouchActive = parts[1] == "1";
         }
+        else if (cmd == "pacifist" && parts.Length >= 2) {
+            PacifistActive = parts[1] == "1";
+        }
         else if (cmd == "freeze" && parts.Length >= 2) {
             int sec = int.Parse(parts[1]);
             ThreadPool.QueueUserWorkItem(_ => {
+                ReleaseMovementKeys();
+                Thread.Sleep(50);
                 BlockInput(true);
                 Thread.Sleep(sec * 1000);
                 BlockInput(false);
@@ -361,7 +406,7 @@ class HookApp : Form
             });
         }
         else if (cmd == "flash") {
-            this.Invoke((MethodInvoker)delegate { ShowFlash(); });
+            FlashScreen();
         }
         else if (cmd == "shake") {
             ThreadPool.QueueUserWorkItem(_ => {
@@ -428,7 +473,7 @@ function compileHelper() {
       fs.writeFileSync(csPath, csharpCode, 'utf8');
       const cscPath = 'C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\csc.exe';
       if (!fs.existsSync(cscPath)) throw new Error('csc.exe не найден.');
-      execSync(`"${cscPath}" /nologo /out:"${exePath}" /target:winexe /optimize /r:System.Windows.Forms.dll,System.Drawing.dll "${csPath}"`);
+      execSync(`"${cscPath}" /nologo /out:"${exePath}" /target:winexe /optimize /r:System.Windows.Forms.dll "${csPath}"`);
       console.log('✅ Background Helper скомпилирован успешно!');
     } catch (err) {
       console.error('⚠️ Ошибка автокомпиляции C# Helper:', err.message);
@@ -460,29 +505,46 @@ function sendCmd(cmd) {
   }
 }
 
-// ── HTTP helpers ──
-async function apiGet(path) {
-  const url = `${BASE_URL}${path}&agentSecret=${encodeURIComponent(AGENT_SECRET)}`;
-  const res = await fetch(url, { headers: { 'User-Agent': 'cs2-agent/1.0' } });
-  return res.json();
-}
-
-async function apiPost(path, body) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'User-Agent': 'cs2-agent/1.0' },
-    body: JSON.stringify({ ...body, agentSecret: AGENT_SECRET }),
-  });
-  return res.json();
-}
-
 // ── Utilities ──
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function log(msg)  { console.log(`[${new Date().toLocaleTimeString('ru-RU')}] ${msg}`); }
 
+let supabaseUrl = '';
+let supabaseAnonKey = '';
+
+async function fetchConfig() {
+  const url = `${BASE_URL}/api/cs2/agent/config`;
+  const res = await fetch(url);
+  const data = await res.json();
+  supabaseUrl = data.supabaseUrl;
+  supabaseAnonKey = data.supabaseAnonKey;
+}
+
+// ── HTTP helpers (Supabase REST API directly) ──
+async function apiGetTask() {
+  const url = `${supabaseUrl}/rest/v1/cs2_reward_queue?streamer_id=eq.${STREAMER_ID}&status=eq.pending&order=created_at.asc&limit=1`;
+  const res = await fetch(url, { headers: { 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${supabaseAnonKey}` } });
+  const data = await res.json();
+  return data && data.length > 0 ? data[0] : null;
+}
+
+async function setTaskStatus(taskId, status, errorMsg = null) {
+  const url = `${supabaseUrl}/rest/v1/cs2_reward_queue?id=eq.${taskId}`;
+  const body = { status };
+  if (errorMsg) body.error = errorMsg;
+  await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${supabaseAnonKey}` },
+    body: JSON.stringify(body)
+  });
+}
+
 // ── Действия ──
 async function executeTask(task) {
   log(`\n▶ Задача [${task.id.substring(0,8)}] action="${task.action_type}" от "${task.user_name}"`);
+
+  // Атомарный перевод в processing напрямую через REST
+  await setTaskStatus(task.id, 'processing');
 
   try {
     switch (task.action_type) {
@@ -522,6 +584,13 @@ async function executeTask(task) {
         await sleep(30000);
         sendCmd('block_crouch 0'); 
         log('✅ Блок приседания снят');
+        break;
+      case 'pacifist':
+        log('🕊️ Пацифист на 15с...');
+        sendCmd('pacifist 1');
+        await sleep(15000);
+        sendCmd('pacifist 0'); 
+        log('✅ Пацифист снят');
         break;
       case 'play_sound':
         log('🔊 Воспроизведение звука на стриме (через оверлей)');
@@ -575,17 +644,17 @@ async function executeTask(task) {
         await sleep(2000);
     }
 
-    await apiPost('/api/cs2/agent/confirm', { taskId: task.id, status: 'done' });
-    log(`✅ Задача ${task.id.substring(0,8)} подтверждена сервером`);
+    await setTaskStatus(task.id, 'done');
+    log(`✅ Задача ${task.id.substring(0,8)} выполнена`);
   } catch (err) {
     console.error(`❌ Ошибка выполнения задачи: ${err.message}`);
     try {
-      await apiPost('/api/cs2/agent/confirm', { taskId: task.id, status: 'error', error: err.message });
+      await setTaskStatus(task.id, 'error', err.message);
     } catch {}
   }
 }
 
-// ── Polling loop (Очередь) ──
+// ── Polling loop (Прямой опрос Supabase REST, 0 Vercel CPU) ──
 let running = false;
 async function poll() {
   if (running) return;

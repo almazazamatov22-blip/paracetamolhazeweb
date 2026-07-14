@@ -16,6 +16,8 @@ const ACTION_LABELS: Record<string, { label: string; icon: string; color: string
   invert_mouse:  { label: 'Инверсия мыши 10 сек',       icon: '🔃', color: '#22d3ee', desc: 'Инвертирует движение мыши на 10 секунд.' },
   low_sens_10:   { label: 'Низкая чувств. 10 сек',      icon: '🐢', color: '#86efac', desc: 'Снижает чувствительность мыши на 10 сек.' },
   high_sens_10:  { label: 'Высокая чувств. 10 сек',     icon: '🐇', color: '#fca5a5', desc: 'Резко повышает чувствительность на 10 сек.' },
+  spinbot:       { label: 'Крутилка (Spinbot)',         icon: '🌪️', color: '#f472b6', desc: 'Зажимает ЛКМ и бешено крутится 10 сек.' },
+  pacifist:      { label: 'Пацифист 15 сек',            icon: '🕊️', color: '#cbd5e1', desc: 'Блокирует ЛКМ (запрещает стрелять) на 15 сек.' },
 }
 
 export default function CS2InteractivePage() {

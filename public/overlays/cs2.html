@@ -282,164 +282,154 @@
 <body>
   <div id="banner-container"></div>
 
-  <script>
-    (function() {
-      const params = new URLSearchParams(window.location.search);
-      const STREAMER_ID = params.get('streamerId') || '';
-      const BASE_URL = params.get('baseUrl') || (window.location.origin !== 'null' ? window.location.origin : 'https://paracetamolhaze.vercel.app');
-      const POLL_INTERVAL = 1200; // ms
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      (function() {
+        const params = new URLSearchParams(window.location.search);
+        const STREAMER_ID = params.get('streamerId') || '';
+        const BASE_URL = params.get('baseUrl') || (window.location.origin !== 'null' ? window.location.origin : 'https://paracetamolhaze.vercel.app');
 
-      const ACTION_ICONS = {
-        drop_weapon:   '🔫',
-        freeze_3:      '🧊',
-        freeze_5:      '❄️',
-        spin_180:      '🔄',
-        block_jump:    '🚫',
-        block_crouch:  '🦆',
-        play_sound:    '🔊',
-        flash_screen:  '💥',
-        random_weapon_switch: '🎲',
-        invert_mouse:  '🔃',
-        low_sens_10:   '🐢',
-        high_sens_10:  '🐇',
-        spinbot:       '🌪️',
-      };
+        const ACTION_ICONS = {
+          drop_weapon:   '🔫',
+          freeze_3:      '🧊',
+          freeze_5:      '❄️',
+          spin_180:      '🔄',
+          block_jump:    '🚫',
+          block_crouch:  '🦆',
+          pacifist:      '🕊️',
+          play_sound:    '🔊',
+          flash_screen:  '💥',
+          random_weapon_switch: '🎲',
+          invert_mouse:  '🔃',
+          low_sens_10:   '🐢',
+          high_sens_10:  '🐇',
+          spinbot:       '🌪️',
+        };
 
-      const ACTION_DURATIONS = {
-        drop_weapon: 2000,
-        freeze_3: 3000,
-        freeze_5: 5000,
-        spin_180: 2000,
-        block_jump: 30000,
-        block_crouch: 30000,
-        play_sound: 5000,
-        mouse_shake: 5000,
-        flash_screen: 2000,
-        random_weapon_switch: 2000,
-        invert_mouse: 10000,
-        low_sens_10: 10000,
-        high_sens_10: 10000,
-        spinbot: 10000
-      };
+        const ACTION_DURATIONS = {
+          drop_weapon: 2000,
+          freeze_3: 3000,
+          freeze_5: 5000,
+          spin_180: 2000,
+          block_jump: 30000,
+          block_crouch: 30000,
+          pacifist: 15000,
+          play_sound: 5000,
+          mouse_shake: 5000,
+          flash_screen: 2000,
+          random_weapon_switch: 2000,
+          invert_mouse: 10000,
+          low_sens_10: 10000,
+          high_sens_10: 10000,
+          spinbot: 10000
+        };
 
-      const bannerEl = document.getElementById('banner-container');
+        const bannerEl = document.getElementById('banner-container');
 
-      // Create flash overlay div
-      const flashOverlay = document.createElement('div');
-      flashOverlay.style.position = 'fixed';
-      flashOverlay.style.inset = '0';
-      flashOverlay.style.backgroundColor = 'white';
-      flashOverlay.style.zIndex = '9999';
-      flashOverlay.style.opacity = '0';
-      flashOverlay.style.pointerEvents = 'none';
-      flashOverlay.style.transition = 'opacity 0.1s ease-out';
-      document.body.appendChild(flashOverlay);
-
-      const flashSound = new Audio('/sounds/flash.mp3');
-      const streamSound = new Audio('/sounds/stream.mp3');
-
-      function triggerFlash() {
-        flashSound.currentTime = 0;
-        flashSound.play().catch(console.error);
+        // Create flash overlay div
+        const flashOverlay = document.createElement('div');
+        flashOverlay.style.position = 'fixed';
+        flashOverlay.style.inset = '0';
+        flashOverlay.style.backgroundColor = 'white';
+        flashOverlay.style.zIndex = '9999';
+        flashOverlay.style.opacity = '0';
+        flashOverlay.style.pointerEvents = 'none';
         flashOverlay.style.transition = 'opacity 0.1s ease-out';
-        flashOverlay.style.opacity = '1';
-        setTimeout(() => {
-          flashOverlay.style.transition = 'opacity 3s ease-in';
-          flashOverlay.style.opacity = '0';
-        }, 2000);
-      }
+        document.body.appendChild(flashOverlay);
 
-      function triggerStreamSound() {
-        streamSound.currentTime = 0;
-        streamSound.play().catch(console.error);
-      }
+        const flashSound = new Audio('/sounds/flash.mp3');
+        const streamSound = new Audio('/sounds/stream.mp3');
 
-      // Particle burst on completion
-      function spawnParticles(x, y) {
-        const burst = document.createElement('div');
-        burst.className = 'particle-burst';
-        burst.style.left = x + 'px';
-        burst.style.top = y + 'px';
-        const colors = ['#1ed760', '#60a5fa', '#a78bfa', '#f59e0b', '#f87171'];
-        for (let i = 0; i < 12; i++) {
-          const p = document.createElement('div');
-          p.className = 'p';
-          const angle = (i / 12) * Math.PI * 2;
-          const dist = 40 + Math.random() * 60;
-          p.style.setProperty('--tx', (Math.cos(angle) * dist) + 'px');
-          p.style.setProperty('--ty', (Math.sin(angle) * dist) + 'px');
-          p.style.setProperty('--d', (Math.random() * 0.2) + 's');
-          p.style.background = colors[i % colors.length];
-          burst.appendChild(p);
-        }
-        document.body.appendChild(burst);
-        setTimeout(() => burst.remove(), 900);
-      }
-
-
-
-      let bannerTimer = null;
-      let lastSince = new Date(Date.now() - 60000).toISOString();
-
-      // ── Banner (big central notification) ──
-      function showBanner(event) {
-        if (bannerTimer) {
-          clearTimeout(bannerTimer);
-          const old = bannerEl.querySelector('.banner-card');
-          if (old) { old.remove(); }
+        function triggerFlash() {
+          flashSound.currentTime = 0;
+          flashSound.play().catch(console.error);
+          flashOverlay.style.transition = 'opacity 0.1s ease-out';
+          flashOverlay.style.opacity = '1';
+          setTimeout(() => {
+            flashOverlay.style.transition = 'opacity 3s ease-in';
+            flashOverlay.style.opacity = '0';
+          }, 2000);
         }
 
-        const icon = ACTION_ICONS[event.action_type] || '🎮';
-        const durationMs = ACTION_DURATIONS[event.action_type] || 4000;
+        function triggerStreamSound() {
+          streamSound.currentTime = 0;
+          streamSound.play().catch(console.error);
+        }
 
-        const card = document.createElement('div');
-        card.className = 'banner-card enter';
-        card.style.position = 'relative';
-        card.style.setProperty('--banner-dur', (durationMs / 1000) + 's');
-        card.innerHTML = `
-          ${event.user_avatar
-            ? `<img class="banner-avatar" src="${event.user_avatar}" alt="" onerror="this.style.display='none'" />`
-            : ''
+        // Particle burst on completion
+        function spawnParticles(x, y) {
+          const burst = document.createElement('div');
+          burst.className = 'particle-burst';
+          burst.style.left = x + 'px';
+          burst.style.top = y + 'px';
+          const colors = ['#1ed760', '#60a5fa', '#a78bfa', '#f59e0b', '#f87171'];
+          for (let i = 0; i < 12; i++) {
+            const p = document.createElement('div');
+            p.className = 'p';
+            const angle = (i / 12) * Math.PI * 2;
+            const dist = 40 + Math.random() * 60;
+            p.style.setProperty('--tx', (Math.cos(angle) * dist) + 'px');
+            p.style.setProperty('--ty', (Math.sin(angle) * dist) + 'px');
+            p.style.setProperty('--d', (Math.random() * 0.2) + 's');
+            p.style.background = colors[i % colors.length];
+            burst.appendChild(p);
           }
-          <div class="banner-icon">${icon}</div>
-          <div class="banner-info">
-            <div class="banner-user">${event.user_name} активировал</div>
-            <div class="banner-reward">${event.reward_name || event.action_type}</div>
-          </div>
-          <div class="banner-progress"></div>
-        `;
+          document.body.appendChild(burst);
+          setTimeout(() => burst.remove(), 900);
+        }
 
-        bannerEl.appendChild(card);
+        let bannerTimer = null;
 
-        bannerTimer = setTimeout(() => {
-          card.classList.remove('enter');
-          card.classList.add('exit');
-          setTimeout(() => card.remove(), 450);
-        }, durationMs);
-      }
+        // ── Banner (big central notification) ──
+        function showBanner(event) {
+          if (bannerTimer) {
+            clearTimeout(bannerTimer);
+            const old = bannerEl.querySelector('.banner-card');
+            if (old) { old.remove(); }
+          }
 
-      // ── Polling ──
-      const seenForBanner = new Set();
-      const seenForEffects = new Set();
+          const icon = ACTION_ICONS[event.action_type] || '🎮';
+          const durationMs = ACTION_DURATIONS[event.action_type] || 4000;
 
-      async function poll() {
-        if (!STREAMER_ID) return;
-        try {
-          // Always fetch recent 60 seconds to avoid missing any events that took a while to process
-          lastSince = new Date(Date.now() - 60000).toISOString();
-          const res = await fetch(`${BASE_URL}/api/cs2/overlay/events?streamerId=${STREAMER_ID}&since=${encodeURIComponent(lastSince)}`);
-          if (!res.ok) return;
-          const { events } = await res.json();
+          const card = document.createElement('div');
+          card.className = 'banner-card enter';
+          card.style.position = 'relative';
+          card.style.setProperty('--banner-dur', (durationMs / 1000) + 's');
+          card.innerHTML = `
+            ${event.user_avatar
+              ? `<img class="banner-avatar" src="${event.user_avatar}" alt="" onerror="this.style.display='none'" />`
+              : ''
+            }
+            <div class="banner-icon">${icon}</div>
+            <div class="banner-info">
+              <div class="banner-user">${event.user_name} активировал</div>
+              <div class="banner-reward">${event.reward_name || event.action_type}</div>
+            </div>
+            <div class="banner-progress"></div>
+          `;
 
-          for (const ev of (events || [])) {
-            // Banner on pending
-            if (!seenForBanner.has(ev.id) && ev.status === 'pending') {
+          bannerEl.appendChild(card);
+
+          bannerTimer = setTimeout(() => {
+            card.classList.remove('enter');
+            card.classList.add('exit');
+            setTimeout(() => card.remove(), 450);
+          }, durationMs);
+        }
+
+        const seenForBanner = new Set();
+        const seenForEffects = new Set();
+
+        function handleEvent(ev) {
+          if (!ev) return;
+          if (ev.status === 'pending') {
+            if (!seenForBanner.has(ev.id)) {
               seenForBanner.add(ev.id);
               showBanner(ev);
             }
-
-            // Visual/Audio effects on processing or done
-            if (!seenForEffects.has(ev.id) && (ev.status === 'processing' || ev.status === 'done')) {
+          }
+          if (ev.status === 'processing' || ev.status === 'done') {
+            if (!seenForEffects.has(ev.id)) {
               seenForEffects.add(ev.id);
               if (ev.action_type === 'flash_screen') {
                 triggerFlash();
@@ -448,18 +438,42 @@
               }
             }
           }
-        } catch(e) {
-          console.warn('[CS2 Overlay] Poll error:', e);
         }
-      }
 
-      if (!STREAMER_ID) {
-        console.warn('⚠️ streamerId не задан в URL');
-      } else {
-        poll();
-        setInterval(poll, POLL_INTERVAL);
-      }
-    })();
-  </script>
+        async function init() {
+          if (!STREAMER_ID) {
+            console.warn('⚠️ streamerId не задан в URL');
+            return;
+          }
+
+          try {
+            // Get Config
+            const cfgRes = await fetch(`${BASE_URL}/api/cs2/agent/config`);
+            const cfg = await cfgRes.json();
+            
+            // Get Initial Pending
+            const initialRes = await fetch(`${cfg.supabaseUrl}/rest/v1/cs2_reward_queue?streamer_id=eq.${STREAMER_ID}&status=eq.pending`, {
+              headers: { 'apikey': cfg.supabaseAnonKey, 'Authorization': `Bearer ${cfg.supabaseAnonKey}` }
+            });
+            const initialEvents = await initialRes.json();
+            for (const ev of (initialEvents || [])) {
+              handleEvent(ev);
+            }
+
+            // Realtime
+            const client = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+            client.channel('public:cs2_reward_queue')
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'cs2_reward_queue', filter: `streamer_id=eq.${STREAMER_ID}` }, payload => {
+                handleEvent(payload.new);
+              }).subscribe();
+
+          } catch(e) {
+            console.error('[CS2 Overlay] Init error:', e);
+          }
+        }
+        
+        init();
+      })();
+    </script>
 </body>
 </html>
