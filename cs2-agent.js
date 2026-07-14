@@ -660,8 +660,8 @@ async function poll() {
   if (running) return;
   running = true;
   try {
-    const data = await apiGet(`/api/cs2/agent/poll?streamerId=${STREAMER_ID}`);
-    if (data.task) await executeTask(data.task);
+    const task = await apiGetTask();
+    if (task) await executeTask(task);
   } catch (err) {
     if (!err.message?.includes('ECONNREFUSED')) console.error('[poll error]', err.message);
   } finally {
@@ -669,9 +669,14 @@ async function poll() {
   }
 }
 
-log(`🚀 Агент запущен. Опрос каждые ${POLL_MS}ms...`);
-log('Нажми Ctrl+C для остановки\n');
-setInterval(poll, POLL_MS);
+async function start() {
+  log('🚀 Инициализация... Получение конфига Supabase');
+  await fetchConfig();
+  log(`🚀 Агент запущен. Опрос напрямую в Supabase каждые ${POLL_MS}ms...`);
+  log('Нажми Ctrl+C для остановки\n');
+  setInterval(poll, POLL_MS);
+}
+start();
 
 process.on('SIGINT', () => {
   log('\n👋 Остановка агента...');
