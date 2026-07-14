@@ -2,23 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
-const ACTION_OPTIONS = [
-  { value: 'drop_weapon',  label: '🔫 Выбросить оружие (G)' },
-  { value: 'freeze_3',     label: '🧊 Заморозка 3 сек' },
-  { value: 'freeze_5',     label: '❄️ Заморозка 5 сек' },
-  { value: 'spin_180',     label: '🔄 Разворот 180°' },
-  { value: 'block_jump',   label: '🚫 Блок прыжка 30 сек' },
-  { value: 'block_crouch', label: '🦆 Блок приседания 30 сек' },
-  { value: 'play_sound',   label: '🔊 Звук на стриме' },
-  { value: 'mouse_shake',  label: '🖱️ Тряска мыши 5 сек' },
-  { value: 'flash_screen', label: '💥 Вспышка экрана' },
-  { value: 'random_weapon_switch', label: '🎲 Рандомное оружие' },
-  { value: 'invert_mouse', label: '🔃 Инверсия мыши 10 сек' },
-  { value: 'low_sens_10',  label: '🐢 Низкая чувств. 10 сек' },
-  { value: 'high_sens_10', label: '🐇 Высокая чувств. 10 сек' },
-  { value: 'spinbot',      label: '🌪️ Крутилка (Spinbot) 10 сек' },
-  { value: 'pacifist',     label: '🕊️ Пацифист (Нет стрельбы) 15 сек' },
-]
+import { ACTION_REGISTRY } from '@/lib/cs2-actions';
+
+const ACTION_OPTIONS = Object.values(ACTION_REGISTRY).map(a => ({
+  value: a.actionType,
+  label: `${a.icon} ${a.label}`
+}));
 
 type Reward = {
   id: string

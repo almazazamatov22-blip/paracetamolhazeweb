@@ -2,23 +2,33 @@
 
 import { useState, useEffect } from 'react'
 
-const ACTION_LABELS: Record<string, { label: string; icon: string; color: string; desc: string }> = {
-  drop_weapon:   { label: 'Выбросить оружие',          icon: '🔫', color: '#ef4444', desc: 'Нажимает клавишу G — выбрасывает активное оружие.' },
-  freeze_3:      { label: 'Заморозка 3 сек',            icon: '🧊', color: '#60a5fa', desc: 'Блокирует передвижение на 3 секунды.' },
-  freeze_5:      { label: 'Заморозка 5 сек',            icon: '❄️', color: '#38bdf8', desc: 'Блокирует передвижение на 5 секунд.' },
-  spin_180:      { label: 'Разворот 180°',              icon: '🔄', color: '#a78bfa', desc: 'Мгновенный разворот камеры на 180°.' },
-  block_jump:    { label: 'Блок прыжка 30 сек',         icon: '🚫', color: '#f87171', desc: 'Блокирует прыжок на 30 секунд.' },
-  block_crouch:  { label: 'Блок приседания 30 сек',     icon: '🦆', color: '#fbbf24', desc: 'Блокирует приседание на 30 секунд.' },
-  play_sound:    { label: 'Звук на стриме',             icon: '🔊', color: '#34d399', desc: 'Воспроизводит звуковой эффект.' },
-  mouse_shake:   { label: 'Тряска мыши 5 сек',          icon: '🖱️', color: '#fb923c', desc: 'Хаотично трясёт прицел 5 секунд.' },
-  flash_screen:  { label: 'Вспышка экрана',             icon: '💥', color: '#fcd34d', desc: 'Белая вспышка на оверлее на 1 секунду.' },
-  random_weapon_switch: { label: 'Рандомное оружие',    icon: '🎲', color: '#c084fc', desc: 'Случайно переключает слоты оружия.' },
-  invert_mouse:  { label: 'Инверсия мыши 10 сек',       icon: '🔃', color: '#22d3ee', desc: 'Инвертирует движение мыши на 10 секунд.' },
-  low_sens_10:   { label: 'Низкая чувств. 10 сек',      icon: '🐢', color: '#86efac', desc: 'Снижает чувствительность мыши на 10 сек.' },
-  high_sens_10:  { label: 'Высокая чувств. 10 сек',     icon: '🐇', color: '#fca5a5', desc: 'Резко повышает чувствительность на 10 сек.' },
-  spinbot:       { label: 'Крутилка (Spinbot)',         icon: '🌪️', color: '#f472b6', desc: 'Зажимает ЛКМ и бешено крутится 10 сек.' },
-  pacifist:      { label: 'Пацифист 15 сек',            icon: '🕊️', color: '#cbd5e1', desc: 'Блокирует ЛКМ (запрещает стрелять) на 15 сек.' },
-}
+import { ACTION_REGISTRY } from '@/lib/cs2-actions';
+
+const UI_COLORS: Record<string, string> = {
+  drop_weapon: '#ef4444',
+  freeze_3: '#60a5fa',
+  freeze_5: '#38bdf8',
+  spin_180: '#a78bfa',
+  block_jump: '#f87171',
+  block_crouch: '#fbbf24',
+  play_sound: '#34d399',
+  mouse_shake: '#fb923c',
+  flash_screen: '#fcd34d',
+  random_weapon_switch: '#c084fc',
+  invert_mouse: '#22d3ee',
+  low_sens_10: '#86efac',
+  high_sens_10: '#fca5a5',
+  spinbot: '#f472b6',
+  pacifist: '#cbd5e1',
+};
+
+const ACTION_LABELS: Record<string, { label: string; icon: string; color: string; desc: string }> = 
+  Object.fromEntries(
+    Object.entries(ACTION_REGISTRY).map(([k, v]) => [
+      k, 
+      { label: v.label, icon: v.icon, color: UI_COLORS[k] || '#94a3b8', desc: v.description }
+    ])
+  );
 
 export default function CS2InteractivePage() {
   const [user, setUser] = useState<{ login: string; id: string; avatar?: string } | null>(null)

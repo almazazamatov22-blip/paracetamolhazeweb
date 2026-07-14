@@ -63,19 +63,31 @@ set NODE_BIN=node_portable\\node.exe
 :download_agent
 
 echo [+] Загрузка скрипта агента...
-powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%BASE_URL%/cs2-agent.js' -OutFile 'cs2-agent.js'"
+set AGENT_URL=%BASE_URL%/api/cs2/agent/download?t=%RANDOM%
+powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%AGENT_URL%' -OutFile 'cs2-agent.js.tmp'"
 
-if not exist cs2-agent.js (
-    echo [❌] Не удалось скачать cs2-agent.js.
-    pause
-    exit /b 1
+if not exist cs2-agent.js.tmp (
+    echo [❌] Не удалось скачать cs2-agent.js.tmp
+    if exist cs2-agent.js (
+        echo [!] Использую старую закэшированную версию.
+    ) else (
+        pause
+        exit /b 1
+    )
+) else (
+    move /y cs2-agent.js.tmp cs2-agent.js >nul
 )
-
-if exist cs2_input_helper.exe del cs2_input_helper.exe
 
 :: Create a start.bat shortcut for future quick runs
 echo @echo off > start.bat
 echo chcp 65001 ^>nul >> start.bat
+echo title CS2 Interactive Agent Setup >> start.bat
+echo set STREAMER_ID=%STREAMER_ID% >> start.bat
+echo set BASE_URL=%BASE_URL% >> start.bat
+echo echo [+] Проверка обновлений... >> start.bat
+echo set AGENT_URL=%%BASE_URL%%/api/cs2/agent/download?t=%%RANDOM%% >> start.bat
+echo powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%%AGENT_URL%%' -OutFile 'cs2-agent.js.tmp' -UseBasicParsing" >> start.bat
+echo if exist cs2-agent.js.tmp move /y cs2-agent.js.tmp cs2-agent.js ^>nul >> start.bat
 if "%NODE_BIN%"=="node" (
     echo node cs2-agent.js --streamerId=%STREAMER_ID% --baseUrl=%BASE_URL% >> start.bat
 ) else (
