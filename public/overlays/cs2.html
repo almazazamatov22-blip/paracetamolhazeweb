@@ -364,38 +364,79 @@
 
         const seenForBanner = new Set();
         const seenForEffects = new Set();
+        let overlayConfig = null;
+        let reconcileInFlight = false;
+
+        function getDurationMs(ev) {
+          const registryDuration = Number(ACTION_REGISTRY[ev.action_type]?.durationMs);
+          if (registryDuration > 0) return registryDuration;
+          const eventDuration = Number(ev.duration_ms);
+          return eventDuration > 0 ? eventDuration : 2000;
+        }
+
+        function maybeShowBanner(ev) {
+          if (!ev || seenForBanner.has(ev.id)) return;
+
+          const durationMs = getDurationMs(ev);
+          const startedAt = ev.started_at ? new Date(ev.started_at).getTime() : NaN;
+          let remainingMs = Number.isFinite(startedAt)
+            ? (startedAt + durationMs) - Date.now()
+            : 0;
+
+          // A fast action can change processing -> done before OBS receives the
+          // processing event. Keep a short done fallback for those actions.
+          if (ev.status === 'done' && durationMs <= 2500) {
+            remainingMs = Math.max(remainingMs, 1800);
+          }
+
+          // A processing claim without started_at is intentionally ignored. The
+          // agent writes started_at only after the helper confirms STARTED.
+          if (ev.status === 'processing' && !Number.isFinite(startedAt)) return;
+          if (remainingMs <= 0) return;
+
+          seenForBanner.add(ev.id);
+          showBanner(ev, remainingMs, durationMs);
+        }
 
         function handleEvent(ev) {
           if (!ev) return;
-          
-          if (ev.status === 'processing') {
-            if (!seenForBanner.has(ev.id)) {
-              seenForBanner.add(ev.id);
-              
-              const durationMs = ev.duration_ms || (ACTION_REGISTRY[ev.action_type]?.durationMs ?? 4000);
-              let remainingMs = durationMs;
-              
-              if (ev.started_at) {
-                const startedAt = new Date(ev.started_at).getTime();
-                remainingMs = (startedAt + durationMs) - Date.now();
-              }
-              
-              if (remainingMs > 0) {
-                showBanner(ev, remainingMs, durationMs);
-              }
+
+          if (ev.status === 'processing' || ev.status === 'done') {
+            maybeShowBanner(ev);
+          }
+
+          const effectHasStarted = ev.status === 'done' ||
+            (ev.status === 'processing' && Boolean(ev.started_at));
+
+          if (effectHasStarted && !seenForEffects.has(ev.id)) {
+            seenForEffects.add(ev.id);
+            if (ev.action_type === 'flash_screen') {
+              triggerFlash();
+            } else if (ev.action_type === 'play_sound') {
+              triggerStreamSound();
             }
           }
-          
-          // Audio effects can run immediately upon seeing processing or done
-          if (ev.status === 'processing' || ev.status === 'done') {
-            if (!seenForEffects.has(ev.id)) {
-              seenForEffects.add(ev.id);
-              if (ev.action_type === 'flash_screen') {
-                triggerFlash();
-              } else if (ev.action_type === 'play_sound') {
-                triggerStreamSound();
-              }
-            }
+        }
+
+        async function reconcileProcessing() {
+          if (!overlayConfig || reconcileInFlight) return;
+          reconcileInFlight = true;
+          try {
+            const url = `${overlayConfig.supabaseUrl}/rest/v1/cs2_reward_queue?streamer_id=eq.${STREAMER_ID}&status=eq.processing&started_at=not.is.null&order=created_at.desc&limit=5`;
+            const res = await fetch(url, {
+              cache: 'no-store',
+              headers: {
+                'apikey': overlayConfig.supabaseAnonKey,
+                'Authorization': `Bearer ${overlayConfig.supabaseAnonKey}`,
+              },
+            });
+            if (!res.ok) return;
+            const events = await res.json();
+            for (const ev of (events || [])) handleEvent(ev);
+          } catch (e) {
+            console.warn('[CS2 Overlay] Reconcile failed:', e);
+          } finally {
+            reconcileInFlight = false;
           }
         }
 
@@ -409,6 +450,7 @@
             // Get Config
             const cfgRes = await fetch(`${BASE_URL}/api/cs2/agent/config`);
             const cfg = await cfgRes.json();
+            overlayConfig = cfg;
             ACTION_REGISTRY = cfg.actions || {};
             
             // Get Initial pending or processing
@@ -425,7 +467,14 @@
             client.channel('public:cs2_reward_queue')
               .on('postgres_changes', { event: '*', schema: 'public', table: 'cs2_reward_queue', filter: `streamer_id=eq.${STREAMER_ID}` }, payload => {
                 handleEvent(payload.new);
-              }).subscribe();
+              })
+              .subscribe(status => {
+                if (status === 'SUBSCRIBED') reconcileProcessing();
+              });
+
+            // Realtime is primary. This lightweight direct-Supabase reconciliation
+            // catches very fast processing -> done transitions and reconnect gaps.
+            setInterval(reconcileProcessing, 1000);
 
           } catch(e) {
             console.error('[CS2 Overlay] Init error:', e);

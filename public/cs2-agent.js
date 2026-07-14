@@ -18,7 +18,7 @@ const STREAMER_ID = String(process.env.CS2_STREAMER_ID || args.streamerId || '')
 const AGENT_SECRET = process.env.CS2_AGENT_SECRET || args.agentSecret || '';
 const POLL_MS = parseInt(process.env.CS2_POLL_MS || args.pollMs || '500');
 
-const AGENT_VERSION = "2.0.1";
+const AGENT_VERSION = "2.0.2";
 console.log(`[CS2 Agent] Запуск версии ${AGENT_VERSION}`);
 
 if (!STREAMER_ID) {
@@ -246,11 +246,31 @@ class HookApp : Form
     const int LLKHF_INJECTED = 0x00000010;
     const int LLMHF_INJECTED = 0x00000001;
 
+    IntPtr cachedCs2Handle = IntPtr.Zero;
+
     IntPtr GetCs2Handle()
     {
+        if (cachedCs2Handle != IntPtr.Zero && IsWindow(cachedCs2Handle)) {
+            return cachedCs2Handle;
+        }
+
         Process[] procs = Process.GetProcessesByName("cs2");
-        if (procs.Length > 0) return procs[0].MainWindowHandle;
+        for (int i = 0; i < procs.Length; i++) {
+            IntPtr handle = procs[i].MainWindowHandle;
+            if (handle != IntPtr.Zero && IsWindow(handle)) {
+                cachedCs2Handle = handle;
+                return handle;
+            }
+        }
+
+        cachedCs2Handle = IntPtr.Zero;
         return IntPtr.Zero;
+    }
+
+    bool IsCs2Foreground()
+    {
+        IntPtr cs2Wnd = GetCs2Handle();
+        return cs2Wnd != IntPtr.Zero && GetForegroundWindow() == cs2Wnd;
     }
 
     IntPtr KeyboardHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -277,12 +297,12 @@ class HookApp : Form
                     }
                 }
 
-                if (BlockJumpActive && kbd.vkCode == 0x20) // Space
+                if (BlockJumpActive && IsCs2Foreground() && kbd.vkCode == 0x20) // Space
                 {
                     return (IntPtr)1; // Block original space
                 }
                 
-                if (BlockCrouchActive && (kbd.vkCode == 0xA2 || kbd.vkCode == 0xA3 || kbd.vkCode == 0x11 || kbd.vkCode == 0x43)) // Ctrl/C
+                if (BlockCrouchActive && IsCs2Foreground() && (kbd.vkCode == 0xA2 || kbd.vkCode == 0xA3 || kbd.vkCode == 0x11 || kbd.vkCode == 0x43)) // Ctrl/C
                 {
                     return (IntPtr)1; // Block original crouch
                 }
@@ -302,12 +322,19 @@ class HookApp : Form
             
             if (!isInjected)
             {
-                if (BlockJumpActive && wm == 0x020A) // Scroll
+                // Suppress ordinary Windows mouse movement while CS2 freeze is active.
+                // Raw Input is compensated separately in WndProc below.
+                if (FreezeActive && IsCs2Foreground() && wm == 0x0200) // WM_MOUSEMOVE
+                {
+                    return (IntPtr)1;
+                }
+
+                if (BlockJumpActive && IsCs2Foreground() && wm == 0x020A) // Scroll
                 {
                     return (IntPtr)1; // Block scroll
                 }
                 
-                if (PacifistActive && (wm == 0x0201 || wm == 0x0202)) // LBUTTONDOWN / LBUTTONUP
+                if (PacifistActive && IsCs2Foreground() && (wm == 0x0201 || wm == 0x0202)) // LBUTTONDOWN / LBUTTONUP
                 {
                     return (IntPtr)1; // Block shooting
                 }
@@ -407,6 +434,7 @@ class HookApp : Form
         SendKey(0x39, false); // Space
         SendKey(0x1D, false); // Ctrl
         SendKey(0x2A, false); // Shift
+        SendKey(0x2E, false); // C
     }
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -454,6 +482,7 @@ class HookApp : Form
             flashForm.FormBorderStyle = FormBorderStyle.None;
             flashForm.StartPosition = FormStartPosition.Manual;
             flashForm.BackColor = Color.White;
+            flashForm.TopMost = true;
             flashForm.ShowInTaskbar = false;
             
             flashForm.Location = new Point(pt.X, pt.Y);
@@ -481,6 +510,8 @@ class HookApp : Form
             app = mainApp;
             f.Opacity = opacity;
             f.Show();
+            f.TopMost = true;
+            SetWindowPos(f.Handle, HWND_TOPMOST, f.Left, f.Top, f.Width, f.Height, SWP_NOACTIVATE);
             
             fadeTimer = new System.Windows.Forms.Timer();
             fadeTimer.Interval = 30; // 30ms step
@@ -508,6 +539,10 @@ class HookApp : Form
         try {
             Console.WriteLine("STARTED " + cmdId);
             Console.Out.Flush();
+
+            // Give Node -> Supabase -> OBS Realtime a short head start, so the
+            // notification appears together with the actual effect.
+            Thread.Sleep(250);
             
             if (actionType == "drop_weapon") {
                 SendKey(0x22, true); Thread.Sleep(50); SendKey(0x22, false);
@@ -542,10 +577,13 @@ class HookApp : Form
             else if (actionType == "block_jump") {
                 ThreadPool.QueueUserWorkItem(_ => {
                     try {
+                        // Release a jump that was already held before enabling the hook.
+                        SendKey(0x39, false);
                         BlockJumpActive = true;
                         Thread.Sleep(durationMs);
                     } finally {
                         BlockJumpActive = false;
+                        SendKey(0x39, false);
                         Console.WriteLine("FINISHED " + cmdId);
                         Console.Out.Flush();
                     }
@@ -555,10 +593,16 @@ class HookApp : Form
             else if (actionType == "block_crouch") {
                 ThreadPool.QueueUserWorkItem(_ => {
                     try {
+                        // Release Ctrl/C before blocking. Otherwise a key pressed at the
+                        // activation boundary can remain logically held inside CS2.
+                        SendKey(0x1D, false); // Ctrl
+                        SendKey(0x2E, false); // C
                         BlockCrouchActive = true;
                         Thread.Sleep(durationMs);
                     } finally {
                         BlockCrouchActive = false;
+                        SendKey(0x1D, false);
+                        SendKey(0x2E, false);
                         Console.WriteLine("FINISHED " + cmdId);
                         Console.Out.Flush();
                     }
@@ -568,10 +612,17 @@ class HookApp : Form
             else if (actionType == "pacifist") {
                 ThreadPool.QueueUserWorkItem(_ => {
                     try {
+                        // Cancel a shot that was already held at activation time.
+                        SendMouseClick(false);
                         PacifistActive = true;
-                        Thread.Sleep(durationMs);
+                        DateTime pacifistEnd = DateTime.UtcNow.AddMilliseconds(durationMs);
+                        while (DateTime.UtcNow < pacifistEnd) {
+                            SendMouseClick(false);
+                            Thread.Sleep(20);
+                        }
                     } finally {
                         PacifistActive = false;
+                        SendMouseClick(false);
                         Console.WriteLine("FINISHED " + cmdId);
                         Console.Out.Flush();
                     }
@@ -597,6 +648,18 @@ class HookApp : Form
                     }
                 });
                 return;
+            }
+            else if (actionType == "random_weapon_switch") {
+                // Press two distinct random weapon slots. The second slot is the final
+                // result; using two distinct slots guarantees a visible switch even
+                // when the first randomly selected slot was already active.
+                ushort[] slots = new ushort[] { 0x02, 0x03, 0x04 }; // 1, 2, 3
+                Random rnd = new Random();
+                int first = rnd.Next(0, slots.Length);
+                int second = (first + 1 + rnd.Next(0, slots.Length - 1)) % slots.Length;
+                SendKey(slots[first], true); Thread.Sleep(45); SendKey(slots[first], false);
+                Thread.Sleep(120);
+                SendKey(slots[second], true); Thread.Sleep(45); SendKey(slots[second], false);
             }
             else if (actionType == "invert_mouse") {
                 ThreadPool.QueueUserWorkItem(_ => {
@@ -700,6 +763,7 @@ class HookApp : Form
                     FreezeActive = false;
                     MultiplierX = 1.0;
                     MultiplierY = 1.0;
+                    SendMouseClick(false);
                     if (activeFlashForm != null && !activeFlashForm.IsDisposed) {
                         try {
                             activeFlashForm.Invoke((MethodInvoker)delegate { activeFlashForm.Close(); });
@@ -853,36 +917,66 @@ function startHelper() {
 startHelper();
 
 function sendCmd(cmdId, actionType, durationMs) {
-  return new Promise((resolve, reject) => {
-    if (!helperProc || !helperProc.stdin.writable) {
-      return reject(new Error('Helper not running'));
-    }
-    
-    let started = false;
-    
-    const startTimeout = setTimeout(() => {
-      if (!started) {
-        pendingCommands.delete(cmdId);
-        reject(new Error('Timeout waiting for STARTED'));
-      }
-    }, 3000);
+  if (!helperProc || !helperProc.stdin.writable) {
+    throw new Error('Helper not running');
+  }
 
-    const handlers = {
-      onStarted: () => {
-        started = true;
-        clearTimeout(startTimeout);
-      },
-      onFinished: () => {
-        resolve();
-      },
-      onError: (err) => {
-        reject(err);
-      }
-    };
-    
-    pendingCommands.set(cmdId, handlers);
-    helperProc.stdin.write(`COMMAND ${cmdId} ${actionType} ${durationMs}\n`);
+  let startResolve;
+  let startReject;
+  let finishResolve;
+  let finishReject;
+
+  const started = new Promise((resolve, reject) => {
+    startResolve = resolve;
+    startReject = reject;
   });
+  const finished = new Promise((resolve, reject) => {
+    finishResolve = resolve;
+    finishReject = reject;
+  });
+  // Prevent an unhandled rejection when STARTED itself times out and the caller
+  // never reaches await command.finished. Awaiting it later still rejects normally.
+  finished.catch(() => {});
+
+  let didStart = false;
+  const startTimeout = setTimeout(() => {
+    if (!didStart) {
+      pendingCommands.delete(cmdId);
+      const error = new Error('Timeout waiting for STARTED');
+      startReject(error);
+      finishReject(error);
+    }
+  }, 3000);
+
+  const finishTimeout = setTimeout(() => {
+    if (pendingCommands.has(cmdId)) {
+      pendingCommands.delete(cmdId);
+      finishReject(new Error('Timeout waiting for FINISHED'));
+    }
+  }, Math.max(Number(durationMs) + 10000, 15000));
+
+  pendingCommands.set(cmdId, {
+    onStarted: () => {
+      if (didStart) return;
+      didStart = true;
+      clearTimeout(startTimeout);
+      startResolve();
+    },
+    onFinished: () => {
+      clearTimeout(startTimeout);
+      clearTimeout(finishTimeout);
+      finishResolve();
+    },
+    onError: (err) => {
+      clearTimeout(startTimeout);
+      clearTimeout(finishTimeout);
+      if (!didStart) startReject(err);
+      finishReject(err);
+    },
+  });
+
+  helperProc.stdin.write(`COMMAND ${cmdId} ${actionType} ${durationMs}\n`);
+  return { started, finished };
 }
 
 // ── Utilities ──
@@ -958,7 +1052,8 @@ async function setTaskStatus(taskId, status, errorMsg = null, requirePending = f
   const body = { status };
   if (errorMsg) body.error = errorMsg;
   if (status === 'processing') {
-    body.started_at = new Date().toISOString();
+    // Claim the task first, but do not start the OBS timer until the helper
+    // confirms STARTED. markTaskStarted() writes started_at separately.
     if (Number.isFinite(Number(durationMs))) body.duration_ms = Number(durationMs);
   } else if (status === 'done') {
     body.finished_at = new Date().toISOString();
@@ -990,15 +1085,35 @@ async function setTaskStatus(taskId, status, errorMsg = null, requirePending = f
   return data[0] || null;
 }
 
+async function markTaskStarted(taskId, durationMs) {
+  if (taskId.startsWith('test_')) return;
+
+  const url = `${supabaseUrl}/rest/v1/cs2_reward_queue?id=eq.${encodeURIComponent(taskId)}&status=eq.processing`;
+  const body = {
+    started_at: new Date().toISOString(),
+    duration_ms: Number(durationMs),
+  };
+
+  const result = await patchTaskStatus(url, body);
+  if (!result.res.ok) {
+    throw new Error(`markTaskStarted failed: ${result.res.status} ${result.text}`);
+  }
+}
+
 // ── Действия ──
 async function executeTask(task) {
   log(`\n▶ Задача [${task.id.substring(0,8)}] action="${task.action_type}" от "${task.user_name}"`);
 
-  // Атомарный перевод в processing
+  const registryDurationMs = Number(actionsRegistry[task.action_type]?.durationMs);
+  const durationMs = registryDurationMs > 0
+    ? registryDurationMs
+    : (Number(task.duration_ms) > 0 ? Number(task.duration_ms) : 2000);
+  task.duration_ms = durationMs;
+
+  // Atomic claim. This prevents duplicate execution, but started_at is written
+  // only after the helper emits STARTED, keeping OBS synchronized with the effect.
   try {
-    const fallbackDurationMs = Number(task.duration_ms) || Number(actionsRegistry[task.action_type]?.durationMs) || 2000;
-    const updatedTask = await setTaskStatus(task.id, 'processing', null, true, fallbackDurationMs);
-    task.duration_ms = Number(updatedTask?.duration_ms) || fallbackDurationMs;
+    await setTaskStatus(task.id, 'processing', null, true, durationMs);
   } catch (err) {
     log(`⚠️ Пропуск задачи ${task.id.substring(0,8)}: ${err.message}`);
     return;
@@ -1007,15 +1122,21 @@ async function executeTask(task) {
   try {
     const cmdId = task.id;
     const actionType = task.action_type;
-    const durationMs = task.duration_ms;
 
-    log(`⏳ Ожидание завершения действия ${actionType} (${durationMs}ms)...`);
-    
-    // For play_sound, there is no C# helper logic, just wait.
+    log(`⏳ Запуск действия ${actionType} (${durationMs}ms)...`);
+
     if (actionType === 'play_sound') {
+      await markTaskStarted(task.id, durationMs);
       await sleep(durationMs);
     } else {
-      await sendCmd(cmdId, actionType, durationMs);
+      const command = sendCmd(cmdId, actionType, durationMs);
+      await command.started;
+      try {
+        await markTaskStarted(task.id, durationMs);
+      } catch (startErr) {
+        console.warn(`[WARN] Не удалось синхронизировать started_at: ${startErr.message}`);
+      }
+      await command.finished;
     }
 
     await setTaskStatus(task.id, 'done');
@@ -1030,31 +1151,18 @@ async function executeTask(task) {
 
 // ── Polling loop (REST polling напрямую в Supabase) ──
 let running = false;
-let currentPollMs = 1000;
-let emptyPollCount = 0;
 
 async function poll() {
   if (running) return;
   running = true;
   try {
     const task = await apiGetTask();
-    if (task) {
-      emptyPollCount = 0;
-      currentPollMs = 1000;
-      await executeTask(task);
-    } else {
-      emptyPollCount++;
-      if (emptyPollCount > 5) {
-        currentPollMs = 5000;
-      } else {
-        currentPollMs = 2500;
-      }
-    }
+    if (task) await executeTask(task);
   } catch (err) {
     if (!err.message?.includes('ECONNREFUSED')) console.error('[poll error]', err.message);
   } finally {
     running = false;
-    setTimeout(poll, currentPollMs);
+    setTimeout(poll, POLL_MS);
   }
 }
 
@@ -1090,9 +1198,9 @@ async function start() {
 
   log('🚀 Инициализация... Получение конфига Supabase');
   await fetchConfig();
-  log(`🚀 Агент запущен. REST polling напрямую в Supabase каждые 2500-5000ms...`);
+  log(`🚀 Агент запущен. REST polling напрямую в Supabase каждые ${POLL_MS}ms...`);
   log('Нажми Ctrl+C для остановки\n');
-  setTimeout(poll, currentPollMs);
+  setTimeout(poll, POLL_MS);
 }
 start();
 

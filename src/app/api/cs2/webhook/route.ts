@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import * as crypto from 'crypto';
 import { getSupabaseServerKey, getSupabaseUrl } from '@/lib/supabase-env';
+import { ACTION_REGISTRY } from '@/lib/cs2-actions';
 
 export const runtime = 'nodejs';
 
@@ -198,6 +199,7 @@ export async function POST(req: NextRequest) {
         user_avatar: userAvatar,
         action_type: reward.action_type,
         reward_name: reward.name,
+        duration_ms: ACTION_REGISTRY[reward.action_type]?.durationMs ?? 2000,
         status: 'pending',
       });
 
