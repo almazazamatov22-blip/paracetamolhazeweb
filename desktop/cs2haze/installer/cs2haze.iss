@@ -1,0 +1,39 @@
+#define MyAppName "cs2haze"
+#define MyAppVersion "1.0.0"
+#define MyAppPublisher "Paracetamol Haze"
+#define MyAppExeName "cs2haze.exe"
+
+[Setup]
+AppId={{C0F8FE6E-4336-46A1-9C56-5F1A56C2A54E}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+DefaultDirName={localappdata}\Programs\cs2haze
+DefaultGroupName=cs2haze
+DisableProgramGroupPage=yes
+PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog
+OutputDir=..\dist
+OutputBaseFilename=CS2Haze-Setup
+SetupIconFile=..\assets\cs2haze.ico
+UninstallDisplayIcon={app}\cs2haze.exe
+Compression=lzma2/ultra64
+SolidCompression=yes
+WizardStyle=modern
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+CloseApplications=yes
+RestartApplications=no
+
+[Files]
+Source: "..\dist\launcher\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\runtime\*"; DestDir: "{app}\runtime"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\assets\cs2haze.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
+Source: "..\launcher\launcher-config.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
+
+[Icons]
+Name: "{autodesktop}\cs2haze"; Filename: "{app}\cs2haze.exe"; IconFilename: "{app}\Assets\cs2haze.ico"
+Name: "{group}\cs2haze"; Filename: "{app}\cs2haze.exe"; IconFilename: "{app}\Assets\cs2haze.ico"
+
+[Run]
+Filename: "{app}\cs2haze.exe"; Description: "Запустить cs2haze"; Flags: nowait postinstall skipifsilent

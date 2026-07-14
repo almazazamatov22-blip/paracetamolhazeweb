@@ -1,0 +1,11 @@
+{
+  "launcherVersion": "1.0.0",
+  "runtimeVersion": "2.0.6",
+  "mandatory": true,
+  "runtimeUrl": "https://RELEASE-OR-STORAGE/cs2haze-runtime.zip",
+  "runtimeSha256": "REPLACE_AFTER_BUILD",
+  "launcherUrl": null,
+  "launcherSha256": null,
+  "requireAuthentication": false,
+  "requireSubscription": false
+}

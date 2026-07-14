@@ -1,0 +1,7 @@
+{
+  "ApiBaseUrl": "https://paracetamolhaze.ru",
+  "AgentBaseUrl": "https://paracetamolhaze.vercel.app",
+  "ManifestPath": "/api/cs2/launcher/manifest",
+  "RequireAuthentication": false,
+  "RequireSubscription": false
+}
