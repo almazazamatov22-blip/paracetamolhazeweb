@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Windows.Forms;
 
 namespace CS2Haze.Updater;
 
