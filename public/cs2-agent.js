@@ -18,7 +18,7 @@ const STREAMER_ID = String(process.env.CS2_STREAMER_ID || args.streamerId || '')
 const AGENT_SECRET = process.env.CS2_AGENT_SECRET || args.agentSecret || '';
 const POLL_MS = parseInt(process.env.CS2_POLL_MS || args.pollMs || '500');
 
-const AGENT_VERSION = "2.0.3";
+const AGENT_VERSION = "2.0.4";
 console.log(`[CS2 Agent] Запуск версии ${AGENT_VERSION}`);
 
 if (!STREAMER_ID) {
@@ -185,7 +185,6 @@ class HookApp : Form
     
     public volatile bool BlockJumpActive = false;
     public volatile bool BlockCrouchActive = false;
-    public volatile bool PacifistActive = false;
     public volatile bool FreezeActive = false;
 
     IntPtr kbHookId = IntPtr.Zero;
@@ -317,13 +316,9 @@ class HookApp : Form
         {
             MSLLHOOKSTRUCT ms = (MSLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(MSLLHOOKSTRUCT));
             int wm = wParam.ToInt32();
-            
-            // Only input emitted by this helper may bypass Pacifist.
-            // Some gaming-mouse software marks real clicks as LLMHF_INJECTED,
-            // so treating every injected event as trusted made blocking intermittent.
-            bool isOwnInjected = ms.dwExtraInfo == INJECTED_TAG;
-            
-            if (!isOwnInjected)
+            bool isInjected = (ms.dwExtraInfo == INJECTED_TAG) || ((ms.flags & LLMHF_INJECTED) != 0);
+
+            if (!isInjected)
             {
                 // Suppress ordinary Windows mouse movement while CS2 freeze is active.
                 // Raw Input is compensated separately in WndProc below.
@@ -335,11 +330,6 @@ class HookApp : Form
                 if (BlockJumpActive && IsCs2Foreground() && wm == 0x020A) // Scroll
                 {
                     return (IntPtr)1; // Block scroll
-                }
-                
-                if (PacifistActive && IsCs2Foreground() && (wm == 0x0201 || wm == 0x0202 || wm == 0x0203)) // LBUTTONDOWN / LBUTTONUP / DBLCLK
-                {
-                    return (IntPtr)1; // Block shooting
                 }
             }
         }
@@ -364,13 +354,6 @@ class HookApp : Form
                         int lLastX = Marshal.ReadInt32(pData, headerSize + 12);
                         int lLastY = Marshal.ReadInt32(pData, headerSize + 16);
                         uint ulExtra = (uint)Marshal.ReadInt32(pData, headerSize + 20);
-                        ushort buttonFlags = (ushort)Marshal.ReadInt16(pData, headerSize + 4);
-
-                        // Raw Input can bypass WH_MOUSE_LL in some CS2/mouse-driver setups.
-                        // Immediately release every physical left-button down as a second layer.
-                        if (PacifistActive && IsCs2Foreground() && (buttonFlags & 0x0001) != 0) {
-                            SendMouseClick(false);
-                        }
                         
                         if (ulExtra != (uint)INJECTED_TAG.ToInt32() && (lLastX != 0 || lLastY != 0))
                         {
@@ -452,6 +435,47 @@ class HookApp : Form
     [DllImport("user32.dll")]
     static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
+    [DllImport("user32.dll")]
+    static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    const int SW_SHOWNOACTIVATE = 4;
+    const uint SWP_SHOWWINDOW = 0x0040;
+
+    class NoActivateFlashForm : Form
+    {
+        const int WS_EX_LAYERED = 0x00080000;
+        const int WS_EX_TRANSPARENT = 0x00000020;
+        const int WS_EX_TOOLWINDOW = 0x00000080;
+        const int WS_EX_NOACTIVATE = 0x08000000;
+        const int WM_NCHITTEST = 0x0084;
+        const int HTTRANSPARENT = -1;
+
+        protected override bool ShowWithoutActivation
+        {
+            get { return true; }
+        }
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams cp = base.CreateParams;
+                cp.ExStyle |= WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
+                return cp;
+            }
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_NCHITTEST)
+            {
+                m.Result = new IntPtr(HTTRANSPARENT);
+                return;
+            }
+            base.WndProc(ref m);
+        }
+    }
+
     void FlashScreen(string cmdId, int durationMs)
     {
         IntPtr cs2Wnd = GetCs2Handle();
@@ -477,7 +501,6 @@ class HookApp : Form
             return;
         }
 
-        // Close existing if any
         if (activeFlashForm != null && !activeFlashForm.IsDisposed) {
             try {
                 activeFlashForm.Invoke((MethodInvoker)delegate {
@@ -487,21 +510,29 @@ class HookApp : Form
         }
 
         ThreadPool.QueueUserWorkItem(_ => {
-            Form flashForm = new Form();
+            NoActivateFlashForm flashForm = new NoActivateFlashForm();
             activeFlashForm = flashForm;
             flashForm.FormBorderStyle = FormBorderStyle.None;
             flashForm.StartPosition = FormStartPosition.Manual;
             flashForm.BackColor = Color.White;
-            flashForm.TopMost = true;
             flashForm.ShowInTaskbar = false;
-            
             flashForm.Location = new Point(pt.X, pt.Y);
             flashForm.Size = new Size(rect.Width, rect.Height);
+            flashForm.Opacity = 1.0;
 
-            int initialStyle = GetWindowLong(flashForm.Handle, -20);
-            SetWindowLong(flashForm.Handle, -20, initialStyle | 0x80000 /* WS_EX_LAYERED */ | 0x20 /* WS_EX_TRANSPARENT */ | 0x08000000 /* WS_EX_NOACTIVATE */ | 0x00000080 /* WS_EX_TOOLWINDOW */);
-            
-            SetWindowPos(flashForm.Handle, HWND_TOPMOST, pt.X, pt.Y, rect.Width, rect.Height, SWP_NOACTIVATE);
+            // Creating and showing the window with explicit NOACTIVATE flags avoids
+            // the alt-tab-like focus/cursor flash caused by Form.Show()/TopMost.
+            IntPtr flashHandle = flashForm.Handle;
+            ShowWindow(flashHandle, SW_SHOWNOACTIVATE);
+            SetWindowPos(
+                flashHandle,
+                HWND_TOPMOST,
+                pt.X,
+                pt.Y,
+                rect.Width,
+                rect.Height,
+                SWP_NOACTIVATE | SWP_SHOWWINDOW
+            );
 
             Application.Run(new FlashApplicationContext(flashForm, cmdId, this, durationMs));
         });
@@ -516,21 +547,18 @@ class HookApp : Form
         int totalMs;
         int holdMs;
         bool finished = false;
-        
+
         public FlashApplicationContext(Form form, string commandId, HookApp mainApp, int durationMs) {
             f = form;
             cmdId = commandId;
             app = mainApp;
-            totalMs = Math.Max(1200, durationMs);
-            holdMs = Math.Min(700, Math.Max(500, totalMs / 3));
+
+            // Slower and stronger than v2.0.3:
+            // at least 1 second fully white, then a long smooth fade.
+            totalMs = Math.Max(3000, durationMs);
+            holdMs = Math.Min(1200, Math.Max(1000, totalMs / 3));
             startedAt = DateTime.UtcNow;
 
-            // Strong flash: stay fully white first, then fade over the remaining time.
-            f.Opacity = 1.0;
-            f.Show();
-            f.TopMost = true;
-            SetWindowPos(f.Handle, HWND_TOPMOST, f.Left, f.Top, f.Width, f.Height, SWP_NOACTIVATE);
-            
             fadeTimer = new System.Windows.Forms.Timer();
             fadeTimer.Interval = 16;
             fadeTimer.Tick += FadeTimer_Tick;
@@ -547,7 +575,7 @@ class HookApp : Form
             Console.Out.Flush();
             ExitThread();
         }
-        
+
         private void FadeTimer_Tick(object sender, EventArgs e) {
             double elapsedMs = (DateTime.UtcNow - startedAt).TotalMilliseconds;
             if (elapsedMs >= totalMs) {
@@ -635,29 +663,6 @@ class HookApp : Form
                         BlockCrouchActive = false;
                         SendKey(0x1D, false);
                         SendKey(0x2E, false);
-                        Console.WriteLine("FINISHED " + cmdId);
-                        Console.Out.Flush();
-                    }
-                });
-                return;
-            }
-            else if (actionType == "pacifist") {
-                ThreadPool.QueueUserWorkItem(_ => {
-                    try {
-                        // Publish the state before releasing the button, so no click can
-                        // slip through at the activation boundary.
-                        PacifistActive = true;
-                        SendMouseClick(false);
-                        DateTime pacifistEnd = DateTime.UtcNow.AddMilliseconds(durationMs);
-                        while (DateTime.UtcNow < pacifistEnd) {
-                            // The low-level hook is primary. Rapid mouse-up injection is a
-                            // fallback for CS2 Raw Input and gaming-mouse driver paths.
-                            SendMouseClick(false);
-                            Thread.Sleep(5);
-                        }
-                    } finally {
-                        PacifistActive = false;
-                        SendMouseClick(false);
                         Console.WriteLine("FINISHED " + cmdId);
                         Console.Out.Flush();
                     }
@@ -794,7 +799,6 @@ class HookApp : Form
                     ReleaseMovementKeys();
                     BlockJumpActive = false;
                     BlockCrouchActive = false;
-                    PacifistActive = false;
                     FreezeActive = false;
                     MultiplierX = 1.0;
                     MultiplierY = 1.0;

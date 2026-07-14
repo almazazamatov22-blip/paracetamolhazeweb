@@ -161,6 +161,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    const actionConfig = ACTION_REGISTRY[reward.action_type];
+    if (!actionConfig) {
+      // The action was removed from the product (for example, pacifist).
+      // Disable the stale internal mapping so it cannot keep producing no-op tasks.
+      await supabase
+        .from('cs2_rewards')
+        .update({ enabled: false })
+        .eq('id', reward.id);
+
+      await logError(
+        'cs2_webhook',
+        'Unsupported CS2 action was disabled',
+        { rewardId: reward.id, actionType: reward.action_type },
+        'warn'
+      );
+
+      return NextResponse.json({ ok: true });
+    }
+
     // Кулдаун — проверяем последнее выполнение
     if (reward.cooldown_seconds > 0) {
       const cooldownAgo = new Date(Date.now() - reward.cooldown_seconds * 1000).toISOString();
@@ -199,7 +218,7 @@ export async function POST(req: NextRequest) {
         user_avatar: userAvatar,
         action_type: reward.action_type,
         reward_name: reward.name,
-        duration_ms: ACTION_REGISTRY[reward.action_type]?.durationMs ?? 2000,
+        duration_ms: actionConfig.durationMs,
         status: 'pending',
       });
 

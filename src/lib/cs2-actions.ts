@@ -57,16 +57,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
     durationMs: 30000,
     effectType: 'keyboard',
     description: 'Блокирует приседание на 30 секунд.',
-  },
-  pacifist: {
-    actionType: 'pacifist',
-    label: 'Пацифист 15 сек',
-    icon: '🕊️',
-    durationMs: 15000,
-    effectType: 'mouse',
-    description: 'Блокирует ЛКМ (запрещает стрелять) на 15 сек.',
-  },
-  play_sound: {
+  },  play_sound: {
     actionType: 'play_sound',
     label: 'Звук на стриме',
     icon: '🔊',
@@ -86,9 +77,9 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
     actionType: 'flash_screen',
     label: 'Вспышка экрана',
     icon: '💥',
-    durationMs: 2000,
+    durationMs: 3000,
     effectType: 'overlay',
-    description: 'Сильная белая вспышка поверх окна CS2 на 2 секунды.',
+    description: 'Сильная белая вспышка: 1 секунда полной яркости и плавное затухание.',
   },
   random_weapon_switch: {
     actionType: 'random_weapon_switch',
