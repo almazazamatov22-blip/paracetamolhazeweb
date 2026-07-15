@@ -46,6 +46,7 @@ jobs:
       - name: Build cs2haze
         shell: powershell
         run: |
+          npm ci
           .\desktop\cs2haze\scripts\build-cs2haze.ps1 -RepoRoot $PWD
 
       - name: Test autonomous agent runtime
