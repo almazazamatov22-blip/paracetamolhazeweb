@@ -237,8 +237,10 @@ export default function Home() {
   const [selectedAuctionRewardIds, setSelectedAuctionRewardIds] = useState<string[]>([])
   const [isGiveawayConnected, setIsGiveawayConnected] = useState(false)
   const [participants, setParticipants] = useState<Participant[]>([])
-  const [totalMessages, setTotalMessages] = useState(0)
-  const [connectionTime, setConnectionTime] = useState(0)
+  const [giveawayTotalMessages, setGiveawayTotalMessages] = useState(0)
+  const [giveawayTime, setGiveawayTime] = useState(0)
+  const [lotteryTime, setLotteryTime] = useState(0)
+  const [auctionTime, setAuctionTime] = useState(0)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [winner, setWinner] = useState<Participant | null>(null)
   const [statusMessage, setStatusMessage] = useState(getIdleStatus('giveaway'))
@@ -410,8 +412,8 @@ export default function Home() {
 
     if (activeMode === 'lottery' && winnerTicket) setWinner(winnerTicket)
     if (activeMode === 'auction' && winnerBidder) setWinner(winnerBidder)
-    if (activeMode === 'lottery') setTotalMessages(tickets.length)
-    if (activeMode === 'auction') setTotalMessages(state.auction_bids?.length || 0)
+    
+    
   }, [activeMode])
 
   const fetchRozState = useCallback(async () => {
@@ -544,7 +546,7 @@ export default function Home() {
       ? lotteryParticipants.length
       : auctionBidders.length
 
-  const activityCount = activeMode === 'lottery' ? lotteryTickets.length : totalMessages
+  const activityCount = activeMode === 'giveaway' ? giveawayTotalMessages : activeMode === 'lottery' ? lotteryTickets.length : auctionBidders.length
   const activityLabel = activeMode === 'giveaway' ? 'Сообщений' : activeMode === 'lottery' ? 'Билетов' : 'Ставок'
   const sideTitle = activeMode === 'giveaway' ? 'Участники розыгрыша' : activeMode === 'lottery' ? 'Билеты лотереи' : 'Ставки аукциона'
   const sideCount = activeMode === 'giveaway' ? participants.length : activeMode === 'lottery' ? lotteryTickets.length : auctionBidders.length
@@ -552,15 +554,55 @@ export default function Home() {
 
   /* ─── Timer ─── */
   useEffect(() => {
-    if (isConnected) {
-      timerRef.current = setInterval(() => {
-        setConnectionTime(prev => prev + 1)
-      }, 1000)
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current)
+    const timer = setInterval(() => {
+      setGiveawayTime(prev => isGiveawayConnected ? prev + 1 : prev)
+      setLotteryTime(prev => selectedLotteryRewardId ? prev + 1 : prev)
+      setAuctionTime(prev => selectedAuctionRewardIds.length > 0 ? prev + 1 : prev)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [isGiveawayConnected, selectedLotteryRewardId, selectedAuctionRewardIds])
+
+  
+  /* ─── Giveaway Persistence ─── */
+  const loadedGiveawayRef = useRef(false)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !loadedGiveawayRef.current) {
+      loadedGiveawayRef.current = true
+      const saved = localStorage.getItem('roz_giveaway_state')
+      if (saved) {
+        try {
+          const state = JSON.parse(saved)
+          if (state.participants) setParticipants(state.participants)
+          if (state.giveawayTime) setGiveawayTime(state.giveawayTime)
+          if (state.giveawayTotalMessages) setGiveawayTotalMessages(state.giveawayTotalMessages)
+          if (state.keyword) setKeyword(state.keyword)
+          if (state.isGiveawayConnected) {
+             setIsGiveawayConnected(true)
+             if (state.streamerName) setStreamerName(state.streamerName)
+          }
+        } catch(e) {}
+      }
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [isConnected])
+  }, [])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && loadedGiveawayRef.current) {
+      localStorage.setItem('roz_giveaway_state', JSON.stringify({
+        participants,
+        giveawayTime,
+        giveawayTotalMessages,
+        isGiveawayConnected,
+        keyword,
+        streamerName
+      }))
+    }
+  }, [participants, giveawayTime, giveawayTotalMessages, isGiveawayConnected, keyword, streamerName])
+
+  useEffect(() => {
+    if (isGiveawayConnected && !wsRef.current && streamerName && keyword) {
+      startSimulation()
+    }
+  }, [isGiveawayConnected, streamerName, keyword])
 
   /* ─── Auto-scroll chat ─── */
   useEffect(() => {
@@ -661,7 +703,7 @@ export default function Home() {
         if (activeMode === 'giveaway' && isKeywordMatch(text, currentKeyword)) {
           if (!participantsSet.current.has(login)) {
             participantsSet.current.add(login)
-            setTotalMessages(prev => prev + 1)
+            setGiveawayTotalMessages(prev => prev + 1)
             const newUser: Participant = {
               username: m[1],
               color: userColor,
@@ -685,7 +727,7 @@ export default function Home() {
           const nextTickets = [...lotteryTicketsRef.current, ticket]
           lotteryTicketsRef.current = nextTickets
           setLotteryTickets(nextTickets)
-          setTotalMessages(prev => prev + 1)
+          setGiveawayTotalMessages(prev => prev + 1)
           setStatusMessage(`${m[1]} купил билет #${ticketNumber} за ${safeTicketPrice} баллов`)
           requestAvatar(m[1])
         }
@@ -714,7 +756,7 @@ export default function Home() {
               setAuctionBidders(nextBidders)
               setAuctionWinner(null)
               setWinner(null)
-              setTotalMessages(prev => prev + 1)
+              setGiveawayTotalMessages(prev => prev + 1)
               setStatusMessage(`Новая ставка: ${m[1]} — ${bidAmount} баллов`)
               requestAvatar(m[1])
             }
@@ -787,9 +829,11 @@ export default function Home() {
       userColorsRef.current.clear()
       participantsSet.current.clear()
       avatarRequestedRef.current.clear()
-      setTotalMessages(0)
+      setGiveawayTotalMessages(0)
     }
-    setConnectionTime(0)
+    if (activeMode === 'giveaway') setGiveawayTime(0)
+    if (activeMode === 'lottery') setLotteryTime(0)
+    if (activeMode === 'auction') setAuctionTime(0)
     setWinner(null)
 
     if (activeMode === 'lottery') {
@@ -883,12 +927,16 @@ export default function Home() {
       return
     }
 
-    setStatusMessage(`Подключение к чату ${streamerName}... Ожидание сообщений с ключевым словом "${keyword}"`)
-    startSimulation()
+    if (activeMode === 'giveaway') {
+      setStatusMessage(`Подключение к чату ${streamerName}... Ожидание сообщений с ключевым словом "${keyword}"`)
+      startSimulation()
+    }
   }
 
   const handleDisconnect = async () => {
-    setConnectionTime(0)
+    if (activeMode === 'giveaway') setGiveawayTime(0)
+    if (activeMode === 'lottery') setLotteryTime(0)
+    if (activeMode === 'auction') setAuctionTime(0)
     if (activeMode === 'giveaway') {
       setIsGiveawayConnected(false)
       stopSimulation()
@@ -910,6 +958,28 @@ export default function Home() {
         body: JSON.stringify({ action: 'save', settings: { auction_reward_ids: [] } })
       })
     }
+  }
+
+    const handleDeleteLotteryEntry = async (login: string) => {
+    try {
+      await fetch('/api/roz/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deleteLotteryEntry', login })
+      })
+      fetchRozState()
+    } catch (e) {}
+  }
+
+  const handleDeleteAuctionBid = async (login: string) => {
+    try {
+      await fetch('/api/roz/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deleteAuctionBid', login })
+      })
+      fetchRozState()
+    } catch (e) {}
   }
 
   const handleModeChange = (mode: RozMode) => {
@@ -1072,7 +1142,7 @@ export default function Home() {
       lotteryDrawnRef.current = false
       setLotteryWinner(null)
       setWinner(null)
-      setTotalMessages(0)
+      setGiveawayTotalMessages(0)
       setStatusMessage('Лотерея сброшена. Новые билеты будут приходить только через покупку выбранной Twitch-награды.')
     } catch (error: any) {
       setStatusMessage(error.message || 'Не удалось сбросить лотерею')
@@ -1100,7 +1170,7 @@ export default function Home() {
       auctionBiddersRef.current.clear()
       setAuctionWinner(null)
       setWinner(null)
-      setTotalMessages(0)
+      setGiveawayTotalMessages(0)
       setStatusMessage('Аукцион сброшен. Новые ставки будут приходить только через покупку выбранной Twitch-награды.')
     } catch (error: any) {
       setStatusMessage(error.message || 'Не удалось сбросить аукцион')
@@ -1386,7 +1456,7 @@ export default function Home() {
                     <Clock className="w-4 h-4 text-purple-400" />
                   </div>
                 </div>
-                <div className="text-xl font-bold text-white">{formatTime(connectionTime)}</div>
+                <div className="text-xl font-bold text-white">{formatTime(activeMode === 'giveaway' ? giveawayTime : activeMode === 'lottery' ? lotteryTime : auctionTime)}</div>
                 <div className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">Время</div>
               </div>
             </div>
