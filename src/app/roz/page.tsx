@@ -35,6 +35,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
+import { useRozRealtime, RealtimeStatus } from '@/hooks/use-roz-realtime'
 
 /* ─── Types ─── */
 interface Participant {
@@ -284,6 +285,9 @@ export default function Home() {
   const participantsRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const simulateRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>('connecting')
+  const lastUpdatedRef = useRef<number>(0)
 
   const isConnected = activeMode === 'giveaway' 
     ? isGiveawayConnected 
@@ -636,15 +640,23 @@ export default function Home() {
     return () => { cancelled = true }
   }, [fetchRewards, fetchRozState])
 
-  useEffect(() => {
-    if (!authUser) return
+  const handleRealtimeUpdate = useCallback((state: RozServerState) => {
+    if (state.updated_at) {
+      const updatedTime = Date.parse(state.updated_at)
+      if (updatedTime <= lastUpdatedRef.current) {
+        return // Ignore duplicate or older updates
+      }
+      lastUpdatedRef.current = updatedTime
+    }
+    syncRozState(state)
+  }, [syncRozState])
 
-    const interval = setInterval(() => {
-      fetchRozState()
-    }, 2500)
-
-    return () => clearInterval(interval)
-  }, [authUser, fetchRozState])
+  useRozRealtime({
+    userId: authUser?.id,
+    onUpdate: handleRealtimeUpdate,
+    onStatusChange: setRealtimeStatus,
+    onRequireRefetch: fetchRozState,
+  })
 
   /* ─── Format time ─── */
   const formatTime = (seconds: number) => {
@@ -987,7 +999,6 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'deleteLotteryEntry', login })
       })
-      fetchRozState()
     } catch (e) {}
   }
 
@@ -998,7 +1009,6 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'deleteAuctionBid', login })
       })
-      fetchRozState()
     } catch (e) {}
   }
 
@@ -1216,10 +1226,25 @@ export default function Home() {
               </h1>
             </div>
           </div>
-          {/* Version badge */}
-          <Badge variant="secondary" className="bg-white/15 text-white border-white/20 text-xs font-medium px-3 py-1 hidden sm:flex">
-            v0.1
-          </Badge>
+          {/* Version badge & Realtime status */}
+          <div className="hidden sm:flex items-center gap-3">
+            {authUser && (
+              <div className="flex items-center gap-2 text-xs font-medium text-gray-400 bg-white/5 px-2.5 py-1 rounded-full border border-white/10">
+                <div className={`w-1.5 h-1.5 rounded-full ${
+                  realtimeStatus === 'online' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' :
+                  realtimeStatus === 'connecting' || realtimeStatus === 'reconnecting' ? 'bg-yellow-500 animate-pulse' :
+                  'bg-red-500'
+                }`} />
+                {realtimeStatus === 'online' ? 'Realtime' :
+                 realtimeStatus === 'connecting' ? 'Подключение...' :
+                 realtimeStatus === 'reconnecting' ? 'Переподключение...' :
+                 'Ошибка'}
+              </div>
+            )}
+            <Badge variant="secondary" className="bg-white/15 text-white border-white/20 text-xs font-medium px-3 py-1">
+              v0.1
+            </Badge>
+          </div>
         </div>
       </header>
 

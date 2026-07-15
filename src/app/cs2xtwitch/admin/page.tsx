@@ -52,6 +52,22 @@ export default function CS2AdminPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [copiedOverlay, setCopiedOverlay] = useState(false)
+  const [overlayUrl, setOverlayUrl] = useState('')
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text)
+    setCopiedOverlay(true)
+    setTimeout(() => setCopiedOverlay(false), 2000)
+  }
+
+  useEffect(() => {
+    if (user) {
+      setOverlayUrl(`${window.location.origin}/overlays/cs2.html?streamerId=${user.id}`)
+    } else {
+      setOverlayUrl('')
+    }
+  }, [user])
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -225,6 +241,28 @@ export default function CS2AdminPage() {
       {success && <div className="adm-flash adm-flash-ok">{success}</div>}
 
       <div className="adm-body">
+        {/* OBS Info */}
+        <section className="adm-form-section">
+          <h2 className="adm-section-title">Оверлей уведомлений (OBS)</h2>
+          <div className="adm-form" style={{ gap: '12px' }}>
+            <p style={{ color: 'var(--adm-muted)', fontSize: '14px', lineHeight: 1.5, margin: 0 }}>
+              Добавьте источник-браузер 1920×1080. В настройках источника установите галочки «Управление аудио через OBS» и «Обновить браузер, когда сцена становится активной». В расширенных свойствах аудио включите «Прослушивание и вывод».
+            </p>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <code style={{ flex: 1, padding: '12px 14px', background: '#08090d', borderRadius: '10px', color: '#aeb4c4', fontFamily: 'monospace', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {overlayUrl}
+              </code>
+              <button
+                onClick={() => copyToClipboard(overlayUrl)}
+                className={`adm-btn ${copiedOverlay ? 'adm-btn-primary' : 'adm-btn-ghost'}`}
+                style={{ minWidth: '120px', justifyContent: 'center' }}
+              >
+                {copiedOverlay ? 'Скопировано' : 'Копировать'}
+              </button>
+            </div>
+          </div>
+        </section>
+
         {/* Form */}
         <section className="adm-form-section">
           <h2 className="adm-section-title">

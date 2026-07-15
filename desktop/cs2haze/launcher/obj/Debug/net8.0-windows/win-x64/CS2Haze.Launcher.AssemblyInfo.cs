@@ -12,11 +12,12 @@ using System.Reflection;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("cs2haze")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
-[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.3.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.3+81d62391d6c9ba2f40904e916642126c9050fc7e")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.5.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.5+d646fa4bd03c012847e65af4bc0981427049f78e")]
 [assembly: System.Reflection.AssemblyProductAttribute("cs2haze")]
 [assembly: System.Reflection.AssemblyTitleAttribute("cs2haze")]
-[assembly: System.Reflection.AssemblyVersionAttribute("1.0.3.0")]
+[assembly: System.Reflection.AssemblyVersionAttribute("1.0.5.0")]
+[assembly: System.Reflection.AssemblyMetadata("Cs2HazeUpdateRepository", "almazazamatov22-blip/paracetamolhazeweb")]
 [assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows7.0")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("Windows7.0")]
 
