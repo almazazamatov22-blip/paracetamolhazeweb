@@ -765,6 +765,8 @@ export default function Home() {
         setStatusMessage('Пожалуйста, введите ключевое слово для розыгрыша')
         return
       }
+    }
+    
     if (activeMode !== 'giveaway') {
       if (!authUser) {
         window.location.href = '/auth/twitch?source=roz'
