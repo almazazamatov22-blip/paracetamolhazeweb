@@ -485,6 +485,33 @@
           }
         }
 
+        let lastRecoverySyncAt = 0;
+        const RECOVERY_SYNC_COOLDOWN_MS = 10_000;
+
+        function recoverySync() {
+          const now = Date.now();
+          if (now - lastRecoverySyncAt < RECOVERY_SYNC_COOLDOWN_MS) return;
+
+          lastRecoverySyncAt = now;
+          void reconcileProcessing();
+        }
+
+        window.addEventListener('online', recoverySync);
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            recoverySync();
+          }
+        });
+
+        let client = null;
+        let channel = null;
+
+        window.addEventListener('pagehide', () => {
+          if (client && channel) {
+            client.removeChannel(channel);
+          }
+        });
+
         async function init() {
           if (!STREAMER_ID) {
             console.warn('⚠️ streamerId не задан в URL');
@@ -508,18 +535,14 @@
             }
 
             // Realtime
-            const client = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
-            client.channel('public:cs2_reward_queue')
+            client = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+            channel = client.channel(`cs2-overlay:${STREAMER_ID}`)
               .on('postgres_changes', { event: '*', schema: 'public', table: 'cs2_reward_queue', filter: `streamer_id=eq.${STREAMER_ID}` }, payload => {
                 handleEvent(payload.new);
               })
               .subscribe(status => {
-                if (status === 'SUBSCRIBED') reconcileProcessing();
+                if (status === 'SUBSCRIBED') recoverySync();
               });
-
-            // Realtime is primary. This lightweight direct-Supabase reconciliation
-            // catches very fast processing -> done transitions and reconnect gaps.
-            setInterval(reconcileProcessing, 1000);
 
           } catch(e) {
             console.error('[CS2 Overlay] Init error:', e);
