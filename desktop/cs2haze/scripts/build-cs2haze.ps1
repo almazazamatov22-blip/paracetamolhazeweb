@@ -85,9 +85,18 @@ Remove-Item $nodeExtract -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive $nodeZip (Split-Path $nodeExtract) -Force
 Copy-Item (Join-Path $nodeExtract "node.exe") (Join-Path $RuntimeOut "node.exe") -Force
 
-Write-Host "Copying the known-working agent without modifying it..."
-Copy-Item (Join-Path $RepoRoot "scripts\cs2-agent.js") `
-  (Join-Path $RuntimeOut "cs2-agent.js") -Force
+Write-Host "Bundling agent with esbuild..."
+Push-Location $RepoRoot
+try {
+  $AgentJs = Join-Path $RepoRoot "scripts\cs2-agent.js"
+  $OutJs = Join-Path $RuntimeOut "cs2-agent.js"
+  & npx esbuild $AgentJs --bundle --platform=node --target=node24 --format=cjs --outfile=$OutJs
+  if ($LASTEXITCODE -ne 0) {
+    throw "esbuild failed with exit code $LASTEXITCODE"
+  }
+} finally {
+  Pop-Location
+}
 
 Write-Host "Compiling the current embedded C# helper..."
 $compileHelper = Join-Path $KitRoot "scripts\compile-current-helper.mjs"

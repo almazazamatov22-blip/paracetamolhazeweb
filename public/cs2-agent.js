@@ -13,6 +13,11 @@ const args = process.argv.slice(2).reduce((acc, a) => {
   return acc;
 }, {});
 
+if (args['bundle-smoke-test']) {
+  console.log('BUNDLE_OK');
+  process.exit(0);
+}
+
 const BASE_URL_RAW = process.env.CS2_BASE_URL || args.baseUrl || 'https://paracetamolhaze.ru';
 const BASE_URL = String(BASE_URL_RAW).trim().replace(/\/+$/, '');
 const STREAMER_ID = String(process.env.CS2_STREAMER_ID || args.streamerId || '').trim();

@@ -48,6 +48,34 @@ jobs:
         run: |
           .\desktop\cs2haze\scripts\build-cs2haze.ps1 -RepoRoot $PWD
 
+      - name: Test autonomous agent runtime
+        shell: powershell
+        run: |
+          $tempDir = Join-Path $env:TEMP "cs2haze-agent-smoke-test"
+          Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+          Copy-Item .\desktop\cs2haze\dist\runtime\cs2-agent.js $tempDir\ -Force
+          Copy-Item .\desktop\cs2haze\dist\runtime\node.exe $tempDir\ -Force
+          
+          Push-Location $tempDir
+          try {
+            if (Test-Path node_modules) { throw "node_modules should not exist" }
+            
+            Write-Host "Running syntax check..."
+            .\node.exe --check cs2-agent.js
+            if ($LASTEXITCODE -ne 0) { throw "Syntax check failed" }
+            
+            Write-Host "Running bundle smoke test..."
+            $output = .\node.exe cs2-agent.js --bundle-smoke-test
+            Write-Host $output
+            if ($LASTEXITCODE -ne 0 -or $output -notmatch "BUNDLE_OK") {
+              throw "Smoke test failed or missing BUNDLE_OK output"
+            }
+            Write-Host "Autonomous agent runtime test passed."
+          } finally {
+            Pop-Location
+          }
+
       - name: Test packaged updater lifecycle
         shell: powershell
         run: >-
