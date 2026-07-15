@@ -235,7 +235,7 @@ export default function Home() {
   const [twitchRewards, setTwitchRewards] = useState<TwitchReward[]>([])
   const [selectedLotteryRewardId, setSelectedLotteryRewardId] = useState('')
   const [selectedAuctionRewardIds, setSelectedAuctionRewardIds] = useState<string[]>([])
-  const [isConnected, setIsConnected] = useState(false)
+  const [isGiveawayConnected, setIsGiveawayConnected] = useState(false)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [totalMessages, setTotalMessages] = useState(0)
   const [connectionTime, setConnectionTime] = useState(0)
@@ -281,6 +281,12 @@ export default function Home() {
   const participantsRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const simulateRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const isConnected = activeMode === 'giveaway' 
+    ? isGiveawayConnected 
+    : activeMode === 'lottery' 
+      ? !!selectedLotteryRewardId 
+      : selectedAuctionRewardIds.length > 0;
 
   const safeTicketPrice = Math.max(1, ticketPrice || 100)
   const safeAuctionMinBid = Math.max(1, auctionMinBid || 100)
@@ -338,10 +344,13 @@ export default function Home() {
         ? [state.auction_reward_id]
         : []
     setSelectedAuctionRewardIds(auctionRewardIds)
-    setPrizeName(activeMode === 'auction'
-      ? state.auction_prize || 'Приз стримера'
-      : state.lottery_prize || 'Приз стримера'
-    )
+    
+    if (activeMode === 'lottery' && state.lottery_reward_id) {
+      setPrizeName(state.lottery_prize || 'Приз стримера')
+    } else if (activeMode === 'auction' && auctionRewardIds.length > 0) {
+      setPrizeName(state.auction_prize || 'Приз стримера')
+    }
+
     const tickets = (state.lottery_entries || []).map((entry, index) => ({
       id: entry.id || entry.redemption_id,
       number: entry.number || index + 1,
@@ -585,14 +594,14 @@ export default function Home() {
   }, [fetchRewards, fetchRozState])
 
   useEffect(() => {
-    if (!authUser || !isConnected) return
+    if (!authUser) return
 
     const interval = setInterval(() => {
       fetchRozState()
     }, 2500)
 
     return () => clearInterval(interval)
-  }, [authUser, fetchRozState, isConnected])
+  }, [authUser, fetchRozState])
 
   /* ─── Format time ─── */
   const formatTime = (seconds: number) => {
@@ -756,7 +765,7 @@ export default function Home() {
         setStatusMessage('Пожалуйста, введите ключевое слово для розыгрыша')
         return
       }
-    } else {
+    if (activeMode !== 'giveaway') {
       if (!authUser) {
         window.location.href = '/auth/twitch?source=roz'
         return
@@ -769,8 +778,8 @@ export default function Home() {
       }
     }
 
-    setIsConnected(true)
     if (activeMode === 'giveaway') {
+      setIsGiveawayConnected(true)
       setParticipants([])
       setChatMessages([])
       userColorsRef.current.clear()
@@ -824,7 +833,6 @@ export default function Home() {
         }
         setStatusMessage(`Лотерея активна. Билет выдается за покупку награды "${createData.title}" (${createData.cost} баллов канала)`)
       } catch (error: any) {
-        setIsConnected(false)
         setStatusMessage(error.message || 'Не удалось запустить лотерею')
       }
       return
@@ -868,7 +876,6 @@ export default function Home() {
         }
         setStatusMessage(`Аукцион активен. Ставки идут через покупку награды: ${createData.title}`)
       } catch (error: any) {
-        setIsConnected(false)
         setStatusMessage(error.message || 'Не удалось запустить аукцион')
       }
       return
@@ -878,11 +885,29 @@ export default function Home() {
     startSimulation()
   }
 
-  const handleDisconnect = () => {
-    setIsConnected(false)
+  const handleDisconnect = async () => {
     setConnectionTime(0)
-    if (activeMode === 'giveaway') stopSimulation()
-    setStatusMessage(`Отключено. ${getIdleStatus(activeMode)}`)
+    if (activeMode === 'giveaway') {
+      setIsGiveawayConnected(false)
+      stopSimulation()
+      setStatusMessage(`Отключено. ${getIdleStatus(activeMode)}`)
+    } else if (activeMode === 'lottery') {
+      setSelectedLotteryRewardId('')
+      setStatusMessage('Отключено от лотереи. Можете начать новую.')
+      await fetch('/api/roz/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', settings: { lottery_reward_id: '' } })
+      })
+    } else if (activeMode === 'auction') {
+      setSelectedAuctionRewardIds([])
+      setStatusMessage('Отключено от аукциона. Можете начать новый.')
+      await fetch('/api/roz/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', settings: { auction_reward_ids: [] } })
+      })
+    }
   }
 
   const handleModeChange = (mode: RozMode) => {
