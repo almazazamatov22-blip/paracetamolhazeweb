@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 
-import { ACTION_REGISTRY } from '@/lib/cs2-actions';
+import { ACTION_REGISTRY } from '@/lib/cs2-actions'
 
 const UI_COLORS: Record<string, string> = {
   drop_weapon: '#ef4444',
@@ -19,20 +19,28 @@ const UI_COLORS: Record<string, string> = {
   low_sens_10: '#86efac',
   high_sens_10: '#fca5a5',
   spinbot: '#f472b6',
-  pacifist: '#cbd5e1',
-};
+}
 
-const ACTION_LABELS: Record<string, { label: string; icon: string; color: string; desc: string }> = 
-  Object.fromEntries(
-    Object.entries(ACTION_REGISTRY).map(([k, v]) => [
-      k, 
-      { label: v.label, icon: v.icon, color: UI_COLORS[k] || '#94a3b8', desc: v.description }
-    ])
-  );
+const ACTION_LABELS = Object.fromEntries(
+  Object.entries(ACTION_REGISTRY).map(([key, value]) => [
+    key,
+    {
+      label: value.label,
+      icon: value.icon,
+      color: UI_COLORS[key] || '#94a3b8',
+      desc: value.description,
+      durationMs: value.durationMs,
+    },
+  ])
+)
+
+function formatDuration(durationMs: number) {
+  if (durationMs < 1000) return `${durationMs} мс`
+  return `${durationMs / 1000} сек`
+}
 
 export default function CS2InteractivePage() {
   const [user, setUser] = useState<{ login: string; id: string; avatar?: string } | null>(null)
-  const [loading, setLoading] = useState(true)
   const [subscribing, setSubscribing] = useState(false)
   const [subscribeMsg, setSubscribeMsg] = useState('')
   const [copiedOverlay, setCopiedOverlay] = useState(false)
@@ -40,41 +48,44 @@ export default function CS2InteractivePage() {
 
   useEffect(() => {
     fetch('/api/auth/me')
-      .then(r => r.json())
-      .then(d => {
-        if (d.login) setUser({ login: d.login, id: d.id, avatar: d.profile_image_url })
+      .then(response => response.json())
+      .then(data => {
+        if (data.login) {
+          setUser({ login: data.login, id: data.id, avatar: data.profile_image_url })
+        }
       })
       .catch(() => {})
-      .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
-    if (user) {
-      fetch('/api/cs2/subscribe')
-        .then(r => r.json())
-        .then(d => {
-          if (typeof d.isSubscribed === 'boolean') {
-            setIsSubscribed(d.isSubscribed)
-          }
-        })
-        .catch(() => {})
-    }
+    if (!user) return
+
+    fetch('/api/cs2/subscribe')
+      .then(response => response.json())
+      .then(data => {
+        if (typeof data.isSubscribed === 'boolean') {
+          setIsSubscribed(data.isSubscribed)
+        }
+      })
+      .catch(() => {})
   }, [user])
 
   async function handleSubscribe() {
     setSubscribing(true)
     setSubscribeMsg('')
+
     try {
-      const res = await fetch('/api/cs2/subscribe', { method: 'POST' })
-      const data = await res.json()
+      const response = await fetch('/api/cs2/subscribe', { method: 'POST' })
+      const data = await response.json()
+
       if (data.success) {
-        setSubscribeMsg(`✅ Интеграция успешно активирована!`)
+        setSubscribeMsg('Интеграция успешно активирована')
         setIsSubscribed(true)
       } else {
-        setSubscribeMsg(`❌ Ошибка подключения: ${data.error}`)
+        setSubscribeMsg(`Ошибка подключения: ${data.error}`)
       }
-    } catch (e: any) {
-      setSubscribeMsg(`❌ ${e.message}`)
+    } catch (error: unknown) {
+      setSubscribeMsg(error instanceof Error ? error.message : 'Не удалось подключиться')
     } finally {
       setSubscribing(false)
     }
@@ -86,204 +97,204 @@ export default function CS2InteractivePage() {
     setTimeout(() => setCopiedOverlay(false), 2000)
   }
 
+  const overlayUrl = user
+    ? `https://paracetamolhaze.ru/overlays/cs2.html?streamerId=${user.id}`
+    : ''
+
   return (
     <main className="cs2-page">
+      <div className="cs2-ambient cs2-ambient-one" aria-hidden="true" />
+      <div className="cs2-ambient cs2-ambient-two" aria-hidden="true" />
+
       <div className="cs2-container">
-        {/* Header */}
-        <header className="cs2-header animate-fade-in">
-          <div className="cs2-logo">
+        <header className="cs2-hero animate-fade-in">
+          <span className="cs2-eyebrow">CS2 INTERACTIVE</span>
+          <div className="cs2-logo" aria-label="CS2 и Twitch">
             <span className="cs2-logo-cs">CS2</span>
             <span className="cs2-logo-x">×</span>
             <span className="cs2-logo-twitch">TWITCH</span>
           </div>
+          <h1>Зрители запускают эффекты. Вы управляете правилами.</h1>
           <p className="cs2-tagline">
-            Позвольте вашим зрителям управлять игровым процессом в CS2 за баллы канала Twitch
+            Подключите баллы канала Twitch к действиям в CS2 — без ручных скриптов и сложной настройки.
           </p>
 
-          {!loading && (
-            <div className="cs2-auth-strip">
-              {user ? (
-                <div className="cs2-user-pill">
-                  {user.avatar && <img src={user.avatar} alt={user.login} className="cs2-user-avatar" />}
-                  <span className="cs2-user-name">{user.login}</span>
-                  <a href="/cs2interactive/admin" className="cs2-btn cs2-btn-primary">
-                    ⚙️ Панель управления
-                  </a>
-                </div>
-              ) : (
-                <a href="/auth/twitch?source=cs2interactive" className="cs2-btn cs2-btn-twitch">
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                    <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
-                  </svg>
-                  Войти через Twitch
+          <div className="cs2-hero-actions">
+            {user ? (
+              <div className="cs2-user-card">
+                {user.avatar && <img src={user.avatar} alt="" className="cs2-user-avatar" />}
+                <span className="cs2-user-name">{user.login}</span>
+                <span className="cs2-user-status">Twitch подключён</span>
+                <a href="/cs2interactive/admin" className="cs2-btn cs2-btn-primary">
+                  Открыть панель управления
                 </a>
-              )}
-            </div>
-          )}
+              </div>
+            ) : (
+              <a href="/auth/twitch?source=cs2interactive" className="cs2-btn cs2-btn-twitch">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true">
+                  <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z" />
+                </svg>
+                Войти через Twitch
+              </a>
+            )}
+          </div>
         </header>
 
-        {/* Step-by-Step Setup Wizard for logged in users */}
-        {user && (
-          <section className="cs2-wizard-section animate-slide-up">
-            <h2 className="cs2-section-title">🔌 Мастер настройки интерактивности</h2>
-            
-            <div className="cs2-wizard-card">
-              <div className="cs2-wizard-timeline">
-                
-                {/* Step 1 */}
-                <div className="cs2-wizard-step">
-                  <div className="cs2-step-node">
-                    <span className="cs2-step-number">1</span>
-                  </div>
-                  <div className="cs2-step-content">
-                    <h3 className="cs2-step-title">Подключение к Twitch</h3>
-                    <p className="cs2-step-desc">
-                      Активируйте подписку на события Twitch EventSub, чтобы сервер мог мгновенно получать сигналы о трате баллов на вашем канале.
-                    </p>
-                    <div className="cs2-step-actions">
-                      <button
-                        className="cs2-btn cs2-btn-primary"
-                        onClick={handleSubscribe}
-                        disabled={subscribing || isSubscribed}
-                        id="subscribe-btn"
-                        style={isSubscribed ? { background: '#22c55e', color: '#fff', cursor: 'default' } : undefined}
-                      >
-                        {subscribing ? '⏳ Подключение...' : isSubscribed ? '✅ Интеграция активна' : '⚡ Активировать интеграцию'}
-                      </button>
-                      {subscribeMsg && (
-                        <span className={`cs2-step-msg-pill ${subscribeMsg.startsWith('✅') ? 'msg-ok' : 'msg-err'}`}>
-                          {subscribeMsg}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+        <section className="cs2-launch-section animate-slide-up" aria-labelledby="launch-title">
+          <div className="cs2-section-heading cs2-section-heading-centered">
+            <span className="cs2-section-kicker">БЫСТРЫЙ СТАРТ</span>
+            <h2 id="launch-title">Как запустить интерактив — 1–2 минуты</h2>
+          </div>
 
-                {/* Step 2 */}
-                <div className="cs2-wizard-step">
-                  <div className="cs2-step-node">
-                    <span className="cs2-step-number">2</span>
-                  </div>
-                  <div className="cs2-step-content">
-                    <h3 className="cs2-step-title">Скачивание и запуск Агента</h3>
-                    <p className="cs2-step-desc">
-                      Установите CS2Haze с помощью нашего удобного инсталлятора.
-                    </p>
-                    <div className="cs2-step-actions" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                      <a
-                        href="/download/cs2haze"
-                        className="cs2-btn cs2-btn-download"
-                      >
-                        📥 Скачать cs2haze
-                      </a>
-                      <span className="cs2-step-hint" style={{ color: 'rgba(229,231,235,0.5)', fontSize: '0.9em' }}>
-                        Windows 10/11 · Node.js не требуется
-                      </span>
-                    </div>
-                  </div>
-                </div>
+          <div className="cs2-launch-grid">
+            <article className="cs2-launch-card">
+              <span className="cs2-step-badge">1</span>
+              <div className="cs2-step-icon" aria-hidden="true">↓</div>
+              <h3>Скачайте лаунчер</h3>
+              <p>Установщик для Windows 10/11. Node.js и ручная настройка не нужны.</p>
+              <a href="/download/cs2haze" className="cs2-card-link">
+                Скачать CS2Haze
+              </a>
+            </article>
 
-                {/* Step 3 */}
-                <div className="cs2-wizard-step">
-                  <div className="cs2-step-node">
-                    <span className="cs2-step-number">3</span>
-                  </div>
-                  <div className="cs2-step-content">
-                    <h3 className="cs2-step-title">Настройка OBS оверлея</h3>
-                    <p className="cs2-step-desc">
-                      Добавьте в OBS источник-браузер (Browser Source) с разрешением 1920x1080 и ссылкой ниже, чтобы вы и ваши зрители видели всплывающие уведомления и анимации во время активации наград.
-                    </p>
-                    <div className="cs2-copy-wrapper">
-                      <div className="cs2-copy-input">
-                        {typeof window !== 'undefined' ? window.location.origin : 'https://paracetamolhaze.ru'}/overlays/cs2.html?streamerId={user.id}
-                      </div>
-                      <button
-                        onClick={() => copyToClipboard(`${typeof window !== 'undefined' ? window.location.origin : 'https://paracetamolhaze.ru'}/overlays/cs2.html?streamerId=${user.id}`)}
-                        className={`cs2-btn ${copiedOverlay ? 'cs2-btn-copied' : 'cs2-btn-copy'}`}
-                      >
-                        {copiedOverlay ? '✅ Скопировано!' : '📋 Копировать'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Step 4 */}
-                <div className="cs2-wizard-step">
-                  <div className="cs2-step-node">
-                    <span className="cs2-step-number">4</span>
-                  </div>
-                  <div className="cs2-step-content">
-                    <h3 className="cs2-step-title">Привязка наград</h3>
-                    <p className="cs2-step-desc">
-                      Создайте награды на Twitch за баллы канала, затем перейдите в панель управления наградами и сопоставьте ID наград с действиями в игре.
-                    </p>
-                    <div className="cs2-step-actions">
-                      <a href="/cs2interactive/admin" className="cs2-btn cs2-btn-primary">
-                        ⚙️ Перейти к привязке наград →
-                      </a>
-                    </div>
-                  </div>
-                </div>
-
+            <article className="cs2-launch-card cs2-smartscreen-card">
+              <span className="cs2-step-badge">2</span>
+              <div className="cs2-smartscreen-preview" aria-label="Пример предупреждения Windows SmartScreen">
+                <strong>Система Windows защитила компьютер</strong>
+                <span>Приложение пока без цифровой подписи.</span>
+                <b>Подробнее</b>
               </div>
+              <h3>Подтвердите запуск</h3>
+              <p>
+                Если появится предупреждение, проверьте, что скачивание началось по кнопке на этой странице,
+                нажмите <strong>«Подробнее»</strong>, затем <strong>«Выполнить в любом случае»</strong>.
+              </p>
+            </article>
+
+            <article className="cs2-launch-card">
+              <span className="cs2-step-badge">3</span>
+              <div className="cs2-step-icon cs2-step-icon-twitch" aria-hidden="true">▣</div>
+              <h3>Войдите через Twitch</h3>
+              <p>Без передачи пароля: авторизация проходит на официальной странице Twitch OAuth.</p>
+              {!user && <span className="cs2-card-muted">Кнопка входа находится выше</span>}
+              {user && <span className="cs2-card-complete">Готово · {user.login}</span>}
+            </article>
+
+            <article className="cs2-launch-card">
+              <span className="cs2-step-badge">4</span>
+              <div className="cs2-step-icon" aria-hidden="true">◇</div>
+              <h3>Создайте награды</h3>
+              <p>Выберите эффекты, стоимость и задержку — CS2Haze создаст награды на Twitch.</p>
+              {user ? (
+                <a href="/cs2interactive/admin" className="cs2-card-link">
+                  Настроить награды
+                </a>
+              ) : (
+                <span className="cs2-card-muted">После входа в Twitch</span>
+              )}
+            </article>
+          </div>
+
+          <p className="cs2-oauth-note">
+            <span aria-hidden="true">●</span> Мы не просим пароль — используется только официальный OAuth Twitch.
+          </p>
+        </section>
+
+        {user && (
+          <section className="cs2-control-section animate-slide-up" aria-labelledby="control-title">
+            <div className="cs2-section-heading">
+              <span className="cs2-section-kicker">ВАША НАСТРОЙКА</span>
+              <h2 id="control-title">Подготовьте стрим к работе</h2>
+              <p>Три действия перед запуском трансляции.</p>
+            </div>
+
+            <div className="cs2-control-grid">
+              <article className="cs2-control-card">
+                <div className="cs2-control-topline">
+                  <span className={`cs2-status-dot ${isSubscribed ? 'is-ready' : ''}`} />
+                  <span>{isSubscribed ? 'EventSub активен' : 'Требуется подключение'}</span>
+                </div>
+                <h3>События Twitch</h3>
+                <p>Разрешите серверу получать активации наград канала.</p>
+                <button
+                  className="cs2-btn cs2-btn-primary"
+                  onClick={handleSubscribe}
+                  disabled={subscribing || isSubscribed}
+                  id="subscribe-btn"
+                >
+                  {subscribing ? 'Подключаем…' : isSubscribed ? 'Интеграция активна' : 'Активировать интеграцию'}
+                </button>
+                {subscribeMsg && (
+                  <span className={`cs2-inline-message ${isSubscribed ? 'is-success' : 'is-error'}`}>
+                    {subscribeMsg}
+                  </span>
+                )}
+              </article>
+
+              <article className="cs2-control-card">
+                <div className="cs2-control-topline">
+                  <span className="cs2-status-dot" />
+                  <span>OBS Browser Source</span>
+                </div>
+                <h3>Оверлей уведомлений</h3>
+                <p>Добавьте источник-браузер 1920×1080 и вставьте персональную ссылку.</p>
+                <div className="cs2-copy-wrapper">
+                  <code className="cs2-copy-input">{overlayUrl}</code>
+                  <button
+                    onClick={() => copyToClipboard(overlayUrl)}
+                    className={`cs2-btn ${copiedOverlay ? 'cs2-btn-copied' : 'cs2-btn-ghost'}`}
+                  >
+                    {copiedOverlay ? 'Скопировано' : 'Копировать'}
+                  </button>
+                </div>
+              </article>
+
+              <article className="cs2-control-card">
+                <div className="cs2-control-topline">
+                  <span className="cs2-status-dot is-ready" />
+                  <span>Панель управления</span>
+                </div>
+                <h3>Эффекты и награды</h3>
+                <p>Создавайте, включайте и редактируйте награды в одном месте.</p>
+                <a href="/cs2interactive/admin" className="cs2-btn cs2-btn-primary">
+                  Перейти к наградам
+                </a>
+              </article>
             </div>
           </section>
         )}
 
-        {/* Actions showcase */}
-        <section className="cs2-actions-section animate-slide-up">
-          <h2 className="cs2-section-title">⚔️ Доступные действия в CS2</h2>
+        <section className="cs2-actions-section animate-slide-up" aria-labelledby="actions-title">
+          <div className="cs2-section-heading">
+            <span className="cs2-section-kicker">КАТАЛОГ ЭФФЕКТОВ</span>
+            <h2 id="actions-title">Доступные действия в CS2</h2>
+            <p>От короткого звука до полного хаоса с мышью — выберите то, что подходит вашему стриму.</p>
+          </div>
+
           <div className="cs2-actions-grid">
             {Object.entries(ACTION_LABELS).map(([key, info]) => (
-              <div key={key} className="cs2-action-card" style={{ '--accent': info.color } as React.CSSProperties}>
+              <article
+                key={key}
+                className="cs2-action-card"
+                style={{ '--accent': info.color } as CSSProperties}
+              >
                 <div className="cs2-action-header">
-                  <span className="cs2-action-icon">{info.icon}</span>
+                  <span className="cs2-action-icon" aria-hidden="true">{info.icon}</span>
                   <span className="cs2-action-key">{key}</span>
                 </div>
                 <h3 className="cs2-action-title">{info.label}</h3>
                 <p className="cs2-action-desc">{info.desc}</p>
-              </div>
+                <span className="cs2-action-duration">до {formatDuration(info.durationMs)}</span>
+              </article>
             ))}
           </div>
         </section>
 
-        {/* How it works for guest users */}
-        {!user && (
-          <section className="cs2-how-section animate-slide-up">
-            <h2 className="cs2-section-title">🛠️ Как это устроено?</h2>
-            <div className="cs2-steps-grid">
-              <div className="cs2-step-card">
-                <div className="cs2-step-card-num">01</div>
-                <h4>Twitch Webhooks</h4>
-                <p>Наш сервер мгновенно ловит события покупки наград на вашем стриме через официальный Twitch EventSub API.</p>
-              </div>
-              <div className="cs2-step-card">
-                <div className="cs2-step-card-num">02</div>
-                <h4>Локальный Агент</h4>
-                <p>Легковесный скрипт на ПК опрашивает очередь сервера и эмулирует нажатие клавиш в вашей игре.</p>
-              </div>
-              <div className="cs2-step-card">
-                <div className="cs2-step-card-num">03</div>
-                <h4>Анимированный оверлей</h4>
-                <p>Оверлей в OBS показывает красивую карточку с ником зрителя и действием, которое он активировал.</p>
-              </div>
-            </div>
-            
-            <div className="cs2-guest-cta">
-              <p>Готовы добавить интерактива на свои стримы?</p>
-              <a href="/auth/twitch?source=cs2interactive" className="cs2-btn cs2-btn-twitch">
-                Войти и начать настройку
-              </a>
-            </div>
-          </section>
-        )}
-
-        {/* Nav links */}
-        <nav className="cs2-nav animate-fade-in">
+        <nav className="cs2-nav animate-fade-in" aria-label="Навигация CS2 Interactive">
           {user && (
             <>
-              <a href="/cs2interactive/admin" className="cs2-nav-link">⚙️ Настройки наград</a>
-              <a href="/cs2interactive/history" className="cs2-nav-link">📜 История активаций</a>
+              <a href="/cs2interactive/admin" className="cs2-nav-link">Настройки наград</a>
+              <a href="/cs2interactive/history" className="cs2-nav-link">История активаций</a>
             </>
           )}
           <a href="/" className="cs2-nav-link cs2-nav-back">← На главную</a>
@@ -292,497 +303,291 @@ export default function CS2InteractivePage() {
 
       <style>{`
         .cs2-page {
+          --bg: #0b0c12;
+          --panel: #13151d;
+          --panel-strong: #181a24;
+          --line: rgba(255,255,255,0.085);
+          --line-strong: rgba(255,255,255,0.14);
+          --text: #f5f7fb;
+          --muted: #8d93a5;
+          --purple: #9146ff;
+          --purple-light: #ad72ff;
           min-height: 100vh;
-          background: #0f1117;
-          color: #e5e7eb;
-          font-family: 'Inter', system-ui, -apple-system, sans-serif;
+          background: var(--bg);
+          color: var(--text);
+          font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           position: relative;
           overflow-x: hidden;
         }
-
-        /* Animations */
-        .animate-fade-in {
-          animation: fadeIn 0.5s ease forwards;
+        .cs2-page * { box-sizing: border-box; }
+        .cs2-ambient {
+          position: fixed;
+          width: 520px;
+          height: 520px;
+          border-radius: 50%;
+          filter: blur(120px);
+          opacity: .12;
+          pointer-events: none;
         }
-        .animate-slide-up {
-          animation: slideUp 0.5s ease forwards;
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(16px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
+        .cs2-ambient-one { background: #6d28d9; top: -280px; left: 12%; }
+        .cs2-ambient-two { background: #2563eb; top: 240px; right: -360px; opacity: .07; }
         .cs2-container {
-          position: relative;
-          z-index: 1;
-          max-width: 960px;
+          width: min(1080px, calc(100% - 32px));
           margin: 0 auto;
-          padding: 64px 24px 96px;
+          padding: 54px 0 72px;
           display: flex;
           flex-direction: column;
-          gap: 64px;
+          gap: 76px;
+          position: relative;
+          z-index: 1;
         }
-        
-        /* Header */
-        .cs2-header {
+        .animate-fade-in { animation: cs2Fade .45s ease both; }
+        .animate-slide-up { animation: cs2Rise .5s ease both; }
+        @keyframes cs2Fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes cs2Rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-fade-in, .animate-slide-up { animation: none; }
+        }
+
+        .cs2-hero {
+          max-width: 760px;
+          margin: 0 auto;
           text-align: center;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 20px;
+          gap: 16px;
+        }
+        .cs2-eyebrow, .cs2-section-kicker {
+          color: var(--purple-light);
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: .18em;
         }
         .cs2-logo {
-          font-size: clamp(48px, 12vw, 88px);
-          font-weight: 900;
-          letter-spacing: -0.05em;
-          line-height: 0.9;
           display: flex;
           align-items: center;
-          gap: 0.1em;
+          gap: .12em;
+          font-size: clamp(50px, 8vw, 78px);
+          font-weight: 950;
+          letter-spacing: -.06em;
+          line-height: .9;
         }
-        .cs2-logo-cs {
-          background: linear-gradient(135deg, #6366f1, #818cf8);
+        .cs2-logo-cs, .cs2-logo-twitch {
+          background: linear-gradient(135deg, #6d78ff, #b34cff);
           -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
           background-clip: text;
+          color: transparent;
         }
-        .cs2-logo-x {
-          color: rgba(255,255,255,0.15);
-          font-weight: 200;
-          font-size: 0.7em;
-        }
-        .cs2-logo-twitch {
-          background: linear-gradient(135deg, #a78bfa, #9146ff);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+        .cs2-logo-twitch { background-image: linear-gradient(135deg, #9d69ff, #d044ff); }
+        .cs2-logo-x { color: #343744; font-size: .6em; font-weight: 300; }
+        .cs2-hero h1 {
+          max-width: 650px;
+          font-size: clamp(24px, 4vw, 38px);
+          line-height: 1.08;
+          letter-spacing: -.04em;
+          margin: 5px 0 0;
         }
         .cs2-tagline {
-          color: rgba(229,231,235,0.5);
-          font-size: 17px;
-          line-height: 1.5;
-          letter-spacing: -0.01em;
-          max-width: 540px;
+          max-width: 610px;
+          color: var(--muted);
+          font-size: 16px;
+          line-height: 1.65;
+          margin: 0;
         }
-
-        /* Buttons & Auth */
-        .cs2-auth-strip {
-          display: flex;
-          gap: 16px;
-          justify-content: center;
-          margin-top: 12px;
-        }
-        .cs2-user-pill {
+        .cs2-hero-actions { margin-top: 8px; min-height: 46px; }
+        .cs2-user-card {
           display: flex;
           align-items: center;
-          gap: 12px;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 50px;
-          padding: 6px 16px 6px 8px;
-          font-size: 14px;
+          gap: 10px;
+          padding: 6px 7px 6px 10px;
+          border: 1px solid var(--line);
+          background: rgba(255,255,255,.035);
+          border-radius: 12px;
         }
-        .cs2-user-avatar {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          object-fit: cover;
-          border: 1.5px solid #6366f1;
-        }
-        .cs2-user-name {
-          font-weight: 600;
-          color: #e5e7eb;
-        }
-        
-        .cs2-btn {
+        .cs2-user-avatar { width: 30px; height: 30px; border-radius: 8px; object-fit: cover; }
+        .cs2-user-name { font-size: 14px; font-weight: 700; }
+        .cs2-user-status { color: #55d88b; font-size: 12px; margin-right: 4px; }
+
+        .cs2-btn, .cs2-card-link {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 10px;
-          padding: 12px 24px;
+          gap: 9px;
+          min-height: 42px;
+          padding: 10px 18px;
           border-radius: 8px;
-          font-weight: 600;
-          font-size: 14px;
+          border: 1px solid transparent;
+          font: inherit;
+          font-size: 13px;
+          font-weight: 750;
           cursor: pointer;
-          border: none;
-          transition: all 0.2s ease;
           text-decoration: none;
-          white-space: nowrap;
+          transition: transform .18s ease, background .18s ease, border-color .18s ease;
         }
-        .cs2-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-        
-        .cs2-btn-twitch {
-          background: #9146ff;
-          color: #fff;
-        }
-        .cs2-btn-twitch:hover {
-          background: #a970ff;
-        }
-        
-        .cs2-btn-primary {
-          background: #6366f1;
-          color: #fff;
-        }
-        .cs2-btn-primary:hover {
-          background: #818cf8;
-        }
+        .cs2-btn:hover, .cs2-card-link:hover { transform: translateY(-1px); }
+        .cs2-btn:disabled { opacity: .58; cursor: default; transform: none; }
+        .cs2-btn-twitch { color: white; background: var(--purple); box-shadow: 0 10px 30px rgba(145,70,255,.22); }
+        .cs2-btn-twitch:hover { background: #a45dff; }
+        .cs2-btn-primary { color: white; background: #7650f5; }
+        .cs2-btn-primary:hover { background: #8968f8; }
+        .cs2-btn-ghost { color: #d9dce6; background: rgba(255,255,255,.05); border-color: var(--line); }
+        .cs2-btn-copied { color: #7ee2a8; background: rgba(50,190,110,.1); border-color: rgba(80,220,140,.22); }
 
-        .cs2-btn-download {
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          color: #e5e7eb;
+        .cs2-section-heading { max-width: 690px; margin-bottom: 24px; }
+        .cs2-section-heading-centered { text-align: center; margin: 0 auto 24px; }
+        .cs2-section-heading h2 {
+          margin: 7px 0 0;
+          color: var(--text);
+          font-size: clamp(23px, 3vw, 31px);
+          line-height: 1.2;
+          letter-spacing: -.035em;
         }
-        .cs2-btn-download:hover {
-          background: rgba(255, 255, 255, 0.08);
-          border-color: #6366f1;
+        .cs2-section-heading p { color: var(--muted); line-height: 1.6; margin: 10px 0 0; }
+        .cs2-launch-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 12px;
         }
-
-        /* Wizard Cards */
-        .cs2-section-title {
-          font-size: 24px;
-          font-weight: 800;
-          letter-spacing: -0.02em;
-          margin-bottom: 24px;
-          color: #e5e7eb;
-        }
-        
-        .cs2-wizard-card {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 10px;
-          padding: 32px 40px;
-        }
-        
-        .cs2-wizard-timeline {
+        .cs2-launch-card, .cs2-control-card, .cs2-action-card {
           position: relative;
+          border: 1px solid var(--line);
+          background: linear-gradient(180deg, rgba(255,255,255,.038), rgba(255,255,255,.022));
+          border-radius: 12px;
+        }
+        .cs2-launch-card {
+          min-height: 250px;
+          padding: 26px 18px 20px;
           display: flex;
           flex-direction: column;
-          gap: 40px;
-        }
-        .cs2-wizard-timeline::before {
-          content: '';
-          position: absolute;
-          left: 17px;
-          top: 8px;
-          bottom: 8px;
-          width: 2px;
-          background: rgba(255, 255, 255, 0.08);
-          z-index: 0;
-        }
-        
-        .cs2-wizard-step {
-          display: flex;
-          gap: 24px;
-          position: relative;
-          z-index: 1;
-        }
-        
-        .cs2-step-node {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          background: #0f1117;
-          border: 2px solid rgba(255, 255, 255, 0.15);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 700;
-          color: rgba(229, 231, 235, 0.5);
-          flex-shrink: 0;
-          transition: all 0.2s ease;
-        }
-        .cs2-wizard-step:hover .cs2-step-node {
-          border-color: #6366f1;
-          color: #818cf8;
-        }
-        
-        .cs2-step-content {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
+          align-items: flex-start;
           gap: 10px;
         }
-        .cs2-step-title {
-          font-size: 18px;
-          font-weight: 700;
-          color: #e5e7eb;
-          margin-top: 6px;
+        .cs2-launch-card:hover, .cs2-control-card:hover { border-color: rgba(164,93,255,.35); }
+        .cs2-step-badge {
+          position: absolute;
+          top: 10px;
+          left: 10px;
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          display: grid;
+          place-items: center;
+          color: white;
+          background: var(--purple);
+          font-size: 11px;
+          font-weight: 800;
+          box-shadow: 0 0 0 4px rgba(145,70,255,.1);
         }
-        .cs2-step-desc {
-          font-size: 14px;
-          line-height: 1.6;
-          color: rgba(229, 231, 235, 0.5);
-        }
-        .cs2-step-actions {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          flex-wrap: wrap;
-          margin-top: 4px;
-        }
-
-        .cs2-step-msg-pill {
-          font-size: 13px;
-          padding: 8px 16px;
-          border-radius: 8px;
-          font-weight: 550;
-        }
-        .msg-ok {
-          background: rgba(34, 197, 94, 0.08);
-          color: #22c55e;
-          border: 1px solid rgba(34, 197, 94, 0.2);
-        }
-        .msg-err {
-          background: rgba(239, 68, 68, 0.08);
-          color: #ef4444;
-          border: 1px solid rgba(239, 68, 68, 0.2);
-        }
-
-        .cs2-tip-box {
-          background: rgba(99, 102, 241, 0.05);
-          border: 1px solid rgba(99, 102, 241, 0.15);
-          border-radius: 8px;
-          padding: 12px 16px;
-          font-size: 13px;
-          line-height: 1.6;
-          color: rgba(229, 231, 235, 0.7);
-          margin-top: 6px;
-        }
-        .cs2-tip-box code {
-          background: rgba(0, 0, 0, 0.3);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          padding: 2px 6px;
-          border-radius: 4px;
-          font-family: monospace;
-          color: #818cf8;
-        }
-
-        /* Copy link inputs */
-        .cs2-copy-wrapper {
-          display: flex;
-          background: rgba(0, 0, 0, 0.3);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 10px;
-          padding: 4px;
-          overflow: hidden;
-          margin-top: 4px;
-          max-width: 100%;
-        }
-        .cs2-copy-input {
-          flex: 1;
-          background: transparent;
-          border: none;
-          color: #818cf8;
-          font-family: monospace;
-          font-size: 13px;
-          padding: 10px 14px;
-          overflow-x: auto;
-          white-space: nowrap;
-          user-select: all;
+        .cs2-step-icon {
+          width: 46px;
+          height: 46px;
+          display: grid;
+          place-items: center;
+          margin: 20px auto 8px;
+          border-radius: 50%;
+          color: #c89cff;
+          background: rgba(145,70,255,.13);
+          border: 1px solid rgba(164,93,255,.28);
+          font-size: 25px;
           align-self: center;
         }
-        .cs2-btn-copy {
-          background: rgba(255, 255, 255, 0.05);
-          color: #e5e7eb;
-          border-radius: 8px;
-          padding: 8px 16px;
+        .cs2-step-icon-twitch { border-radius: 11px; }
+        .cs2-launch-card h3, .cs2-control-card h3, .cs2-action-card h3 { margin: 0; color: var(--text); }
+        .cs2-launch-card h3 { font-size: 15px; align-self: center; text-align: center; }
+        .cs2-launch-card p { color: var(--muted); font-size: 12px; line-height: 1.55; margin: 0; text-align: center; }
+        .cs2-card-link {
+          min-height: auto;
+          margin-top: auto;
+          padding: 7px 10px;
+          width: 100%;
+          color: #cda9ff;
+          background: rgba(145,70,255,.08);
+          border-color: rgba(145,70,255,.18);
+          font-size: 12px;
         }
-        .cs2-btn-copy:hover {
-          background: rgba(255, 255, 255, 0.1);
-        }
-        .cs2-btn-copied {
-          background: rgba(34, 197, 94, 0.15);
-          color: #22c55e;
-          border-radius: 8px;
-          padding: 8px 16px;
-          border: 1px solid rgba(34, 197, 94, 0.3);
-        }
-
-        /* Actions Grid */
-        .cs2-actions-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-          gap: 20px;
-        }
-        .cs2-action-card {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 10px;
-          padding: 24px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          transition: all 0.2s ease;
-          position: relative;
-        }
-        .cs2-action-card:hover {
-          background: rgba(255, 255, 255, 0.05);
-          border-color: var(--accent, #6366f1);
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-        }
-        .cs2-action-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .cs2-action-icon {
-          font-size: 32px;
-        }
-        .cs2-action-key {
-          font-size: 11px;
-          font-family: monospace;
-          color: var(--accent, #6366f1);
-          background: rgba(99, 102, 241, 0.06);
-          border: 1px solid rgba(99, 102, 241, 0.15);
-          padding: 2px 8px;
-          border-radius: 4px;
-        }
-        .cs2-action-title {
-          font-size: 16px;
-          font-weight: 700;
-          color: #e5e7eb;
-        }
-        .cs2-action-desc {
-          font-size: 13px;
-          line-height: 1.6;
-          color: rgba(229, 231, 235, 0.5);
-        }
-
-        /* How it works for guests */
-        .cs2-steps-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 24px;
-        }
-        .cs2-step-card {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 10px;
-          padding: 32px 24px;
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          position: relative;
-        }
-        .cs2-step-card-num {
-          font-size: 40px;
-          font-weight: 900;
-          color: rgba(99, 102, 241, 0.2);
-          line-height: 1;
-        }
-        .cs2-step-card h4 {
-          font-size: 18px;
-          font-weight: 700;
-          color: #e5e7eb;
-        }
-        .cs2-step-card p {
-          font-size: 14px;
-          line-height: 1.6;
-          color: rgba(229, 231, 235, 0.5);
-        }
-        
-        .cs2-guest-cta {
+        .cs2-card-complete, .cs2-card-muted {
+          width: 100%;
+          margin-top: auto;
           text-align: center;
-          margin-top: 48px;
-          background: rgba(99, 102, 241, 0.04);
-          border: 1px solid rgba(99, 102, 241, 0.12);
-          padding: 32px;
-          border-radius: 10px;
+          color: #65d99a;
+          font-size: 12px;
+          font-weight: 700;
+        }
+        .cs2-card-muted { color: #666c7d; }
+        .cs2-smartscreen-preview {
+          width: 100%;
+          min-height: 88px;
+          margin: 10px 0 2px;
+          padding: 12px;
           display: flex;
           flex-direction: column;
-          align-items: center;
-          gap: 16px;
+          gap: 5px;
+          color: #111827;
+          background: #edf4ff;
+          border: 1px solid #90bfff;
+          border-radius: 5px;
+          font-family: 'Segoe UI', sans-serif;
+          text-align: left;
         }
-        .cs2-guest-cta p {
-          font-size: 18px;
-          font-weight: 600;
-          color: #e5e7eb;
+        .cs2-smartscreen-preview strong { font-size: 10px; }
+        .cs2-smartscreen-preview span { color: #46556e; font-size: 8px; line-height: 1.35; }
+        .cs2-smartscreen-preview b {
+          align-self: flex-end;
+          margin-top: auto;
+          padding: 3px 7px;
+          color: white;
+          background: #0a67c7;
+          border-radius: 2px;
+          font-size: 8px;
         }
+        .cs2-smartscreen-card p strong { color: #e6d7ff; }
+        .cs2-oauth-note { margin: 12px 0 0; text-align: center; color: #666c7d; font-size: 11px; }
+        .cs2-oauth-note span { color: #55d88b; margin-right: 5px; }
 
-        /* Navigation */
-        .cs2-nav {
-          display: flex;
-          gap: 20px;
-          flex-wrap: wrap;
-          justify-content: center;
-          padding-top: 32px;
-          border-top: 1px solid rgba(255, 255, 255, 0.06);
-        }
-        .cs2-nav-link {
-          font-size: 14px;
-          color: rgba(229, 231, 235, 0.5);
-          text-decoration: none;
-          padding: 8px 18px;
-          border-radius: 8px;
-          transition: all 0.2s ease;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-        }
-        .cs2-nav-link:hover {
-          color: #e5e7eb;
-          background: rgba(255, 255, 255, 0.06);
-          border-color: rgba(255, 255, 255, 0.1);
-        }
-        .cs2-nav-back {
-          color: rgba(229, 231, 235, 0.35);
-          background: transparent;
-          border: none;
-        }
-        .cs2-nav-back:hover {
-          background: transparent;
-          color: #e5e7eb;
-        }
+        .cs2-control-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+        .cs2-control-card { padding: 22px; display: flex; flex-direction: column; align-items: flex-start; gap: 13px; }
+        .cs2-control-card h3 { font-size: 17px; }
+        .cs2-control-card p { color: var(--muted); font-size: 13px; line-height: 1.55; margin: 0; }
+        .cs2-control-topline { display: flex; align-items: center; gap: 8px; color: #8f96a8; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+        .cs2-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #f0ad4e; box-shadow: 0 0 0 4px rgba(240,173,78,.08); }
+        .cs2-status-dot.is-ready { background: #4bd38a; box-shadow: 0 0 0 4px rgba(75,211,138,.09); }
+        .cs2-inline-message { color: #f29a9a; font-size: 12px; }
+        .cs2-inline-message.is-success { color: #62d997; }
+        .cs2-copy-wrapper { width: 100%; display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+        .cs2-copy-input { width: 100%; padding: 9px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #aeb4c4; background: #0d0f15; border: 1px solid var(--line); border-radius: 7px; font-size: 10px; }
 
-        @media (max-width: 768px) {
-          .cs2-container {
-            padding: 48px 16px 64px;
-            gap: 48px;
-          }
-          .cs2-wizard-card {
-            padding: 24px;
-          }
-          .cs2-wizard-timeline::before {
-            left: 11px;
-          }
-          .cs2-step-node {
-            width: 24px;
-            height: 24px;
-            font-size: 12px;
-          }
-          .cs2-wizard-step {
-            gap: 16px;
-          }
-          .cs2-steps-grid {
-            grid-template-columns: 1fr;
-            gap: 16px;
-          }
-          .cs2-actions-grid {
-            grid-template-columns: 1fr;
-          }
-          .cs2-copy-wrapper {
-            flex-direction: column;
-            gap: 8px;
-            background: transparent;
-            border: none;
-            padding: 0;
-          }
-          .cs2-copy-input {
-            width: 100%;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            box-sizing: border-box;
-          }
-          .cs2-btn-copy, .cs2-btn-copied {
-            width: 100%;
-          }
+        .cs2-actions-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .cs2-action-card { min-height: 166px; padding: 19px; display: flex; flex-direction: column; gap: 10px; transition: transform .18s ease, border-color .18s ease, background .18s ease; }
+        .cs2-action-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: var(--panel-strong); }
+        .cs2-action-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .cs2-action-icon { font-size: 24px; }
+        .cs2-action-key { max-width: 68%; overflow: hidden; text-overflow: ellipsis; padding: 3px 7px; color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 5px; font: 10px ui-monospace, SFMono-Regular, Consolas, monospace; }
+        .cs2-action-title { font-size: 15px; }
+        .cs2-action-desc { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+        .cs2-action-duration { margin-top: auto; color: #626878; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+
+        .cs2-nav { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding-top: 22px; border-top: 1px solid var(--line); }
+        .cs2-nav-link { padding: 8px 11px; color: #878d9d; text-decoration: none; font-size: 12px; border-radius: 7px; }
+        .cs2-nav-link:hover { color: white; background: rgba(255,255,255,.04); }
+        .cs2-nav-back { color: #646978; }
+
+        @media (max-width: 900px) {
+          .cs2-launch-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+          .cs2-control-grid { grid-template-columns: 1fr; }
+          .cs2-actions-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+        }
+        @media (max-width: 620px) {
+          .cs2-container { width: min(100% - 24px, 1080px); padding: 36px 0 54px; gap: 58px; }
+          .cs2-hero { gap: 13px; }
+          .cs2-hero h1 { font-size: 26px; }
+          .cs2-tagline { font-size: 14px; }
+          .cs2-user-card { flex-wrap: wrap; justify-content: center; }
+          .cs2-user-status { display: none; }
+          .cs2-launch-grid, .cs2-actions-grid { grid-template-columns: 1fr; }
+          .cs2-launch-card { min-height: auto; padding: 22px 18px 18px; }
+          .cs2-smartscreen-preview { max-width: 250px; align-self: center; }
+          .cs2-section-heading h2 { font-size: 24px; }
         }
       `}</style>
     </main>

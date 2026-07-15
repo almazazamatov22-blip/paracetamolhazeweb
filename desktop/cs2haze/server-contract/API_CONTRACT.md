@@ -8,6 +8,37 @@ email/password form. The canonical API and agent origin is
 
 Returns launcher/runtime versions and the authentication feature flags.
 
+When `launcherVersion` is newer than the running version, `launcherUrl` must
+point to `cs2haze-launcher.zip` and `launcherSha256` must contain the lowercase
+SHA-256 of that archive. The launcher downloads and verifies the archive,
+starts `cs2haze-updater.exe` from a temporary location, and exits. The updater
+keeps `launcher-config.json` and the runtime, swaps the installation directory,
+waits for a versioned ready signal, rolls back if replacement or relaunch
+fails, and then starts the new launcher. Before replacement, the launcher adds
+a per-user Windows `RunOnce` recovery command; after an interrupted update or
+power loss it restores the saved installation before starting cs2haze.
+
+For safety, `launcherUrl` is accepted only when it points to
+`https://github.com/almazazamatov22-blip/paracetamolhazeweb/releases/` and the
+asset name is exactly `cs2haze-launcher.zip`. Redirects from that GitHub URL are
+handled by `HttpClient`; arbitrary manifest hosts are rejected.
+
+The launcher archive contains `launcher-update.json`:
+
+```json
+{
+  "launcherVersion": "1.0.4",
+  "entryPoint": "cs2haze.exe"
+}
+```
+
+Both launcher artifacts are produced by `scripts/build-cs2haze.ps1`:
+
+```text
+cs2haze-launcher.zip
+cs2haze-launcher.sha256
+```
+
 Production currently requires authentication and does not require a paid
 subscription:
 

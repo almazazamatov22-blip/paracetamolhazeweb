@@ -12,8 +12,11 @@ const required = [
   "desktop/cs2haze/launcher/Services/PendingConnectTokenStore.cs",
   "desktop/cs2haze/launcher/MainForm.cs",
   "desktop/cs2haze/tests/CS2Haze.TokenStoreSmoke.csproj",
+  "desktop/cs2haze/tests/CS2Haze.UpdateSmoke.csproj",
   "desktop/cs2haze/tests/Program.cs",
+  "desktop/cs2haze/tests/UpdateSmokeProgram.cs",
   "desktop/cs2haze/updater/CS2Haze.Updater.csproj",
+  "desktop/cs2haze/updater/UpdateInstaller.cs",
   "desktop/cs2haze/installer/cs2haze.iss",
   "desktop/cs2haze/scripts/build-cs2haze.ps1",
   ".github/workflows/build-cs2haze.yml",
@@ -108,11 +111,20 @@ const manifestRoute = fs.readFileSync(
   "src/app/api/cs2/launcher/manifest/route.ts",
   "utf8"
 );
+const buildScriptSource = fs.readFileSync(
+  "desktop/cs2haze/scripts/build-cs2haze.ps1",
+  "utf8"
+);
 const launcherVersion = launcherProject.match(/<Version>([^<]+)<\/Version>/)?.[1];
-const installerVersion = installerDefinition.match(/#define MyAppVersion "([^"]+)"/)?.[1];
-const manifestVersion = manifestRoute.match(/launcherVersion:\s*"([^"]+)"/)?.[1];
+const manifestVersion = manifestRoute.match(
+  /(?:(?:MINIMUM_SELF_UPDATING_VERSION|SUPPORTED_LAUNCHER_VERSION)\s*=|launcherVersion:)\s*["']([^"']+)["']/
+)?.[1];
 must(Boolean(launcherVersion), "Launcher project version missing");
-must(launcherVersion === installerVersion, "Launcher and installer versions differ");
+must(
+  installerDefinition.includes("#ifndef MyAppVersion") &&
+    buildScriptSource.includes('"/DMyAppVersion=$launcherVersion"'),
+  "Installer version is not derived from the launcher project"
+);
 must(launcherVersion === manifestVersion, "Launcher and manifest versions differ");
 
 const stableInstallerUrl =
@@ -165,10 +177,7 @@ const installer = fs.readFileSync(
 must(installer.includes('OutputBaseFilename=CS2Haze-Setup'), "Installer name wrong");
 must(installer.includes('Name: "{autodesktop}\\cs2haze"'), "Desktop shortcut wrong");
 
-const buildScript = fs.readFileSync(
-  "desktop/cs2haze/scripts/build-cs2haze.ps1",
-  "utf8"
-);
+const buildScript = buildScriptSource;
 must(!buildScript.includes("--agent=("), "Helper path is passed as an empty Node argument");
 must(
   buildScript.includes("Embedded helper compilation failed with exit code"),
@@ -184,7 +193,9 @@ must(
   "Release tag is interpolated directly into PowerShell"
 );
 must(
-  releaseWorkflow.includes("/releases/latest/download/CS2Haze-Setup.exe"),
+  releaseWorkflow.includes("$latestUrl") &&
+    releaseWorkflow.includes("'CS2Haze-Setup.exe'") &&
+    releaseWorkflow.includes("'cs2haze-launcher.zip'"),
   "Release smoke test does not verify the public latest URL"
 );
 must(
@@ -194,6 +205,10 @@ must(
 must(
   releaseWorkflow.includes("CS2Haze.TokenStoreSmoke.csproj"),
   "Protocol token-store smoke test is not part of the release workflow"
+);
+must(
+  releaseWorkflow.includes("CS2Haze.UpdateSmoke.csproj"),
+  "Launcher update recovery smoke test is not part of the release workflow"
 );
 
 console.log("cs2haze integration verification passed.");

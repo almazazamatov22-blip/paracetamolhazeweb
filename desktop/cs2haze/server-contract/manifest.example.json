@@ -1,11 +1,11 @@
 {
-  "launcherVersion": "1.0.0",
+  "launcherVersion": "1.0.4",
   "runtimeVersion": "2.0.6",
   "mandatory": true,
   "runtimeUrl": "https://RELEASE-OR-STORAGE/cs2haze-runtime.zip",
   "runtimeSha256": "REPLACE_AFTER_BUILD",
-  "launcherUrl": null,
-  "launcherSha256": null,
+  "launcherUrl": "https://github.com/almazazamatov22-blip/paracetamolhazeweb/releases/latest/download/cs2haze-launcher.zip",
+  "launcherSha256": "REPLACE_AFTER_BUILD",
   "requireAuthentication": false,
   "requireSubscription": false
 }

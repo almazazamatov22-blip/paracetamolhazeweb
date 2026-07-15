@@ -30,7 +30,7 @@ public sealed class AgentService(StorageService storage) : IDisposable
 
         var logPath = Path.Combine(
             storage.LogsDirectory,
-            $"agent-{DateTime.Now:yyyy-MM-dd}.log"
+            $"agent-{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.log"
         );
         logWriter = new StreamWriter(logPath, append: true, Encoding.UTF8) { AutoFlush = true };
 
@@ -43,6 +43,8 @@ public sealed class AgentService(StorageService storage) : IDisposable
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
         };
         info.Environment["CS2_BASE_URL"] = agentBaseUrl;
         info.Environment["CS2_STREAMER_ID"] = streamerId;

@@ -1,5 +1,7 @@
 #define MyAppName "cs2haze"
-#define MyAppVersion "1.0.3"
+#ifndef MyAppVersion
+  #error MyAppVersion must be passed by build-cs2haze.ps1
+#endif
 #define MyAppPublisher "Paracetamol Haze"
 #define MyAppExeName "cs2haze.exe"
 

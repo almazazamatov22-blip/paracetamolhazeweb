@@ -35,6 +35,25 @@ Copy-Item (Join-Path $KitRoot "assets\cs2haze.ico") `
 Copy-Item (Join-Path $KitRoot "launcher\launcher-config.json") `
   (Join-Path $LauncherOut "launcher-config.json") -Force
 
+Write-Host "Creating launcher self-update archive..."
+$launcherProject = [xml](Get-Content (Join-Path $KitRoot "launcher\CS2Haze.Launcher.csproj"))
+$launcherVersion = [string]($launcherProject.Project.PropertyGroup.Version | Select-Object -First 1)
+if (-not $launcherVersion) {
+  throw "Launcher version was not found in CS2Haze.Launcher.csproj."
+}
+
+$launcherPackageManifest = Join-Path $LauncherOut "launcher-update.json"
+@{
+  launcherVersion = $launcherVersion
+  entryPoint = "cs2haze.exe"
+} | ConvertTo-Json | Set-Content $launcherPackageManifest -Encoding utf8
+
+$launcherZip = Join-Path $Dist "cs2haze-launcher.zip"
+Compress-Archive (Join-Path $LauncherOut "*") $launcherZip -Force
+$launcherHash = (Get-FileHash $launcherZip -Algorithm SHA256).Hash.ToLowerInvariant()
+$launcherHash | Set-Content (Join-Path $Dist "cs2haze-launcher.sha256") -Encoding ascii
+Remove-Item $launcherPackageManifest -Force
+
 Write-Host "Downloading latest Node 24 LTS portable runtime..."
 $index = Invoke-RestMethod "https://nodejs.org/dist/index.json"
 $nodeRelease = $index |
@@ -95,11 +114,12 @@ if (-not $isccPath) {
 if (-not $isccPath) {
   throw "ISCC.exe not found. Install Inno Setup before running this step."
 }
-& $isccPath (Join-Path $KitRoot "installer\cs2haze.iss")
+& $isccPath "/DMyAppVersion=$launcherVersion" (Join-Path $KitRoot "installer\cs2haze.iss")
 if ($LASTEXITCODE -ne 0) {
   throw "Installer build failed with exit code $LASTEXITCODE."
 }
 
 Write-Host "Done."
 Write-Host "Installer: $(Join-Path $Dist 'CS2Haze-Setup.exe')"
+Write-Host "Launcher update SHA256: $launcherHash"
 Write-Host "Runtime SHA256: $hash"

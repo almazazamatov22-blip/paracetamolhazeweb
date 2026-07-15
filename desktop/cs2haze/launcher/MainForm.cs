@@ -134,7 +134,7 @@ public sealed class MainForm : Form
             state = storage.LoadState();
             var installDirectory = AppContext.BaseDirectory;
             var launcherVersion =
-                Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
+                Assembly.GetExecutingAssembly().GetName().Version?.ToString(4) ?? "1.0.0.0";
 
             SetState("Проверка обновлений…", "Подключаемся к серверу.", marquee: true);
 
@@ -144,6 +144,38 @@ public sealed class MainForm : Form
                 state.RuntimeVersion,
                 cancellation.Token
             );
+
+            if (UpdateService.IsLauncherUpdateAvailable(launcherVersion, manifest.LauncherVersion))
+            {
+                SetState(
+                    $"Обновление до версии {manifest.LauncherVersion}",
+                    "Скачиваем новую версию лаунчера…",
+                    marquee: false
+                );
+                progress.Value = 0;
+                var reporter = new Progress<int>(value => progress.Value = value);
+                var preparedUpdate = await updateService.PrepareLauncherUpdateAsync(
+                    manifest,
+                    installDirectory,
+                    storage.DataDirectory,
+                    reporter,
+                    cancellation.Token
+                );
+
+                SetState(
+                    "Обновление загружено",
+                    "Закрываем лаунчер и устанавливаем новую версию…",
+                    marquee: false
+                );
+                progress.Value = 100;
+                updateService.StartLauncherUpdater(
+                    preparedUpdate,
+                    installDirectory,
+                    manifest.LauncherVersion
+                );
+                Close();
+                return;
+            }
 
             config.RequireAuthentication =
                 config.RequireAuthentication || manifest.RequireAuthentication;
@@ -224,11 +256,12 @@ public sealed class MainForm : Form
                 line => BeginInvoke(() => detail.Text = line)
             );
 
-            SetState("cs2haze запущен", "Агент работает. Окно можно свернуть.", false);
+            SetState(
+                "cs2haze готов к работе",
+                "Агент подключён. Лаунчер можно свернуть вручную.",
+                false
+            );
             progress.Value = 100;
-
-            await Task.Delay(900, cancellation.Token);
-            WindowState = FormWindowState.Minimized;
         }
         catch (OperationCanceledException)
         {

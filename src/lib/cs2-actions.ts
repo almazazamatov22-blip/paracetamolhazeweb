@@ -57,13 +57,14 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
     durationMs: 30000,
     effectType: 'keyboard',
     description: 'Блокирует приседание на 30 секунд.',
-  },  play_sound: {
+  },
+  play_sound: {
     actionType: 'play_sound',
-    label: 'Звук на стриме',
+    label: 'Звук хедшота',
     icon: '🔊',
     durationMs: 2000,
     effectType: 'audio',
-    description: 'Воспроизводит звук; уведомление показывается 2 секунды.',
+    description: 'Проигрывает звук хедшота на стриме.',
   },
   mouse_shake: {
     actionType: 'mouse_shake',
@@ -75,15 +76,15 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   },
   flash_screen: {
     actionType: 'flash_screen',
-    label: 'Вспышка экрана',
+    label: 'Флешка',
     icon: '💥',
     durationMs: 3000,
     effectType: 'overlay',
-    description: 'Сильная белая вспышка: 1 секунда полной яркости и плавное затухание.',
+    description: 'Белая вспышка на экране стрима с плавным затуханием.',
   },
   random_weapon_switch: {
     actionType: 'random_weapon_switch',
-    label: 'Рандомное оружие',
+    label: 'Случайное оружие',
     icon: '🎲',
     durationMs: 2000,
     effectType: 'keyboard',
@@ -115,7 +116,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   },
   spinbot: {
     actionType: 'spinbot',
-    label: 'Крутилка (Spinbot)',
+    label: 'СпинБот',
     icon: '🌪️',
     durationMs: 10000,
     effectType: 'mouse',

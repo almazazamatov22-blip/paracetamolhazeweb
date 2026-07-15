@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
+using System.Text;
 using CS2Haze.Launcher.Services;
 
 namespace CS2Haze.Launcher;
@@ -13,8 +15,14 @@ internal static class Program
             var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "cs2haze", "logs", "protocol.log");
             Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
             var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            var logEntry = $"{timestamp} protocol received\nscheme=cs2haze\ntarget={hostOrPath}\ntokenPresent={tokenPresent}\ntokenLength={tokenLength}\nprimaryInstance={isPrimary}\n\n";
-            File.AppendAllText(logPath, logEntry);
+            var logEntry =
+                $"{timestamp} Получена команда от браузера.\n"
+                + "Протокол: cs2haze\n"
+                + $"Назначение: {hostOrPath}\n"
+                + $"Токен получен: {(tokenPresent ? "да" : "нет")}\n"
+                + $"Длина токена: {tokenLength}\n"
+                + $"Основной процесс: {(isPrimary ? "да" : "нет")}\n\n";
+            File.AppendAllText(logPath, logEntry, new UTF8Encoding(false));
         }
         catch { }
     }
@@ -100,6 +108,102 @@ internal static class Program
             return;
         }
 
-        Application.Run(new MainForm());
+        var mainForm = new MainForm();
+        mainForm.Shown += (_, _) =>
+        {
+            SignalSuccessfulUpdate(args);
+            _ = Task.Run(() => CleanupTemporaryUpdater(args));
+        };
+        Application.Run(mainForm);
+    }
+
+    private static void CleanupTemporaryUpdater(string[] args)
+    {
+        const string prefix = "--cleanup-updater=";
+        var path = args
+            .FirstOrDefault(arg => arg.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            ?[prefix.Length..]
+            .Trim(' ', '"', '\'');
+
+        if (!IsSafeUpdateFile(path, "updater-", ".exe")) return;
+
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            try
+            {
+                if (!File.Exists(path)) return;
+                File.Delete(path);
+                return;
+            }
+            catch (IOException)
+            {
+                Thread.Sleep(250);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return;
+            }
+        }
+    }
+
+    private static void SignalSuccessfulUpdate(string[] args)
+    {
+        var readyPath = GetArgumentValue(args, "--update-ready=");
+        var expectedVersion = GetArgumentValue(args, "--update-version=");
+        if (!IsSafeUpdateFile(readyPath, "ready-", ".txt")
+            || !Version.TryParse(expectedVersion, out var expected))
+        {
+            return;
+        }
+
+        var current = Assembly.GetExecutingAssembly().GetName().Version;
+        if (current is null
+            || NormalizeVersion(current) != NormalizeVersion(expected))
+        {
+            return;
+        }
+
+        File.WriteAllText(readyPath!, expectedVersion!, new UTF8Encoding(false));
+    }
+
+    private static string? GetArgumentValue(string[] args, string prefix)
+    {
+        return args
+            .FirstOrDefault(arg => arg.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            ?[prefix.Length..]
+            .Trim(' ', '"', '\'');
+    }
+
+    private static bool IsSafeUpdateFile(string? path, string prefix, string extension)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        try
+        {
+            var updatesDirectory = Path.GetFullPath(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "cs2haze",
+                "updates"
+            )).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            var fullPath = Path.GetFullPath(path);
+            var fileName = Path.GetFileName(fullPath);
+            return fullPath.StartsWith(updatesDirectory, StringComparison.OrdinalIgnoreCase)
+                && fileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                && fileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static Version NormalizeVersion(Version version)
+    {
+        return new Version(
+            version.Major,
+            version.Minor,
+            Math.Max(version.Build, 0),
+            Math.Max(version.Revision, 0)
+        );
     }
 }

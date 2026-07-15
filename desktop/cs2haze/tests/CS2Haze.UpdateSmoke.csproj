@@ -10,7 +10,9 @@
     <IntermediateOutputPath>obj\$(MSBuildProjectName)\$(Configuration)\</IntermediateOutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Program.cs" />
-    <Compile Include="..\launcher\Services\PendingConnectTokenStore.cs" Link="PendingConnectTokenStore.cs" />
+    <Compile Include="UpdateSmokeProgram.cs" />
+    <Compile Include="..\launcher\Models\LauncherModels.cs" Link="LauncherModels.cs" />
+    <Compile Include="..\launcher\Services\UpdateService.cs" Link="UpdateService.cs" />
+    <Compile Include="..\updater\UpdateInstaller.cs" Link="UpdateInstaller.cs" />
   </ItemGroup>
 </Project>

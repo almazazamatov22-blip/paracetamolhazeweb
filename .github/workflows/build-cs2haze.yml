@@ -29,6 +29,10 @@ jobs:
         shell: powershell
         run: dotnet run --project .\desktop\cs2haze\tests\CS2Haze.TokenStoreSmoke.csproj -c Release
 
+      - name: Test launcher update recovery
+        shell: powershell
+        run: dotnet run --project .\desktop\cs2haze\tests\CS2Haze.UpdateSmoke.csproj -c Release
+
       - name: Install Inno Setup
         shell: powershell
         run: choco install innosetup --yes --no-progress
@@ -37,6 +41,41 @@ jobs:
         shell: powershell
         run: |
           .\desktop\cs2haze\scripts\build-cs2haze.ps1 -RepoRoot $PWD
+
+      - name: Test packaged updater lifecycle
+        shell: powershell
+        run: >-
+          dotnet run --project .\desktop\cs2haze\tests\CS2Haze.UpdateSmoke.csproj
+          -c Release --
+          --updater=.\desktop\cs2haze\dist\launcher\cs2haze-updater.exe
+
+      - name: Create atomic release metadata
+        if: startsWith(github.ref, 'refs/tags/cs2haze-v')
+        shell: powershell
+        run: |
+          $project = [xml](Get-Content .\desktop\cs2haze\launcher\CS2Haze.Launcher.csproj)
+          $launcherVersion = [string]($project.Project.PropertyGroup.Version | Select-Object -First 1)
+          $launcherHash = (Get-Content .\desktop\cs2haze\dist\cs2haze-launcher.sha256 -Raw).Trim().ToLowerInvariant()
+
+          if (-not $launcherVersion) {
+            throw "Launcher version is missing."
+          }
+          if ($launcherVersion -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Launcher version must contain exactly three numeric parts."
+          }
+          if ($launcherHash -notmatch '^[a-f0-9]{64}$') {
+            throw "Launcher SHA-256 is invalid."
+          }
+
+          $metadata = [ordered]@{
+            releaseTag = $env:GITHUB_REF_NAME
+            launcherVersion = $launcherVersion
+            launcherSha256 = $launcherHash
+          } | ConvertTo-Json
+
+          $metadataPath = Join-Path $PWD 'desktop\cs2haze\dist\cs2haze-release.json'
+          $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+          [System.IO.File]::WriteAllText($metadataPath, $metadata + "`n", $utf8NoBom)
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
@@ -52,60 +91,105 @@ jobs:
             desktop/cs2haze/dist/cs2haze-runtime.zip
             desktop/cs2haze/dist/cs2haze-runtime.sha256
 
+      - name: Upload launcher update
+        uses: actions/upload-artifact@v4
+        with:
+          name: cs2haze-launcher
+          path: |
+            desktop/cs2haze/dist/cs2haze-launcher.zip
+            desktop/cs2haze/dist/cs2haze-launcher.sha256
+
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/cs2haze-v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
+          overwrite_files: false
+          preserve_order: true
           files: |
             desktop/cs2haze/dist/CS2Haze-Setup.exe
             desktop/cs2haze/dist/cs2haze-runtime.zip
             desktop/cs2haze/dist/cs2haze-runtime.sha256
+            desktop/cs2haze/dist/cs2haze-launcher.zip
+            desktop/cs2haze/dist/cs2haze-launcher.sha256
+            desktop/cs2haze/dist/cs2haze-release.json
 
       - name: Verify published installer
         if: startsWith(github.ref, 'refs/tags/cs2haze-v')
         shell: powershell
         run: |
           $tag = [Uri]::EscapeDataString($env:GITHUB_REF_NAME)
-          $tagUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/CS2Haze-Setup.exe"
-          $latestUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/latest/download/CS2Haze-Setup.exe"
-          $expectedLatestPath = "/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/CS2Haze-Setup.exe"
+          $assets = @(
+            'CS2Haze-Setup.exe',
+            'cs2haze-launcher.zip',
+            'cs2haze-launcher.sha256',
+            'cs2haze-release.json'
+          )
 
           for ($attempt = 1; $attempt -le 12; $attempt++) {
             $allDownloadable = $true
 
-            foreach ($url in @($tagUrl, $latestUrl)) {
-              $headers = (& curl.exe -fsSIL --max-redirs 5 $url 2>&1) -join "`n"
+            foreach ($asset in $assets) {
+              $tagUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$asset"
+              $latestUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/latest/download/$asset"
+              $expectedLatestPath = "/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/$asset"
+
+              $tagHeaders = (& curl.exe -fsSIL --max-redirs 5 $tagUrl 2>&1) -join "`n"
+              $latestHeadersFollowed = (& curl.exe -fsSIL --max-redirs 5 $latestUrl 2>&1) -join "`n"
               if (
                 $LASTEXITCODE -ne 0 -or
-                $headers -notmatch '(?im)^HTTP/\S+ 200\b' -or
-                $headers -notmatch '(?im)^content-disposition:\s*attachment;.*filename=CS2Haze-Setup\.exe'
+                $tagHeaders -notmatch '(?im)^HTTP/\S+ 200\b' -or
+                $latestHeadersFollowed -notmatch '(?im)^HTTP/\S+ 200\b'
               ) {
+                $allDownloadable = $false
+                break
+              }
+
+              $latestHeaders = (& curl.exe -fsSI --max-redirs 0 $latestUrl 2>&1) -join "`n"
+              $latestLocation = [regex]::Match(
+                $latestHeaders,
+                '(?im)^location:\s*(.+)\s*$'
+              ).Groups[1].Value.Trim()
+              $latestPointsToTag = $false
+              if ($latestLocation) {
+                try {
+                  $latestPath = [Uri]::UnescapeDataString(([Uri]$latestLocation).AbsolutePath)
+                  $latestPointsToTag = $latestPath -eq $expectedLatestPath
+                } catch {
+                  $latestPointsToTag = $false
+                }
+              }
+
+              if (-not $latestPointsToTag) {
                 $allDownloadable = $false
                 break
               }
             }
 
-            $latestHeaders = (& curl.exe -fsSI --max-redirs 0 $latestUrl 2>&1) -join "`n"
-            $latestLocation = [regex]::Match(
-              $latestHeaders,
-              '(?im)^location:\s*(.+)\s*$'
-            ).Groups[1].Value.Trim()
-            $latestPointsToTag = $false
-            if ($latestLocation) {
-              try {
-                $latestPath = [Uri]::UnescapeDataString(([Uri]$latestLocation).AbsolutePath)
-                $latestPointsToTag = $latestPath -eq $expectedLatestPath
-              } catch {
-                $latestPointsToTag = $false
+            if ($allDownloadable) {
+              $metadataUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/cs2haze-release.json"
+              $metadataText = (& curl.exe -fsSL --max-redirs 5 $metadataUrl 2>&1) -join "`n"
+              $publishedMetadata = $metadataText | ConvertFrom-Json
+              $expectedHash = (Get-Content .\desktop\cs2haze\dist\cs2haze-launcher.sha256 -Raw).Trim().ToLowerInvariant()
+              $publishedArchive = Join-Path $env:RUNNER_TEMP 'published-cs2haze-launcher.zip'
+              $archiveUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/cs2haze-launcher.zip"
+              & curl.exe -fsSL --max-redirs 5 $archiveUrl -o $publishedArchive
+              $publishedHash = if ($LASTEXITCODE -eq 0) {
+                (Get-FileHash $publishedArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+              } else {
+                ''
               }
-            }
-
-            if ($allDownloadable -and $latestPointsToTag) {
-              Write-Host "Published installer is downloadable."
-              exit 0
+              Remove-Item $publishedArchive -Force -ErrorAction SilentlyContinue
+              if (
+                $publishedMetadata.releaseTag -eq $env:GITHUB_REF_NAME -and
+                $publishedMetadata.launcherSha256 -eq $expectedHash -and
+                $publishedHash -eq $expectedHash
+              ) {
+                Write-Host "Installer and launcher update assets are downloadable."
+                exit 0
+              }
             }
 
             Start-Sleep -Seconds 5
           }
 
-          throw "Published installer did not become downloadable through both tag and latest URLs."
+          throw "Published installer or launcher update assets did not become downloadable."
