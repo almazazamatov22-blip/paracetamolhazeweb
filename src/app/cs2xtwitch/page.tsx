@@ -98,9 +98,14 @@ export default function cs2xtwitchPage() {
     setTimeout(() => setCopiedOverlay(false), 2000)
   }
 
-  const overlayUrl = user
-    ? `https://paracetamolhaze.ru/overlays/cs2.html?streamerId=${user.id}`
-    : ''
+  const [overlayUrl, setOverlayUrl] = useState('')
+  useEffect(() => {
+    if (user) {
+      setOverlayUrl(`${window.location.origin}/overlays/cs2.html?streamerId=${user.id}`)
+    } else {
+      setOverlayUrl('')
+    }
+  }, [user])
 
   return (
     <main className="cs2-page">

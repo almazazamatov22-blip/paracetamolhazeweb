@@ -25,9 +25,9 @@ const PROJECTS = [
     href: '/roz',
   },
   {
-    title: 'КИНО',
-    desc: 'Онлайн просмотр фильмов и таймингов',
-    href: '/kino',
+    title: 'CS2XTWITCH',
+    desc: 'Зрители управляют твоей игрой',
+    href: '/cs2xtwitch',
   },
   {
     title: 'ЧЕК',
