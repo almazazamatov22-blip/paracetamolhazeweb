@@ -111,6 +111,22 @@ export async function POST(req: NextRequest) {
         auction_winner: getBestAuctionBid(state.auction_bids),
         updated_at: new Date().toISOString(),
       });
+    } else if (action === 'stopLottery') {
+      state = normalizeRozState({
+        ...state,
+        lottery_reward_id: '',
+        lottery_reward_name: '',
+        updated_at: new Date().toISOString(),
+      });
+    } else if (action === 'stopAuction') {
+      state = normalizeRozState({
+        ...state,
+        auction_reward_ids: [],
+        auction_reward_names: [],
+        auction_reward_id: '',
+        auction_reward_name: '',
+        updated_at: new Date().toISOString(),
+      });
     } else if (action === 'deleteLotteryEntry') {
       const targetLogin = typeof body.login === 'string' ? body.login.toLowerCase() : '';
       state = normalizeRozState({

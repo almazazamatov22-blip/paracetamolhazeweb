@@ -937,26 +937,45 @@ export default function Home() {
     if (activeMode === 'giveaway') setGiveawayTime(0)
     if (activeMode === 'lottery') setLotteryTime(0)
     if (activeMode === 'auction') setAuctionTime(0)
+    
     if (activeMode === 'giveaway') {
       setIsGiveawayConnected(false)
       stopSimulation()
       setStatusMessage(`Отключено. ${getIdleStatus(activeMode)}`)
     } else if (activeMode === 'lottery') {
+      const rewardId = selectedLotteryRewardId;
       setSelectedLotteryRewardId('')
+      setStatusMessage('Удаляем награду и отключаемся...')
+      if (rewardId) {
+        await fetch('/api/roz/rewards', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: rewardId })
+        })
+      }
+      await fetch('/api/roz/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stopLottery' })
+      })
       setStatusMessage('Отключено от лотереи. Можете начать новую.')
-      await fetch('/api/roz/state', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save', settings: { lottery_reward_id: '' } })
-      })
     } else if (activeMode === 'auction') {
+      const rewardIds = [...selectedAuctionRewardIds];
       setSelectedAuctionRewardIds([])
-      setStatusMessage('Отключено от аукциона. Можете начать новый.')
+      setStatusMessage('Удаляем награду и отключаемся...')
+      for (const rewardId of rewardIds) {
+        await fetch('/api/roz/rewards', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: rewardId })
+        })
+      }
       await fetch('/api/roz/state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save', settings: { auction_reward_ids: [] } })
+        body: JSON.stringify({ action: 'stopAuction' })
       })
+      setStatusMessage('Отключено от аукциона. Можете начать новый.')
     }
   }
 
@@ -1419,7 +1438,35 @@ export default function Home() {
                   className="flex-1 bg-red-600/80 hover:bg-red-500 text-white font-semibold rounded-xl h-11 transition-all"
                 >
                   <Power className="w-4 h-4 mr-2" />
-                  Отключиться
+                  Остановить {activeMode === 'lottery' ? 'продажу' : activeMode === 'auction' ? 'аукцион' : ''}
+                </Button>
+              )}
+              {activeMode !== 'giveaway' && (
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    if (!confirm('Удалить ВСЕ награды с названием "... .by paracetamolhaze.ru" со всего канала?')) return
+                    try {
+                      setStatusMessage('Удаляем старые награды с Twitch...')
+                      const res = await fetch('/api/roz/rewards', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'cleanup' })
+                      })
+                      const data = await res.json()
+                      if (data.success) {
+                        setStatusMessage(`Успешно удалено наград: ${data.deleted}`)
+                      } else {
+                        setStatusMessage(`Ошибка: ${data.error}`)
+                      }
+                    } catch (e: any) {
+                      setStatusMessage('Ошибка при удалении наград')
+                    }
+                  }}
+                  className="bg-[#2a2a2a] border-[#333] hover:bg-[#333] hover:text-white text-gray-400 font-semibold rounded-xl h-11 px-4 transition-all"
+                  title="Удалить все старые награды, созданные этим сайтом"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </Button>
               )}
             </div>

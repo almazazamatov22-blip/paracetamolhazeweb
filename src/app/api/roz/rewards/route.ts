@@ -117,3 +117,80 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const token = req.cookies.get('twitch_token')?.value;
+    const clientId = process.env.TWITCH_CLIENT_ID;
+
+    if (!token || !clientId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { id, action } = body;
+
+    const userRes = await fetch('https://api.twitch.tv/helix/users', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Client-Id': clientId,
+      },
+      cache: 'no-store',
+    });
+    const userData = await userRes.json().catch(() => null);
+    const userId = userData?.data?.[0]?.id;
+
+    if (!userRes.ok || !userId) {
+      return NextResponse.json({ error: 'Auth fail' }, { status: 401 });
+    }
+
+    if (action === 'cleanup') {
+      const rewardsRes = await fetch(`https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${userId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Client-Id': clientId,
+        },
+      });
+      const rewardsData = await rewardsRes.json().catch(() => null);
+      if (!rewardsRes.ok) return NextResponse.json({ error: 'Failed to fetch rewards' }, { status: rewardsRes.status });
+      
+      const rewardsToDelete = (rewardsData?.data || []).filter((r: any) => r.title.includes('.by paracetamolhaze'));
+      
+      for (const r of rewardsToDelete) {
+        await fetch(`https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${userId}&id=${r.id}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Client-Id': clientId,
+          },
+        });
+      }
+      return NextResponse.json({ success: true, deleted: rewardsToDelete.length });
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+    }
+
+    const deleteRes = await fetch(`https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${userId}&id=${id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Client-Id': clientId,
+      },
+    });
+
+    if (!deleteRes.ok && deleteRes.status !== 204) {
+      const deleteData = await deleteRes.json().catch(() => null);
+      return NextResponse.json(
+        { error: deleteData?.message || 'Failed to delete Twitch reward' },
+        { status: deleteRes.status },
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  }
+}
+
