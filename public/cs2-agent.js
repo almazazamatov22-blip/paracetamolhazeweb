@@ -5,6 +5,7 @@
 
 const fs = require('fs');
 const { execSync, spawn } = require('child_process');
+const { createClient } = require('@supabase/supabase-js');
 
 const args = process.argv.slice(2).reduce((acc, a) => {
   const [k, v] = a.replace(/^--/, '').split('=');
@@ -16,9 +17,8 @@ const BASE_URL_RAW = process.env.CS2_BASE_URL || args.baseUrl || 'https://parace
 const BASE_URL = String(BASE_URL_RAW).trim().replace(/\/+$/, '');
 const STREAMER_ID = String(process.env.CS2_STREAMER_ID || args.streamerId || '').trim();
 const AGENT_SECRET = process.env.CS2_AGENT_SECRET || args.agentSecret || '';
-const POLL_MS = parseInt(process.env.CS2_POLL_MS || args.pollMs || '500');
 
-const AGENT_VERSION = '2.0.8';
+const AGENT_VERSION = '2.0.9';
 console.log(`[CS2 Agent] Запуск версии ${AGENT_VERSION}`);
 
 if (!STREAMER_ID) {
@@ -1097,14 +1097,7 @@ async function fetchConfig() {
   }
 }
 
-// ── HTTP helpers (Supabase REST API directly) ──
-async function apiGetTask() {
-  const url = `${supabaseUrl}/rest/v1/cs2_reward_queue?streamer_id=eq.${STREAMER_ID}&status=eq.pending&order=created_at.asc&limit=1`;
-  const res = await fetch(url, { headers: { 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${supabaseAnonKey}` } });
-  if (!res.ok) throw new Error(`apiGetTask failed: ${res.status} ${await res.text()}`);
-  const data = await res.json();
-  return data && data.length > 0 ? data[0] : null;
-}
+// ── HTTP helpers (Supabase REST API напрямую) ──
 
 let timingCompatibilityWarned = false;
 
@@ -1242,21 +1235,131 @@ async function executeTask(task) {
   }
 }
 
-// ── Polling loop (REST polling напрямую в Supabase) ──
-let running = false;
+// ── Queue & Realtime logic ──
+const taskQueue = [];
+const queuedTaskIds = new Set();
+const completedTaskIds = new Set();
+let workerRunning = false;
+let isShuttingDown = false;
 
-async function poll() {
-  if (running) return;
-  running = true;
+function enqueueTask(task) {
+  if (isShuttingDown || !task?.id) return;
+  if (queuedTaskIds.has(task.id) || completedTaskIds.has(task.id)) return;
+
+  log(`[Queue] Добавлена задача ${task.id.substring(0,8)}`);
+  queuedTaskIds.add(task.id);
+  taskQueue.push(task);
+  taskQueue.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+  void runWorker();
+}
+
+async function runWorker() {
+  if (workerRunning || isShuttingDown) return;
+  workerRunning = true;
+
   try {
-    const task = await apiGetTask();
-    if (task) await executeTask(task);
-  } catch (err) {
-    if (!err.message?.includes('ECONNREFUSED')) console.error('[poll error]', err.message);
+    while (taskQueue.length > 0) {
+      if (isShuttingDown) break;
+      const task = taskQueue.shift();
+      queuedTaskIds.delete(task.id);
+
+      log(`[Queue] Выполнение задачи ${task.id.substring(0,8)}`);
+      await executeTask(task);
+      completedTaskIds.add(task.id);
+    }
   } finally {
-    running = false;
-    setTimeout(poll, POLL_MS);
+    workerRunning = false;
   }
+}
+
+let lastRecoveryAt = 0;
+const RECOVERY_COOLDOWN_MS = 10_000;
+
+async function fetchPendingTasks() {
+  const url = `${supabaseUrl}/rest/v1/cs2_reward_queue?streamer_id=eq.${STREAMER_ID}&status=eq.pending&order=created_at.asc`;
+  const res = await fetch(url, { headers: { 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${supabaseAnonKey}` } });
+  if (!res.ok) throw new Error(`fetchPendingTasks failed: ${res.status} ${await res.text()}`);
+  return await res.json();
+}
+
+async function recoverySync() {
+  if (isShuttingDown) return;
+  const now = Date.now();
+  if (now - lastRecoveryAt < RECOVERY_COOLDOWN_MS) return;
+  lastRecoveryAt = now;
+
+  try {
+    const tasks = await fetchPendingTasks();
+    log(`[Recovery] Найдено pending задач: ${tasks.length}`);
+    for (const task of tasks) {
+      enqueueTask(task);
+    }
+  } catch (err) {
+    console.error('[Recovery Error]', err.message);
+  }
+}
+
+let supabase;
+let channel;
+let reconnectBackoff = 1000;
+let reconnectTimer = null;
+
+function setupRealtime() {
+  if (isShuttingDown) return;
+
+  if (!supabase) {
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      realtime: { params: { eventsPerSecond: 10 } }
+    });
+  }
+
+  log('[Realtime] Подключение...');
+  channel = supabase.channel(`cs2-agent:${STREAMER_ID}`)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'cs2_reward_queue',
+      filter: `streamer_id=eq.${STREAMER_ID}`
+    }, payload => {
+      const task = payload.new;
+      if (task?.status === 'pending') {
+        log(`[Realtime] Получена задача ${task.id.substring(0,8)}`);
+        enqueueTask(task);
+      }
+    })
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'cs2_reward_queue',
+      filter: `streamer_id=eq.${STREAMER_ID}`
+    }, payload => {
+      const task = payload.new;
+      // Accept UPDATEs into pending (e.g. manual recovery or refund)
+      if (task?.status === 'pending') {
+        enqueueTask(task);
+      }
+    })
+    .subscribe((status, err) => {
+      if (status === 'SUBSCRIBED') {
+        log('[Realtime] SUBSCRIBED');
+        reconnectBackoff = 1000;
+        void recoverySync();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        log(`[Realtime] Статус: ${status}. Переподключение через ${reconnectBackoff}ms...`);
+        if (err) console.error(err);
+        
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
+          if (!isShuttingDown) {
+            if (channel) supabase.removeChannel(channel);
+            setupRealtime();
+          }
+        }, reconnectBackoff);
+        
+        reconnectBackoff = Math.min(reconnectBackoff * 2, 30000);
+      }
+    });
 }
 
 async function start() {
@@ -1291,14 +1394,27 @@ async function start() {
 
   log('🚀 Инициализация... Получение конфига Supabase');
   await fetchConfig();
-  log(`🚀 Агент запущен. REST polling напрямую в Supabase каждые ${POLL_MS}ms...`);
+  log(`[CS2 Agent] Агент готов и ожидает задания через Realtime`);
   log('Нажми Ctrl+C для остановки\n');
-  setTimeout(poll, POLL_MS);
+  
+  setupRealtime();
 }
 start();
 
-process.on('SIGINT', async () => {
+async function gracefulShutdown() {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
   log('\n👋 Остановка агента...');
+  
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+
+  if (supabase) {
+    try {
+      if (channel) await supabase.removeChannel(channel);
+      await supabase.removeAllChannels();
+    } catch(e) {}
+  }
+
   if (helperProc && helperProc.stdin.writable) {
     try {
       helperProc.stdin.write('RESET\n');
@@ -1308,23 +1424,17 @@ process.on('SIGINT', async () => {
     helperProc.kill();
   }
   process.exit(0);
-});
+}
 
-// Also handle unhandled exceptions gracefully
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
+
 process.on('uncaughtException', async (err) => {
   console.error('Uncaught Exception:', err);
-  if (helperProc && helperProc.stdin.writable) {
-    try { helperProc.stdin.write('RESET\n'); await sleep(1000); } catch(e){}
-    helperProc.kill();
-  }
-  process.exit(1);
+  await gracefulShutdown();
 });
 
-process.on('unhandledRejection', async (reason, promise) => {
+process.on('unhandledRejection', async (reason) => {
   console.error('Unhandled Rejection:', reason);
-  if (helperProc && helperProc.stdin.writable) {
-    try { helperProc.stdin.write('RESET\n'); await sleep(1000); } catch(e){}
-    helperProc.kill();
-  }
-  process.exit(1);
+  await gracefulShutdown();
 });

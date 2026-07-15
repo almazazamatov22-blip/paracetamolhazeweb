@@ -13,6 +13,9 @@ function getSupabase() {
 }
 
 /**
+ * LEGACY ENDPOINT: Используется только старыми версиями агента (до v2.0.9).
+ * Можно удалить, когда все пользователи обновятся.
+ * 
  * GET /api/cs2/agent/poll?streamerId=XXX&agentSecret=YYY
  * Агент на ПК стримера вызывает этот endpoint каждые 500ms
  * Возвращает следующую задачу из очереди со статусом 'pending'
