@@ -33,7 +33,14 @@ public sealed class UpdateService(HttpClient http, LauncherConfig config)
             + $"?platform=win-x64&launcherVersion={Uri.EscapeDataString(launcherVersion)}"
             + $"&runtimeVersion={Uri.EscapeDataString(runtimeVersion ?? "")}";
 
-        return await http.GetFromJsonAsync<UpdateManifest>(url, cancellationToken)
+        using var response = await http.GetAsync(url, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Сервер обновлений вернул HTTP {(int)response.StatusCode}: {responseBody}");
+        }
+
+        return await response.Content.ReadFromJsonAsync<UpdateManifest>(cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("Пустой манифест обновления.");
     }
 

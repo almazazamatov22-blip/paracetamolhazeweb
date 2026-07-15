@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -62,41 +62,81 @@ async function getPublishedLauncher(): Promise<ReleaseMetadata | null> {
       headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(5_000),
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const text = await response.text().catch(() => 'Failed to read response body');
+      console.error(`[Manifest API] GitHub returned HTTP ${response.status}: ${text}`);
+      return null;
+    }
 
     const metadata: unknown = await response.json();
-    return isReleaseMetadata(metadata) ? metadata : null;
-  } catch {
+    if (!isReleaseMetadata(metadata)) {
+      console.error('[Manifest API] GitHub returned invalid JSON or schema mismatch:', JSON.stringify(metadata));
+      return null;
+    }
+    return metadata;
+  } catch (err) {
+    console.error('[Manifest API] Failed to fetch from GitHub (Timeout or Network error):', err);
     return null;
   }
 }
 
-export async function GET() {
-  const published = await getPublishedLauncher();
-  
-  if (!published) {
-    return NextResponse.json({ error: 'Release metadata is missing or invalid' }, { status: 500 });
+export async function GET(req: NextRequest) {
+  const launcherVersionQuery = req.nextUrl.searchParams.get('launcherVersion') || FALLBACK_LAUNCHER_VERSION;
+  const runtimeVersionQuery = req.nextUrl.searchParams.get('runtimeVersion') || RUNTIME_VERSION;
+
+  try {
+    const published = await getPublishedLauncher();
+    
+    if (!published) {
+      // Return safe fallback instead of 500 error
+      return NextResponse.json({
+        launcherVersion: launcherVersionQuery,
+        runtimeVersion: runtimeVersionQuery,
+        mandatory: false,
+        runtimeUrl: null,
+        runtimeSha256: null,
+        launcherUrl: null,
+        launcherSha256: null,
+        requireAuthentication: true,
+        requireSubscription: false,
+        updateUnavailable: true
+      }, { status: 200 });
+    }
+
+    const launcherVersion = published.launcherVersion;
+    const launcherUrl = `https://github.com/${GITHUB_REPOSITORY}/releases/download/${encodeURIComponent(published.releaseTag)}/cs2haze-launcher.zip`;
+    
+    const runtimeVersion = published.runtimeVersion;
+    const runtimeUrl = `https://github.com/${GITHUB_REPOSITORY}/releases/download/${encodeURIComponent(published.releaseTag)}/cs2haze-runtime.zip`;
+
+    return NextResponse.json({
+      launcherVersion,
+      runtimeVersion,
+      mandatory: true,
+      runtimeUrl,
+      runtimeSha256: published.runtimeSha256,
+      launcherUrl,
+      launcherSha256: published.launcherSha256,
+      requireAuthentication: true,
+      requireSubscription: false,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    });
+  } catch (err) {
+    console.error('[Manifest API] Unexpected error handling request:', err);
+    return NextResponse.json({
+      launcherVersion: launcherVersionQuery,
+      runtimeVersion: runtimeVersionQuery,
+      mandatory: false,
+      runtimeUrl: null,
+      runtimeSha256: null,
+      launcherUrl: null,
+      launcherSha256: null,
+      requireAuthentication: true,
+      requireSubscription: false,
+      updateUnavailable: true
+    }, { status: 200 });
   }
-
-  const launcherVersion = published.launcherVersion;
-  const launcherUrl = `https://github.com/${GITHUB_REPOSITORY}/releases/download/${encodeURIComponent(published.releaseTag)}/cs2haze-launcher.zip`;
-  
-  const runtimeVersion = published.runtimeVersion;
-  const runtimeUrl = `https://github.com/${GITHUB_REPOSITORY}/releases/download/${encodeURIComponent(published.releaseTag)}/cs2haze-runtime.zip`;
-
-  return NextResponse.json({
-    launcherVersion,
-    runtimeVersion,
-    mandatory: true,
-    runtimeUrl,
-    runtimeSha256: published.runtimeSha256,
-    launcherUrl,
-    launcherSha256: published.launcherSha256,
-    requireAuthentication: true,
-    requireSubscription: false,
-  }, {
-    headers: {
-      'Cache-Control': 'no-store, no-cache, must-revalidate',
-    },
-  });
 }

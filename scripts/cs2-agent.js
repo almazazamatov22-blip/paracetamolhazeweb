@@ -18,7 +18,7 @@ const STREAMER_ID = String(process.env.CS2_STREAMER_ID || args.streamerId || '')
 const AGENT_SECRET = process.env.CS2_AGENT_SECRET || args.agentSecret || '';
 const POLL_MS = parseInt(process.env.CS2_POLL_MS || args.pollMs || '500');
 
-const AGENT_VERSION = '2.0.7';
+const AGENT_VERSION = '2.0.8';
 console.log(`[CS2 Agent] Запуск версии ${AGENT_VERSION}`);
 
 if (!STREAMER_ID) {
