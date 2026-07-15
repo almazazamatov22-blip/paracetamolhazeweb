@@ -282,7 +282,9 @@ export default function cs2xtwitchPage() {
                 style={{ '--accent': info.color } as CSSProperties}
               >
                 <div className="cs2-action-header">
-                  <span className="cs2-action-icon" aria-hidden="true">{info.icon}</span>
+                  <span className="cs2-action-icon" aria-hidden="true">
+                    <img src={info.icon} alt="" style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: '4px' }} />
+                  </span>
                   <span className="cs2-action-key">{key}</span>
                 </div>
                 <h3 className="cs2-action-title">{info.label}</h3>
