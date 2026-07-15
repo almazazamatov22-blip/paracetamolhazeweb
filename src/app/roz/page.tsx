@@ -251,6 +251,11 @@ export default function Home() {
   const [vaseWinnerIdx, setVaseWinnerIdx] = useState<number | null>(null)
   const [vasePlayers, setVasePlayers] = useState<Participant[]>([])
 
+  const [lotteryAnimOpen, setLotteryAnimOpen] = useState(false)
+  const [lotteryAnimWinner, setLotteryAnimWinner] = useState<LotteryTicket | null>(null)
+  const [isLotterySpinning, setIsLotterySpinning] = useState(false)
+  const lotteryWheelRef = useRef<HTMLDivElement>(null)
+
   const fetchAvatar = useCallback(async (username: string) => {
     try {
       const res = await fetch(`/api/twitch/user?username=${username}`)
@@ -264,6 +269,7 @@ export default function Home() {
 
   const [spinOffset, setSpinOffset] = useState(0)
   const spinList = participants.length > 0 ? Array(40).fill(participants).flat() : []
+  const lotterySpinList = lotteryTickets.length > 0 ? Array(40).fill(lotteryTickets).flat() : []
   const wheelRef = useRef<HTMLDivElement>(null)
   const chatRef = useRef<HTMLDivElement>(null)
   const userColorsRef = useRef<Map<string, string>>(new Map())
@@ -579,14 +585,14 @@ export default function Home() {
   }, [fetchRewards, fetchRozState])
 
   useEffect(() => {
-    if (!authUser || activeMode === 'giveaway' || !isConnected) return
+    if (!authUser || !isConnected) return
 
     const interval = setInterval(() => {
       fetchRozState()
     }, 2500)
 
     return () => clearInterval(interval)
-  }, [activeMode, authUser, fetchRozState, isConnected])
+  }, [authUser, fetchRozState, isConnected])
 
   /* ─── Format time ─── */
   const formatTime = (seconds: number) => {
@@ -741,29 +747,26 @@ export default function Home() {
 
   /* ─── Connect / Disconnect ─── */
   const handleConnect = async () => {
-    if (!streamerName.trim()) {
-      setStatusMessage('Пожалуйста, введите никнейм стримера')
-      return
-    }
-
-    if (activeMode === 'giveaway' && !keyword.trim()) {
-      setStatusMessage('Пожалуйста, введите ключевое слово для розыгрыша')
-      return
-    }
-
-    if (activeMode === 'lottery' && !selectedLotteryRewardId) {
-      setStatusMessage('Выберите Twitch-награду, покупка которой будет выдавать билет лотереи')
-      return
-    }
-
-    if (activeMode === 'auction' && selectedAuctionRewardIds.length === 0) {
-      setStatusMessage('Выберите одну или несколько Twitch-наград, покупка которых будет считаться ставкой')
-      return
-    }
-
-    if (activeMode !== 'giveaway' && !authUser) {
-      window.location.href = '/auth/twitch?source=roz'
-      return
+    if (activeMode === 'giveaway') {
+      if (!streamerName.trim()) {
+        setStatusMessage('Пожалуйста, введите никнейм стримера')
+        return
+      }
+      if (!keyword.trim()) {
+        setStatusMessage('Пожалуйста, введите ключевое слово для розыгрыша')
+        return
+      }
+    } else {
+      if (!authUser) {
+        window.location.href = '/auth/twitch?source=roz'
+        return
+      }
+      setStreamerName(authUser.login)
+      
+      if (!prizeName.trim()) {
+        setStatusMessage('Пожалуйста, введите предмет розыгрыша')
+        return
+      }
     }
 
     setIsConnected(true)
@@ -780,13 +783,46 @@ export default function Home() {
 
     if (activeMode === 'lottery') {
       try {
-        await saveRozState('save')
+        setStatusMessage('Создаю награду Twitch...')
+        const createRes = await fetch('/api/roz/rewards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: `${prizeName} .by paracetamolhaze.ru`, cost: safeTicketPrice })
+        })
+        const createData = await createRes.json()
+        if (!createRes.ok) throw new Error(createData.error || 'Не удалось создать награду')
+        
+        setSelectedLotteryRewardId(createData.id)
+        
+        // Wait for state update to propagate or pass directly to saveRozState? 
+        // saveRozState uses selectedLotteryRewardId from state, which might not be updated yet.
+        // We will pass it directly to saveRozState.
+        await fetch('/api/roz/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'save',
+            settings: {
+              lottery_reward_id: createData.id,
+              lottery_reward_name: createData.title,
+              auction_reward_ids: selectedAuctionRewardIds,
+              auction_reward_names: [],
+              auction_reward_id: selectedAuctionRewardIds[0] || '',
+              auction_reward_name: '',
+              lottery_prize: prizeName,
+              auction_prize: prizeName,
+              lottery_auto_mode: 'manual',
+              lottery_target: 0,
+            },
+          }),
+        })
+
         const subRes = await fetch('/api/roz/subscribe', { method: 'POST' })
         if (!subRes.ok) {
           const data = await subRes.json().catch(() => ({}))
           throw new Error(data.error || 'Не удалось подключить Twitch EventSub')
         }
-        setStatusMessage(`Лотерея активна. Билет выдается за покупку награды "${selectedLotteryReward?.title}" (${selectedLotteryReward?.cost || safeTicketPrice} баллов канала)`)
+        setStatusMessage(`Лотерея активна. Билет выдается за покупку награды "${createData.title}" (${createData.cost} баллов канала)`)
       } catch (error: any) {
         setIsConnected(false)
         setStatusMessage(error.message || 'Не удалось запустить лотерею')
@@ -794,14 +830,43 @@ export default function Home() {
       return
     } else if (activeMode === 'auction') {
       try {
-        await saveRozState('save')
+        setStatusMessage('Создаю награду Twitch...')
+        const createRes = await fetch('/api/roz/rewards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: `${prizeName} .by paracetamolhaze.ru`, cost: safeAuctionMinBid })
+        })
+        const createData = await createRes.json()
+        if (!createRes.ok) throw new Error(createData.error || 'Не удалось создать награду')
+        
+        setSelectedAuctionRewardIds([createData.id])
+        
+        await fetch('/api/roz/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'save',
+            settings: {
+              lottery_reward_id: selectedLotteryRewardId,
+              lottery_reward_name: '',
+              auction_reward_ids: [createData.id],
+              auction_reward_names: [createData.title],
+              auction_reward_id: createData.id,
+              auction_reward_name: createData.title,
+              lottery_prize: prizeName,
+              auction_prize: prizeName,
+              lottery_auto_mode: 'manual',
+              lottery_target: 0,
+            },
+          }),
+        })
+
         const subRes = await fetch('/api/roz/subscribe', { method: 'POST' })
         if (!subRes.ok) {
           const data = await subRes.json().catch(() => ({}))
           throw new Error(data.error || 'Не удалось подключить Twitch EventSub')
         }
-        const rewardNames = selectedAuctionRewards.map(reward => reward.title).join(', ') || `${selectedAuctionRewardIds.length} наград`
-        setStatusMessage(`Аукцион активен. Ставки идут через покупку наград: ${rewardNames}`)
+        setStatusMessage(`Аукцион активен. Ставки идут через покупку награды: ${createData.title}`)
       } catch (error: any) {
         setIsConnected(false)
         setStatusMessage(error.message || 'Не удалось запустить аукцион')
@@ -822,12 +887,6 @@ export default function Home() {
 
   const handleModeChange = (mode: RozMode) => {
     if (mode === activeMode) return
-
-    if (isConnected) {
-      stopSimulation()
-      setIsConnected(false)
-      setConnectionTime(0)
-    }
 
     setActiveMode(mode)
     setWinner(null)
@@ -891,6 +950,15 @@ export default function Home() {
     }
   }, [rouletteOpen])
 
+  useEffect(() => {
+    if (!lotteryAnimOpen && lotteryWheelRef.current) {
+      lotteryWheelRef.current.style.transition = 'none'
+      lotteryWheelRef.current.style.transform = 'translateX(calc(50% - 64px))'
+      setLotteryAnimWinner(null)
+      setIsLotterySpinning(false)
+    }
+  }, [lotteryAnimOpen])
+
   /* ─── Vase ─── */
   const handleStartVase = () => {
     if (participants.length < 2) return
@@ -912,20 +980,60 @@ export default function Home() {
     }
   }
 
-  const handleDrawLottery = useCallback(async () => {
+  const handleDrawLottery = useCallback(() => {
     const pool = lotteryTicketsRef.current
     if (pool.length === 0) return
+
+    if (lotteryWheelRef.current) {
+      lotteryWheelRef.current.style.transition = 'none'
+      lotteryWheelRef.current.style.transform = 'translateX(calc(50% - 64px))'
+    }
+    setLotteryAnimWinner(null)
+    setIsLotterySpinning(false)
+    setLotteryAnimOpen(true)
+  }, [])
+
+  const executeLotterySpin = useCallback(async () => {
+    if (!lotteryWheelRef.current || lotteryTicketsRef.current.length === 0) return
+    setIsLotterySpinning(true)
+    setLotteryAnimWinner(null)
 
     lotteryDrawnRef.current = true
     try {
       const state = await saveRozState('drawLottery')
       const selected = state?.lottery_winner
       if (selected) {
-        setStatusMessage(`Победитель лотереи: ${selected.username}. Приз: ${prizeName}`)
+        const pool = lotteryTicketsRef.current
+        const winnerIdx = pool.findIndex(t => t.id === selected.id)
+        const finalWinnerIdx = winnerIdx >= 0 ? winnerIdx : Math.floor(Math.random() * pool.length)
+        const w = pool[finalWinnerIdx]
+        
+        const loops = 15
+        const targetIdx = pool.length * loops + finalWinnerIdx
+        const offsetPx = -(targetIdx * 128)
+
+        lotteryWheelRef.current.style.transition = 'none'
+        lotteryWheelRef.current.style.transform = 'translateX(calc(50% - 64px))'
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (lotteryWheelRef.current) {
+              lotteryWheelRef.current.style.transition = 'transform 5.5s cubic-bezier(0.12, 0.8, 0.25, 1)'
+              lotteryWheelRef.current.style.transform = `translateX(calc(50% - 64px + ${offsetPx}px))`
+            }
+
+            setTimeout(() => {
+              setLotteryAnimWinner(w)
+              setStatusMessage(`Победитель лотереи: ${w.username}. Приз: ${prizeName}`)
+              setIsLotterySpinning(false)
+            }, 5600)
+          })
+        })
       }
     } catch (error: any) {
       lotteryDrawnRef.current = false
       setStatusMessage(error.message || 'Не удалось разыграть лотерею')
+      setIsLotterySpinning(false)
     }
   }, [prizeName, saveRozState])
 
@@ -1050,22 +1158,24 @@ export default function Home() {
             </div>
 
             {/* Streamer Name */}
-            <div className="mb-4">
-              <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
-                <User className="w-3.5 h-3.5 text-purple-400" />
-                Никнейм стримера
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-sm font-medium">@</span>
-                <Input
-                  value={streamerName}
-                  onChange={(e) => setStreamerName(e.target.value)}
-                  placeholder="Введите никнейм стримера"
-                  disabled={isConnected}
-                  className="pl-8 bg-[#2a2a2a] border-[#333] text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20 rounded-lg h-11"
-                />
+            {activeMode === 'giveaway' && (
+              <div className="mb-4">
+                <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
+                  <User className="w-3.5 h-3.5 text-purple-400" />
+                  Никнейм стримера
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-sm font-medium">@</span>
+                  <Input
+                    value={streamerName}
+                    onChange={(e) => setStreamerName(e.target.value)}
+                    placeholder="Введите никнейм стримера"
+                    disabled={isConnected}
+                    className="pl-8 bg-[#2a2a2a] border-[#333] text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20 rounded-lg h-11"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {activeMode !== 'giveaway' && (
               <div className="mb-5 rounded-lg border border-[#333] bg-[#242424] p-3">
@@ -1149,28 +1259,17 @@ export default function Home() {
                 <div>
                   <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
                     <Ticket className="w-3.5 h-3.5 text-emerald-400" />
-                    Награда Twitch для билета
+                    Стоимость билета в баллах
                   </label>
-                  <select
-                    value={selectedLotteryRewardId}
-                    onChange={(e) => setSelectedLotteryRewardId(e.target.value)}
-                    disabled={isConnected || rewardsLoading || !authUser}
-                    className="h-11 w-full rounded-lg border border-[#333] bg-[#2a2a2a] px-3 text-sm text-white outline-none transition-colors focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:text-gray-500"
-                  >
-                    <option value="">{rewardsLoading ? 'Загружаю награды...' : 'Выберите награду канала'}</option>
-                    {twitchRewards.map(reward => (
-                      <option key={reward.id} value={reward.id}>
-                        {reward.title} · {reward.cost} баллов
-                      </option>
-                    ))}
-                  </select>
-                  {authUser && !rewardsLoading && twitchRewards.length === 0 && (
-                    <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber-200">
-                      Награды не найдены. Для билетов нужен канал Twitch с доступными Channel Points наградами.
-                    </div>
-                  )}
+                  <Input
+                    type="number"
+                    min="1"
+                    value={ticketPrice}
+                    onChange={(e) => setTicketPrice(Number(e.target.value))}
+                    disabled={isConnected}
+                    className="bg-[#2a2a2a] border-[#333] text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500/20 rounded-lg h-11"
+                  />
                 </div>
-
               </div>
             )}
 
@@ -1193,41 +1292,16 @@ export default function Home() {
                 <div>
                   <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-2">
                     <Gavel className="w-3.5 h-3.5 text-amber-400" />
-                    Награды Twitch для ставок
+                    Начальная ставка в баллах
                   </label>
-                  <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg border border-[#333] bg-[#2a2a2a] p-2">
-                    {rewardsLoading ? (
-                      <div className="px-2 py-2 text-xs text-gray-500">Загружаю награды...</div>
-                    ) : twitchRewards.length === 0 ? (
-                      <div className="px-2 py-2 text-xs text-gray-500">Награды канала не найдены</div>
-                    ) : (
-                      twitchRewards.map(reward => (
-                        <label
-                          key={reward.id}
-                          className={`flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 transition-colors ${
-                            selectedAuctionRewardIds.includes(reward.id)
-                              ? 'border-amber-500/40 bg-amber-500/10'
-                              : 'border-transparent bg-[#242424] hover:bg-[#2f2f2f]'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedAuctionRewardIds.includes(reward.id)}
-                            onChange={() => toggleAuctionReward(reward.id)}
-                            disabled={isConnected || !authUser}
-                            className="h-4 w-4 rounded border-[#444] accent-amber-500"
-                          />
-                          <span className="min-w-0 flex-1 truncate text-sm text-gray-200">{reward.title}</span>
-                          <span className="shrink-0 text-xs font-semibold text-amber-300">{reward.cost}</span>
-                        </label>
-                      ))
-                    )}
-                  </div>
-                  {authUser && !rewardsLoading && twitchRewards.length === 0 && (
-                    <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber-200">
-                      Награды не найдены. Для ставок нужен канал Twitch с доступными Channel Points наградами.
-                    </div>
-                  )}
+                  <Input
+                    type="number"
+                    min="1"
+                    value={auctionMinBid}
+                    onChange={(e) => setAuctionMinBid(Number(e.target.value))}
+                    disabled={isConnected}
+                    className="bg-[#2a2a2a] border-[#333] text-white placeholder:text-gray-500 focus:border-amber-500 focus:ring-amber-500/20 rounded-lg h-11"
+                  />
                 </div>
               </div>
             )}
@@ -1719,6 +1793,79 @@ export default function Home() {
       </Dialog>
 
 
+      {/* ─── Lottery Modal ─── */}
+      <Dialog open={lotteryAnimOpen} onOpenChange={setLotteryAnimOpen}>
+        <DialogContent className="bg-[#1e1e1e] border-[#333] text-white max-w-lg sm:max-w-2xl p-0 overflow-hidden">
+          <div className="p-6">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-xl text-white">
+                <Ticket className="w-5 h-5 text-emerald-400" />
+                Лотерея разыгрывается!
+              </DialogTitle>
+              <DialogDescription className="text-gray-400">
+                Тянем выигрышный билет
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="relative bg-[#1a1a1a] mx-2 sm:mx-6 rounded-xl overflow-hidden h-36 border border-[#333]">
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
+              <ArrowDown className="w-6 h-6 text-emerald-500 drop-shadow-md" />
+            </div>
+            
+            <div
+              ref={lotteryWheelRef}
+              className="flex items-center h-full"
+              style={{ transform: 'translateX(calc(50% - 64px))', willChange: 'transform' }}
+            >
+               {lotterySpinList.map((p, i) => (
+                 <div key={i} className="shrink-0 flex flex-col items-center justify-center border-r border-[#333] last:border-none relative" style={{ width: 128, height: '100%' }}>
+                   <div className="w-14 h-14 rounded-lg flex items-center justify-center text-white text-xl font-bold mb-2 shadow-lg overflow-hidden bg-[#222] border border-[#444]">
+                      <Ticket className="w-6 h-6 text-emerald-500/20 absolute" />
+                      <span className="relative z-10 text-emerald-400 text-base">#{p.number}</span>
+                   </div>
+                   <span className="text-xs font-semibold text-white truncate w-24 text-center">{p.username}</span>
+                 </div>
+               ))}
+            </div>
+          </div>
+
+          {lotteryAnimWinner && (
+            <div className="mx-6 mt-4 bg-[#1a1a1a] border border-emerald-500/30 rounded-xl p-6 text-center shadow-[0_0_15px_rgba(16,185,129,0.15)] flex flex-col items-center">
+             <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-emerald-500/30 mb-3 overflow-hidden" style={{ background: lotteryAnimWinner.color }}>
+                {lotteryAnimWinner.avatar ? (
+                  <img src={lotteryAnimWinner.avatar} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  lotteryAnimWinner.username.charAt(0).toUpperCase()
+                )}
+              </div>
+              <div className="text-3xl font-bold drop-shadow-md winner-glow" style={{ color: lotteryAnimWinner.color }}>
+                {lotteryAnimWinner.username}
+              </div>
+              <div className="text-sm text-emerald-400 font-bold mt-2">Выиграл с билетом #{lotteryAnimWinner.number}!</div>
+            </div>
+          )}
+
+          <div className="flex gap-3 p-6 pt-4">
+            <Button
+              onClick={executeLotterySpin}
+              disabled={isLotterySpinning || !!lotteryAnimWinner}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl h-11"
+            >
+              <RotateCcw className={`w-4 h-4 mr-2 ${isLotterySpinning ? 'animate-spin' : ''}`} />
+              Тянуть билет
+            </Button>
+            <Button
+              onClick={() => setLotteryAnimOpen(false)}
+              variant="secondary"
+              className="bg-[#2a2a2a] hover:bg-[#333] text-gray-300 border border-[#444] rounded-xl h-11"
+            >
+              <X className="w-4 h-4 mr-2" />
+              Закрыть
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

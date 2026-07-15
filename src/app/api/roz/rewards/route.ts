@@ -56,3 +56,64 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    const token = req.cookies.get('twitch_token')?.value;
+    const clientId = process.env.TWITCH_CLIENT_ID;
+
+    if (!token || !clientId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { title, cost } = await req.json();
+    if (!title || !cost) {
+      return NextResponse.json({ error: 'Missing title or cost' }, { status: 400 });
+    }
+
+    const userRes = await fetch('https://api.twitch.tv/helix/users', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Client-Id': clientId,
+      },
+      cache: 'no-store',
+    });
+    const userData = await userRes.json().catch(() => null);
+    const userId = userData?.data?.[0]?.id;
+
+    if (!userRes.ok || !userId) {
+      return NextResponse.json({ error: 'Auth fail' }, { status: 401 });
+    }
+
+    const createRes = await fetch(`https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${userId}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Client-Id': clientId,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title,
+        cost,
+        is_user_input_required: false,
+      }),
+    });
+    const createData = await createRes.json().catch(() => null);
+
+    if (!createRes.ok) {
+      return NextResponse.json(
+        { error: createData?.message || 'Failed to create Twitch reward' },
+        { status: createRes.status },
+      );
+    }
+
+    const reward = createData.data[0];
+    return NextResponse.json({
+      id: reward.id,
+      title: reward.title,
+      cost: reward.cost,
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  }
+}
