@@ -1,0 +1,15 @@
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\bin\Debug\net8.0\CS2Haze.Utf8Smoke.exe
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\bin\Debug\net8.0\CS2Haze.Utf8Smoke.deps.json
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\bin\Debug\net8.0\CS2Haze.Utf8Smoke.runtimeconfig.json
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\bin\Debug\net8.0\CS2Haze.Utf8Smoke.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\bin\Debug\net8.0\CS2Haze.Utf8Smoke.pdb
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\obj\Debug\net8.0\CS2Haze.Utf8Smoke.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\obj\Debug\net8.0\CS2Haze.Utf8Smoke.AssemblyInfoInputs.cache
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\obj\Debug\net8.0\CS2Haze.Utf8Smoke.AssemblyInfo.cs
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\obj\Debug\net8.0\CS2Haze.Utf8Smoke.csproj.CoreCompileInputs.cache
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\obj\Debug\net8.0\CS2Haze.Utf8Smoke.sourcelink.json
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\obj\Debug\net8.0\CS2Haze.Utf8Smoke.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\obj\Debug\net8.0\refint\CS2Haze.Utf8Smoke.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\obj\Debug\net8.0\CS2Haze.Utf8Smoke.pdb
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\obj\Debug\net8.0\CS2Haze.Utf8Smoke.genruntimeconfig.cache
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\obj\Debug\net8.0\ref\CS2Haze.Utf8Smoke.dll

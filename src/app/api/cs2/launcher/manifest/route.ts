@@ -19,6 +19,8 @@ type ReleaseMetadata = {
   releaseTag: string;
   launcherVersion: string;
   launcherSha256: string;
+  runtimeVersion: string;
+  runtimeSha256: string;
 };
 
 function isVersion(value: unknown): value is string {
@@ -48,6 +50,8 @@ function isReleaseMetadata(value: unknown): value is ReleaseMetadata {
     && isVersion(metadata.launcherVersion)
     && compareVersions(metadata.launcherVersion, MINIMUM_SELF_UPDATING_VERSION) >= 0
     && isSha256(metadata.launcherSha256)
+    && isVersion(metadata.runtimeVersion)
+    && isSha256(metadata.runtimeSha256)
   );
 }
 
@@ -69,19 +73,25 @@ async function getPublishedLauncher(): Promise<ReleaseMetadata | null> {
 
 export async function GET() {
   const published = await getPublishedLauncher();
-  const launcherVersion = published?.launcherVersion || FALLBACK_LAUNCHER_VERSION;
-  const launcherUrl = published
-    ? `https://github.com/${GITHUB_REPOSITORY}/releases/download/${encodeURIComponent(published.releaseTag)}/cs2haze-launcher.zip`
-    : null;
+  
+  if (!published) {
+    return NextResponse.json({ error: 'Release metadata is missing or invalid' }, { status: 500 });
+  }
+
+  const launcherVersion = published.launcherVersion;
+  const launcherUrl = `https://github.com/${GITHUB_REPOSITORY}/releases/download/${encodeURIComponent(published.releaseTag)}/cs2haze-launcher.zip`;
+  
+  const runtimeVersion = published.runtimeVersion;
+  const runtimeUrl = `https://github.com/${GITHUB_REPOSITORY}/releases/download/${encodeURIComponent(published.releaseTag)}/cs2haze-runtime.zip`;
 
   return NextResponse.json({
     launcherVersion,
-    runtimeVersion: RUNTIME_VERSION,
+    runtimeVersion,
     mandatory: true,
-    runtimeUrl: null,
-    runtimeSha256: null,
+    runtimeUrl,
+    runtimeSha256: published.runtimeSha256,
     launcherUrl,
-    launcherSha256: published?.launcherSha256 || null,
+    launcherSha256: published.launcherSha256,
     requireAuthentication: true,
     requireSubscription: false,
   }, {

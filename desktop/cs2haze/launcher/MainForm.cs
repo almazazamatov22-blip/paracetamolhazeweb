@@ -37,7 +37,8 @@ public sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Icon = LoadIcon();
 
-        title.Text = "cs2haze";
+        var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
+        title.Text = $"cs2haze {version}";
         title.Font = new Font("Segoe UI", 30, FontStyle.Bold);
         title.ForeColor = Color.White;
         title.Location = new Point(34, 26);

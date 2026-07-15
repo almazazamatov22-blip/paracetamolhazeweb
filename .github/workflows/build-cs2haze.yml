@@ -35,6 +35,10 @@ jobs:
         shell: powershell
         run: dotnet run --project .\desktop\cs2haze\tests\CS2Haze.UpdateSmoke.csproj -c Release
 
+      - name: Test UTF-8 stdout/stderr
+        shell: powershell
+        run: dotnet run --project .\desktop\cs2haze\tests\CS2Haze.Utf8Smoke\CS2Haze.Utf8Smoke.csproj -c Release
+
       - name: Install Inno Setup
         shell: powershell
         run: choco install innosetup --yes --no-progress
@@ -59,6 +63,13 @@ jobs:
           $launcherVersion = [string]($project.Project.PropertyGroup.Version | Select-Object -First 1)
           $launcherHash = (Get-Content .\desktop\cs2haze\dist\cs2haze-launcher.sha256 -Raw).Trim().ToLowerInvariant()
 
+          $agentContent = Get-Content .\scripts\cs2-agent.js -Raw
+          $runtimeVersion = ''
+          if ($agentContent -match "const AGENT_VERSION = '([\d.]+)';") {
+            $runtimeVersion = $matches[1]
+          }
+          $runtimeHash = (Get-Content .\desktop\cs2haze\dist\cs2haze-runtime.sha256 -Raw).Trim().ToLowerInvariant()
+
           if (-not $launcherVersion) {
             throw "Launcher version is missing."
           }
@@ -68,11 +79,19 @@ jobs:
           if ($launcherHash -notmatch '^[a-f0-9]{64}$') {
             throw "Launcher SHA-256 is invalid."
           }
+          if (-not $runtimeVersion) {
+            throw "Runtime version is missing."
+          }
+          if ($runtimeHash -notmatch '^[a-f0-9]{64}$') {
+            throw "Runtime SHA-256 is invalid."
+          }
 
           $metadata = [ordered]@{
             releaseTag = $env:GITHUB_REF_NAME
             launcherVersion = $launcherVersion
             launcherSha256 = $launcherHash
+            runtimeVersion = $runtimeVersion
+            runtimeSha256 = $runtimeHash
           } | ConvertTo-Json
 
           $metadataPath = Join-Path $PWD 'desktop\cs2haze\dist\cs2haze-release.json'
@@ -124,6 +143,8 @@ jobs:
             'CS2Haze-Setup.exe',
             'cs2haze-launcher.zip',
             'cs2haze-launcher.sha256',
+            'cs2haze-runtime.zip',
+            'cs2haze-runtime.sha256',
             'cs2haze-release.json'
           )
 

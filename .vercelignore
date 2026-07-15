@@ -7,4 +7,5 @@ examples/
 modules/
 mini-services/
 *.zip
+!public/icons/*.zip
 *.log
