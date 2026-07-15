@@ -811,7 +811,7 @@ export default function Home() {
     
     if (activeMode !== 'giveaway') {
       if (!authUser) {
-        window.location.href = '/auth/twitch?source=roz'
+        window.location.href = '/api/auth/twitch?source=roz'
         return
       }
       setStreamerName(authUser.login)
@@ -1326,7 +1326,7 @@ export default function Home() {
                       </div>
                     )}
                     <Button
-                      onClick={() => { window.location.href = '/auth/twitch?source=roz' }}
+                      onClick={() => { window.location.href = '/api/auth/twitch?source=roz' }}
                       className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl h-10"
                     >
                       <Plug className="w-4 h-4 mr-2" />
