@@ -370,7 +370,11 @@
               ? `<img class="banner-avatar" src="${event.user_avatar}" alt="" onerror="this.style.display='none'" />`
               : ''
             }
-            <div class="banner-icon">${icon}</div>
+            <div class="banner-icon">
+              ${(icon && (icon.startsWith('http') || icon.startsWith('/'))) 
+                ? `<img src="${icon}" style="width: 40px; height: 40px; object-fit: contain;" alt="" />`
+                : icon}
+            </div>
             <div class="banner-info">
               <div class="banner-user">${event.user_name} активировал</div>
               <div class="banner-reward">${event.reward_name || actionCfg.label} <span id="banner-countdown" style="opacity:0.6;font-size:0.9em;margin-left:8px;"></span></div>

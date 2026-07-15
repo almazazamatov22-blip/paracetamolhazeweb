@@ -82,7 +82,7 @@ const ACTION_DESCRIPTIONS: Record<string, string> = {
   play_sound: 'Проигрывает звук хедшота.',
   mouse_shake: 'Трясет прицел 5 секунд.',
   flash_screen: 'флешка.',
-  random_weapon_switch: 'Случайное оружия.',
+  random_weapon_switch: 'Случайное оружие.',
   invert_mouse: 'Инверсия мыши на 10 секунд.',
   low_sens_10: 'Очень низкая чувствительность на 10 секунд.',
   high_sens_10: 'Очень высокая чувствительность на 10 секунд.',

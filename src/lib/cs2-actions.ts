@@ -13,7 +13,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   drop_weapon: {
     actionType: 'drop_weapon',
     label: 'Выбросить оружие',
-    icon: '🔫',
+    icon: '/icons/drop_weapon.png',
     durationMs: 2000,
     effectType: 'keyboard',
     description: 'Нажимает клавишу G — выбрасывает активное оружие.',
@@ -21,7 +21,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   freeze_3: {
     actionType: 'freeze_3',
     label: 'Заморозка 3 сек',
-    icon: '🧊',
+    icon: '/icons/freeze_3.png',
     durationMs: 3000,
     effectType: 'keyboard',
     description: 'Блокирует передвижение на 3 секунды.',
@@ -29,7 +29,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   freeze_5: {
     actionType: 'freeze_5',
     label: 'Заморозка 5 сек',
-    icon: '❄️',
+    icon: '/icons/freeze_5.png',
     durationMs: 5000,
     effectType: 'keyboard',
     description: 'Блокирует передвижение на 5 секунд.',
@@ -37,7 +37,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   spin_180: {
     actionType: 'spin_180',
     label: 'Разворот 180°',
-    icon: '🔄',
+    icon: '/icons/spin_180.png',
     durationMs: 2000,
     effectType: 'mouse',
     description: 'Мгновенный разворот на 180°.',
@@ -45,7 +45,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   block_jump: {
     actionType: 'block_jump',
     label: 'Блок прыжка 30 сек',
-    icon: '🚫',
+    icon: '/icons/block_jump.png',
     durationMs: 30000,
     effectType: 'keyboard',
     description: 'Блокирует прыжок на 30 секунд.',
@@ -53,7 +53,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   block_crouch: {
     actionType: 'block_crouch',
     label: 'Блок приседания 30 сек',
-    icon: '🦆',
+    icon: '/icons/block_crouch.png',
     durationMs: 30000,
     effectType: 'keyboard',
     description: 'Блокирует приседание на 30 секунд.',
@@ -61,7 +61,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   play_sound: {
     actionType: 'play_sound',
     label: 'Звук хедшота',
-    icon: '🔊',
+    icon: '/icons/play_sound.png',
     durationMs: 2000,
     effectType: 'audio',
     description: 'Проигрывает звук хедшота на стриме.',
@@ -69,7 +69,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   mouse_shake: {
     actionType: 'mouse_shake',
     label: 'Тряска мыши 5 сек',
-    icon: '🖱️',
+    icon: '/icons/mouse_shake.png',
     durationMs: 5000,
     effectType: 'mouse',
     description: 'Хаотично трясёт прицел 5 секунд.',
@@ -77,7 +77,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   flash_screen: {
     actionType: 'flash_screen',
     label: 'Флешка',
-    icon: '💥',
+    icon: '/icons/flash_screen.png',
     durationMs: 3000,
     effectType: 'overlay',
     description: 'Белая вспышка на экране стрима с плавным затуханием.',
@@ -85,7 +85,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   random_weapon_switch: {
     actionType: 'random_weapon_switch',
     label: 'Случайное оружие',
-    icon: '🎲',
+    icon: '/icons/random_weapon_switch.png',
     durationMs: 2000,
     effectType: 'keyboard',
     description: 'Случайно переключает слоты оружия.',
@@ -93,7 +93,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   invert_mouse: {
     actionType: 'invert_mouse',
     label: 'Инверсия мыши 10 сек',
-    icon: '🔃',
+    icon: '/icons/invert_mouse.png',
     durationMs: 10000,
     effectType: 'mouse',
     description: 'Инвертирует движение мыши на 10 секунд.',
@@ -101,7 +101,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   low_sens_10: {
     actionType: 'low_sens_10',
     label: 'Низкая чувств. 10 сек',
-    icon: '🐢',
+    icon: '/icons/low_sens_10.png',
     durationMs: 10000,
     effectType: 'mouse',
     description: 'Снижает чувствительность мыши на 10 сек.',
@@ -109,7 +109,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   high_sens_10: {
     actionType: 'high_sens_10',
     label: 'Высокая чувств. 10 сек',
-    icon: '🐇',
+    icon: '/icons/high_sens_10.png',
     durationMs: 10000,
     effectType: 'mouse',
     description: 'Резко повышает чувствительность на 10 сек.',
@@ -117,7 +117,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
   spinbot: {
     actionType: 'spinbot',
     label: 'СпинБот',
-    icon: '🌪️',
+    icon: '/icons/spinbot.png',
     durationMs: 10000,
     effectType: 'mouse',
     description: 'Зажимает ЛКМ и бешено крутится 10 сек.',

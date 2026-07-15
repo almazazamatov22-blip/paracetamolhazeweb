@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Pencil, Trash2, Power } from 'lucide-react'
+import { Pencil, Trash2, Power, Download } from 'lucide-react'
 
 import { ACTION_REGISTRY } from '@/lib/cs2-actions';
 
 const ACTION_OPTIONS = Object.values(ACTION_REGISTRY).map(a => ({
   value: a.actionType,
-  label: `${a.icon} ${a.label}`
+  label: a.label
 }));
 
 type Reward = {
@@ -335,7 +335,16 @@ export default function CS2AdminPage() {
                 <div key={r.id} className={`adm-reward-item ${!r.enabled ? 'is-disabled' : ''}`}>
                   <div className="adm-reward-main">
                     <div className="adm-reward-info">
-                      <span className="adm-reward-name">{r.name}</span>
+                      <span className="adm-reward-name">
+                        {ACTION_REGISTRY[r.action_type]?.icon && (
+                          <img 
+                            src={ACTION_REGISTRY[r.action_type].icon} 
+                            style={{ width: '20px', height: '20px', verticalAlign: 'middle', marginRight: '8px', borderRadius: '4px' }} 
+                            alt="" 
+                          />
+                        )}
+                        {r.name}
+                      </span>
                       <span className="adm-reward-action">
                         {ACTION_OPTIONS.find(a => a.value === r.action_type)?.label ?? r.action_type}
                       </span>
@@ -354,6 +363,15 @@ export default function CS2AdminPage() {
                     </div>
                   </div>
                   <div className="adm-reward-actions">
+                    <a
+                      href={`/icons/${r.action_type}.zip`}
+                      download
+                      className="adm-btn adm-btn-sm adm-btn-ghost"
+                      title="Скачать иконки"
+                      aria-label={`Скачать иконки для ${r.name}`}
+                    >
+                      <Download size={16} />
+                    </a>
                     <button
                       className={`adm-toggle ${r.enabled ? 'adm-toggle-on' : 'adm-toggle-off'}`}
                       onClick={() => toggleEnabled(r)}

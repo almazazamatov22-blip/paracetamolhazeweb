@@ -2,15 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
-const ACTION_OPTIONS = [
-  { value: 'drop_weapon',  label: '🔫 Выбросить оружие (G)' },
-  { value: 'freeze_3',     label: '🧊 Заморозка 3 сек' },
-  { value: 'freeze_5',     label: '❄️ Заморозка 5 сек' },
-  { value: 'spin_180',     label: '🔄 Разворот 180°' },
-  { value: 'block_jump',   label: '🚫 Блок прыжка 30 сек' },
-  { value: 'block_crouch', label: '🦆 Блок приседания 30 сек' },
-  { value: 'play_sound',   label: '🔊 Звук на стриме' },
-]
+import { ACTION_REGISTRY } from '@/lib/cs2-actions';
+
+const ACTION_OPTIONS = Object.values(ACTION_REGISTRY).map(a => ({
+  value: a.actionType,
+  label: a.label
+}));
 
 type Reward = {
   id: string
@@ -326,7 +323,16 @@ export default function CS2AdminPage() {
               <div key={r.id} className={`adm-reward-item ${!r.enabled ? 'is-disabled' : ''}`}>
                 <div className="adm-reward-main">
                   <div className="adm-reward-info">
-                    <span className="adm-reward-name">{r.name}</span>
+                    <span className="adm-reward-name">
+                      {ACTION_REGISTRY[r.action_type]?.icon && (
+                        <img 
+                          src={ACTION_REGISTRY[r.action_type].icon} 
+                          style={{ width: '20px', height: '20px', verticalAlign: 'middle', marginRight: '8px', borderRadius: '4px' }} 
+                          alt="" 
+                        />
+                      )}
+                      {r.name}
+                    </span>
                     <span className="adm-reward-action">
                       {ACTION_OPTIONS.find(a => a.value === r.action_type)?.label ?? r.action_type}
                     </span>
@@ -345,6 +351,15 @@ export default function CS2AdminPage() {
                   </div>
                 </div>
                 <div className="adm-reward-actions">
+                  <a
+                    href={`/icons/${r.action_type}.zip`}
+                    download
+                    className="adm-btn adm-btn-sm adm-btn-ghost"
+                    title="Скачать иконки"
+                    aria-label={`Скачать иконки для ${r.name}`}
+                  >
+                    ⬇️
+                  </a>
                   <button
                     className={`adm-toggle ${r.enabled ? 'adm-toggle-on' : 'adm-toggle-off'}`}
                     onClick={() => toggleEnabled(r)}
