@@ -116,16 +116,38 @@ const buildScriptSource = fs.readFileSync(
   "utf8"
 );
 const launcherVersion = launcherProject.match(/<Version>([^<]+)<\/Version>/)?.[1];
-const manifestVersion = manifestRoute.match(
-  /(?:(?:MINIMUM_SELF_UPDATING_VERSION|SUPPORTED_LAUNCHER_VERSION)\s*=|launcherVersion:)\s*["']([^"']+)["']/
+const minimumSelfUpdatingVersion = manifestRoute.match(
+  /MINIMUM_SELF_UPDATING_VERSION\s*=\s*["']([^"']+)["']/
 )?.[1];
 must(Boolean(launcherVersion), "Launcher project version missing");
+must(Boolean(minimumSelfUpdatingVersion), "Self-update bootstrap version missing");
 must(
   installerDefinition.includes("#ifndef MyAppVersion") &&
     buildScriptSource.includes('"/DMyAppVersion=$launcherVersion"'),
   "Installer version is not derived from the launcher project"
 );
-must(launcherVersion === manifestVersion, "Launcher and manifest versions differ");
+const toVersionParts = (value) => value.split(".").map(Number);
+const compareVersions = (left, right) => {
+  const a = toVersionParts(left);
+  const b = toVersionParts(right);
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const difference = (a[index] || 0) - (b[index] || 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+};
+must(
+  compareVersions(launcherVersion, minimumSelfUpdatingVersion) >= 0,
+  "Launcher predates the self-update bootstrap version"
+);
+must(
+  launcherProject.includes('<AssemblyMetadata Include="Cs2HazeUpdateRepository"'),
+  "Launcher update repository is not a build-time setting"
+);
+must(
+  manifestRoute.includes("process.env.CS2HAZE_GITHUB_REPOSITORY"),
+  "Manifest update repository is not configurable"
+);
 
 const stableInstallerUrl =
   "https://github.com/almazazamatov22-blip/paracetamolhazeweb/releases/latest/download/CS2Haze-Setup.exe";
@@ -209,6 +231,10 @@ must(
 must(
   releaseWorkflow.includes("CS2Haze.UpdateSmoke.csproj"),
   "Launcher update recovery smoke test is not part of the release workflow"
+);
+must(
+  releaseWorkflow.includes("launcherVersion = $launcherVersion"),
+  "Release metadata does not use the current launcher package version"
 );
 
 console.log("cs2haze integration verification passed.");

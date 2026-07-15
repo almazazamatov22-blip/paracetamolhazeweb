@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      CS2HAZE_UPDATE_REPOSITORY: ${{ github.repository }}
     permissions:
       contents: write
 

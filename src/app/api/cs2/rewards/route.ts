@@ -41,10 +41,9 @@ export async function GET(req: NextRequest) {
     if (error) throw error;
 
     const rewards = data ?? [];
-    let syncWarning = '';
-    for (const reward of rewards) {
+    const promptSyncWarnings = await Promise.all(rewards.map(async (reward) => {
       const prompt = getRewardPrompt(String(reward.action_type));
-      if (reward.description === prompt) continue;
+      if (reward.description === prompt) return '';
 
       try {
         await updateTwitchReward(token, streamerId, reward, 'prompt');
@@ -55,16 +54,18 @@ export async function GET(req: NextRequest) {
           .eq('streamer_id', streamerId);
         if (syncError) throw syncError;
         reward.description = prompt;
+        return '';
       } catch (syncError) {
         console.error('[cs2/rewards prompt sync]', syncError);
-        syncWarning = syncError instanceof TwitchRewardUpdateError
+        return syncError instanceof TwitchRewardUpdateError
           && (syncError.status === 403 || syncError.status === 404)
           ? 'Twitch не разрешает менять награду, которая была создана вручную. Удалите её и создайте заново через эту панель.'
           : 'Не все описания удалось обновить на Twitch. Попробуйте открыть панель позже.';
       }
-    }
+    }));
+    const syncWarning = promptSyncWarnings.find(Boolean);
 
-    return NextResponse.json({ rewards, syncWarning: syncWarning || undefined });
+    return NextResponse.json({ rewards, syncWarning });
   } catch (err: any) {
     console.error('[cs2/rewards GET]', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -138,6 +139,7 @@ async function updateTwitchReward(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(twitchBody),
+      signal: AbortSignal.timeout(5_000),
     }
   );
 

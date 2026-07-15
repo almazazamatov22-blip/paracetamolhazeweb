@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Diagnostics;
+using System.Reflection;
 using Microsoft.Win32;
 using CS2Haze.Launcher.Models;
 
@@ -18,6 +19,8 @@ public sealed class UpdateService(HttpClient http, LauncherConfig config)
     private const long MaxLauncherArchiveBytes = 512L * 1024 * 1024;
     private const string RunOnceKeyPath = @"Software\Microsoft\Windows\CurrentVersion\RunOnce";
     private const string RunOnceValueName = "cs2haze launcher recovery";
+    private const string DefaultUpdateRepository = "almazazamatov22-blip/paracetamolhazeweb";
+    private static readonly string UpdateRepository = GetUpdateRepository();
 
     public async Task<UpdateManifest> GetManifestAsync(
         string launcherVersion,
@@ -311,7 +314,7 @@ public sealed class UpdateService(HttpClient http, LauncherConfig config)
             return false;
         }
 
-        const string prefix = "/almazazamatov22-blip/paracetamolhazeweb/releases/";
+        var prefix = $"/{UpdateRepository}/releases/";
         if (!parsed.AbsolutePath.StartsWith(prefix, StringComparison.Ordinal)) return false;
 
         var parts = parsed.AbsolutePath[prefix.Length..].Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -324,6 +327,28 @@ public sealed class UpdateService(HttpClient http, LauncherConfig config)
 
         launcherUri = parsed;
         return true;
+    }
+
+    private static string GetUpdateRepository()
+    {
+        var configured = typeof(UpdateService).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(attribute => attribute.Key == "Cs2HazeUpdateRepository")
+            ?.Value;
+        if (string.IsNullOrWhiteSpace(configured)) return DefaultUpdateRepository;
+
+        var parts = configured.Split('/');
+        if (parts.Length != 2 || parts.Any(part =>
+            string.IsNullOrWhiteSpace(part)
+            || part.Any(character => !(char.IsLetterOrDigit(character)
+                || character is '-' or '_' or '.'))))
+        {
+            throw new InvalidOperationException(
+                "Некорректный репозиторий канала обновлений CS2Haze."
+            );
+        }
+
+        return configured;
     }
 
     private static void RegisterRecoveryRunOnce(string updaterPath, string installDirectory)

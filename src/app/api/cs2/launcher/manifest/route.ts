@@ -3,7 +3,12 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const GITHUB_REPOSITORY = 'almazazamatov22-blip/paracetamolhazeweb';
+const DEFAULT_GITHUB_REPOSITORY = 'almazazamatov22-blip/paracetamolhazeweb';
+const configuredRepository = process.env.CS2HAZE_GITHUB_REPOSITORY?.trim();
+const GITHUB_REPOSITORY = configuredRepository
+  && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(configuredRepository)
+  ? configuredRepository
+  : DEFAULT_GITHUB_REPOSITORY;
 const RELEASE_METADATA_URL =
   `https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/cs2haze-release.json`;
 const MINIMUM_SELF_UPDATING_VERSION = '1.0.4';

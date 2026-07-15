@@ -1,5 +1,6 @@
 param(
-  [string]$RepoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
+  [string]$RepoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path,
+  [string]$UpdateRepository = $env:CS2HAZE_UPDATE_REPOSITORY
 )
 
 $ErrorActionPreference = "Stop"
@@ -8,6 +9,13 @@ $Dist = Join-Path $KitRoot "dist"
 $LauncherOut = Join-Path $Dist "launcher"
 $RuntimeOut = Join-Path $Dist "runtime"
 
+if ([string]::IsNullOrWhiteSpace($UpdateRepository)) {
+  $UpdateRepository = "almazazamatov22-blip/paracetamolhazeweb"
+}
+if ($UpdateRepository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') {
+  throw "UpdateRepository must use the owner/repository format."
+}
+
 Remove-Item $Dist -Recurse -Force -ErrorAction SilentlyContinue
 New-Item $LauncherOut -ItemType Directory -Force | Out-Null
 New-Item $RuntimeOut -ItemType Directory -Force | Out-Null
@@ -15,6 +23,7 @@ New-Item $RuntimeOut -ItemType Directory -Force | Out-Null
 Write-Host "Building cs2haze launcher..."
 dotnet publish (Join-Path $KitRoot "launcher\CS2Haze.Launcher.csproj") `
   -c Release -r win-x64 --self-contained true `
+  -p:Cs2HazeUpdateRepository=$UpdateRepository `
   -o $LauncherOut
 if ($LASTEXITCODE -ne 0) {
   throw "Launcher publish failed with exit code $LASTEXITCODE."

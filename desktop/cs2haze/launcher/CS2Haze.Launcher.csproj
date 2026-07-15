@@ -15,7 +15,11 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <PublishTrimmed>false</PublishTrimmed>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Cs2HazeUpdateRepository Condition="'$(Cs2HazeUpdateRepository)' == ''">almazazamatov22-blip/paracetamolhazeweb</Cs2HazeUpdateRepository>
   </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="Cs2HazeUpdateRepository" Value="$(Cs2HazeUpdateRepository)" />
+  </ItemGroup>
   <ItemGroup>
     <None Include="Assets\cs2haze.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
