@@ -163,17 +163,18 @@ export default function cs2xtwitchPage() {
                 <span>Приложение пока без цифровой подписи.</span>
                 <b>Подробнее</b>
               </div>
-              <h3>Подтвердите запуск</h3>
-              <p>
-                Это стандартная проверка нового приложения. Если появится предупреждение, нажмите <strong>«Подробнее»</strong>, затем <strong>«Выполнить в любом случае»</strong>.
+              <p className="cs2-desc" style={{marginTop: '10px', fontSize: '14px'}}>
+                  Это стандартная проверка нового приложения. Нажмите <strong>«Подробнее»</strong>, затем <strong>«Выполнить в любом случае»</strong>.
               </p>
             </article>
 
             <article className="cs2-launch-card">
               <span className="cs2-step-badge">3</span>
               <div className="cs2-step-icon cs2-step-icon-twitch" aria-hidden="true"><Twitch size={24} /></div>
-              <h3>Войдите через Twitch</h3>
-              <p>Без передачи пароля: авторизация проходит на официальной странице Twitch OAuth.</p>
+              <h3 className="cs2-step-title">Авторизуйтесь через Twitch</h3>
+              <p className="cs2-desc">
+                Для работы нужно привязать аккаунт. Откройте приложение и нажмите кнопку <strong>Login with Twitch</strong>.
+              </p>
               {!user ? (
                 <a href="/auth/twitch?source=cs2xtwitch" className="cs2-btn cs2-btn-twitch" style={{marginTop: 'auto', width: '100%', minHeight: 'auto', padding: '7px 10px', fontSize: '12px'}}>
                   Войти через Twitch
@@ -197,10 +198,6 @@ export default function cs2xtwitchPage() {
               )}
             </article>
           </div>
-
-          <p className="cs2-oauth-note">
-            <span aria-hidden="true">●</span> Мы не просим пароль — используется только официальный OAuth Twitch.
-          </p>
         </section>
 
         {user && (

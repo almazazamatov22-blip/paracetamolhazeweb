@@ -10,7 +10,7 @@ function sourcePath(source: string) {
   if (source === 'roz') return '/roz';
   if (source === 'overlays') return '/overlays/dashboard';
   if (source === 'cs2') return '/cs2';
-  if (source === 'cs2interactive') return '/cs2xtwitch';
+  if (source === 'cs2interactive' || source === 'cs2xtwitch') return '/cs2xtwitch';
   if (source === 'cs2haze') return '/cs2haze/connect';
   if (source === 'bred' || source === 'trueorfalse' || source === 'trueorfasle') return '/bred';
   return '/overlays/dashboard';
