@@ -20,7 +20,7 @@ function targetUrl(baseUrl: string, source: string | null, error?: string) {
   if (source === 'roz') path = '/roz';
   if (source === 'overlays') path = '/overlays/dashboard';
   if (source === 'cs2') path = '/cs2';
-  if (source === 'cs2interactive') path = '/cs2interactive';
+  if (source === 'cs2interactive') path = '/cs2xtwitch';
   if (source === 'cs2haze') path = '/cs2haze/connect';
   if (source === 'bred' || source === 'trueorfalse' || source === 'trueorfasle') path = '/bred';
 

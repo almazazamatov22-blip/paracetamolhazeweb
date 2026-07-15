@@ -1,0 +1,15 @@
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\bin\Release\net8.0-windows\CS2Haze.UpdateSmoke.exe
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\bin\Release\net8.0-windows\CS2Haze.UpdateSmoke.deps.json
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\bin\Release\net8.0-windows\CS2Haze.UpdateSmoke.runtimeconfig.json
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\bin\Release\net8.0-windows\CS2Haze.UpdateSmoke.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\bin\Release\net8.0-windows\CS2Haze.UpdateSmoke.pdb
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\Release\net8.0-windows\CS2Haze.UpdateSmoke.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\Release\net8.0-windows\CS2Haze.UpdateSmoke.AssemblyInfoInputs.cache
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\Release\net8.0-windows\CS2Haze.UpdateSmoke.AssemblyInfo.cs
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\Release\net8.0-windows\CS2Haze.UpdateSmoke.csproj.CoreCompileInputs.cache
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\Release\net8.0-windows\CS2Haze.UpdateSmoke.sourcelink.json
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\Release\net8.0-windows\CS2Haze.UpdateSmoke.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\Release\net8.0-windows\refint\CS2Haze.UpdateSmoke.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\Release\net8.0-windows\CS2Haze.UpdateSmoke.pdb
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\Release\net8.0-windows\CS2Haze.UpdateSmoke.genruntimeconfig.cache
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\Release\net8.0-windows\ref\CS2Haze.UpdateSmoke.dll

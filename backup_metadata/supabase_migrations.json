@@ -1,0 +1,6 @@
+{
+  "migrations": [
+    {"version":"20260427195856","name":"loto_supabase_realtime_v2"},
+    {"version":"20260427211914","name":"fix_loto_schema_v3"}
+  ]
+}

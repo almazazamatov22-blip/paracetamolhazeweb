@@ -1,0 +1,7 @@
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\dist\launcher\cs2haze-updater.pdb
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\dist\launcher\D3DCompiler_47_cor3.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\dist\launcher\PenImc_cor3.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\dist\launcher\PresentationNative_cor3.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\dist\launcher\vcruntime140_cor3.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\dist\launcher\wpfgfx_cor3.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\dist\launcher\cs2haze-updater.exe

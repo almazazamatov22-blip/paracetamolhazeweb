@@ -40,7 +40,7 @@ export const ACTION_REGISTRY: Record<string, ActionConfig> = {
     icon: '🔄',
     durationMs: 2000,
     effectType: 'mouse',
-    description: 'Мгновенный разворот камеры на 180°.',
+    description: 'Мгновенный разворот на 180°.',
   },
   block_jump: {
     actionType: 'block_jump',

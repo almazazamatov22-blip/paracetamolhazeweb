@@ -1,0 +1,34 @@
+
+> nextjs_tailwind_shadcn_ts@0.2.0 dev
+> next dev -p 3000
+
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://26.20.93.55:3000
+- Environments: .env.local, .env
+✓ Ready in 2.7s
+
+○ Compiling /poker ...
+ HEAD /poker?room=codexviz&size=9 200 in 10.6s (next.js: 10.1s, proxy.ts: 185ms, application-code: 253ms)
+✓ Compiled in 3.2s
+ GET /poker?room=codexviz&size=9&mock=1 200 in 325ms (next.js: 181ms, proxy.ts: 20ms, application-code: 123ms)
+ GET /poker?room=codexviz&size=9&mock=2 200 in 62ms (next.js: 11ms, proxy.ts: 9ms, application-code: 42ms)
+ GET /poker?room=codexviz&size=9&mock=1 200 in 48ms (next.js: 4ms, proxy.ts: 4ms, application-code: 40ms)
+ GET /poker?room=codexviz&size=9&mock=2 200 in 53ms (next.js: 11ms, proxy.ts: 3ms, application-code: 38ms)
+ GET /poker/cards/XX.svg 404 in 716ms (next.js: 490ms, proxy.ts: 4ms, application-code: 223ms)
+ GET /poker?room=codexviz&size=9&mock=2 200 in 476ms (next.js: 206ms, proxy.ts: 48ms, application-code: 221ms)
+ GET /poker?room=codexviz&size=9&mock=1 200 in 472ms (next.js: 246ms, proxy.ts: 45ms, application-code: 181ms)
+ GET /poker?room=codexviz&size=9&mock=2 200 in 226ms (next.js: 13ms, proxy.ts: 15ms, application-code: 198ms)
+ GET /poker?room=codexviz&size=9&mock=1 200 in 224ms (next.js: 45ms, proxy.ts: 13ms, application-code: 165ms)
+ GET /poker/cards/XX.svg 404 in 297ms (next.js: 86ms, proxy.ts: 5ms, application-code: 206ms)
+ GET /poker?room=codexviz&size=9&mock=2 200 in 160ms (next.js: 12ms, proxy.ts: 5ms, application-code: 144ms)
+ GET /poker?room=codexviz&size=9&mock=2 200 in 163ms (next.js: 37ms, proxy.ts: 7ms, application-code: 119ms)
+ GET /poker?room=codexviz&size=9&mock=2 200 in 160ms (next.js: 17ms, proxy.ts: 27ms, application-code: 116ms)
+ GET /poker?room=codexviz&size=9&mock=1 200 in 134ms (next.js: 36ms, proxy.ts: 8ms, application-code: 90ms)
+ GET /poker?room=codexviz&size=9&mock=1 200 in 135ms (next.js: 56ms, proxy.ts: 6ms, application-code: 72ms)
+ GET /poker?room=codexviz&size=9&mock=1 200 in 105ms (next.js: 8ms, proxy.ts: 5ms, application-code: 92ms)
+ GET /poker/cards/XX.svg 404 in 101ms (next.js: 46ms, proxy.ts: 3ms, application-code: 52ms)
+ GET /poker?room=codexviz&size=9&mock=1 200 in 86ms (next.js: 7ms, proxy.ts: 5ms, application-code: 75ms)
+ GET /poker?room=codexviz&size=9&mock=2 200 in 66ms (next.js: 11ms, proxy.ts: 6ms, application-code: 49ms)
+ GET /poker/cards/XX.svg 404 in 51ms (next.js: 9ms, proxy.ts: 4ms, application-code: 38ms)
+ GET /poker/cards/XX.svg 404 in 69ms (next.js: 13ms, proxy.ts: 5ms, application-code: 51ms)

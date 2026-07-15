@@ -1,0 +1,94 @@
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of C:\Users\almaz\package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * C:\Users\almaz\Desktop\paracetamol.haze\package-lock.json
+   * C:\Users\almaz\Desktop\package-lock.json
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+-----
+[1m[31mFATAL[39m[0m: An unexpected Turbopack error occurred. A panic log has been written to C:\Users\almaz\AppData\Local\Temp\next-panic-b4eb0f00d9c754d256f6d846fd0439d.log.
+
+To help make Turbopack better, report this error by clicking here: https://bugs.nextjs.org/search?category=turbopack-error-report&title=Turbopack%20Error%3A%20%5Bproject%5D%2FDesktop%2Fparacetamol.haze%2Fsrc%2Fapp%2Fglobals.css%20%5Bapp-client%5D%20%28css%29&body=Turbopack%20version%3A%20%602275bd85%60%0ANext.js%20version%3A%20%600.0.0%60%0A%0AError%20message%3A%0A%60%60%60%0A%5Bproject%5D%2FDesktop%2Fparacetamol.haze%2Fsrc%2Fapp%2Fglobals.css%20%5Bapp-client%5D%20%28css%29%0A%0ACaused%20by%3A%0A-%20reading%20file%20%22C%3A%5C%5CUsers%5C%5Calmaz%5C%5CDesktop%5C%5Cparacetamol.haze%5C%5Cscratch%5C%5Cchrome-poker-verify%5C%5CDefault%5C%5CSync%20Data%5C%5CLevelDB%5C%5CLOCK%22%0A-%20%D0%9F%D1%80%D0%BE%D1%86%D0%B5%D1%81%D1%81%20%D0%BD%D0%B5%20%D0%BC%D0%BE%D0%B6%D0%B5%D1%82%20%D0%BF%D0%BE%D0%BB%D1%83%D1%87%D0%B8%D1%82%D1%8C%20%D0%B4%D0%BE%D1%81%D1%82%D1%83%D0%BF%20%D0%BA%20%D1%84%D0%B0%D0%B9%D0%BB%D1%83%2C%20%D1%82%D0%B0%D0%BA%20%D0%BA%D0%B0%D0%BA%20%D1%87%D0%B0%D1%81%D1%82%D1%8C%20%D1%8D%D1%82%D0%BE%D0%B3%D0%BE%20%D1%84%D0%B0%D0%B9%D0%BB%D0%B0%20%D0%B7%D0%B0%D0%B1%D0%BB%D0%BE%D0%BA%D0%B8%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B0%20%D0%B4%D1%80%D1%83%D0%B3%D0%B8%D0%BC%20%D0%BF%D1%80%D0%BE%D1%86%D0%B5%D1%81%D1%81%D0%BE%D0%BC.%20%28os%20error%2033%29%0A%0ADebug%20info%3A%0A-%20Execution%20of%20subscribe_issues_and_diags_operation%20failed%0A-%20Execution%20of%20%3CAppEndpoint%20as%20Endpoint%3E%3A%3Aserver_changed%20failed%0A-%20Execution%20of%20%2AProject%3A%3Aserver_changed%20failed%0A-%20Execution%20of%20%2AAppEndpointOutput%3A%3Aserver_assets%20failed%0A-%20Execution%20of%20AppEndpoint%3A%3Aoutput%20failed%0A-%20Execution%20of%20AppProject%3A%3Aapp_module_graphs%20failed%0A-%20Execution%20of%20%2A%3CAppEndpoint%20as%20Endpoint%3E%3A%3Aadditional_entries%20failed%0A-%20Execution%20of%20ModuleGraph%3A%3Afrom_graphs%20failed%0A-%20Execution%20of%20ModuleGraph%3A%3Acreate%20failed%0A-%20Execution%20of%20SingleModuleGraph%3A%3Anew_with_entries_visited_intern%20failed%0A-%20%5Bproject%5D%2FDesktop%2Fparacetamol.haze%2Fsrc%2Fapp%2Fglobals.css%20%5Bapp-client%5D%20%28css%29%0A-%20Execution%20of%20primary_chunkable_referenced_modules%20failed%0A-%20Execution%20of%20%3CCssModule%20as%20Module%3E%3A%3Areferences%20failed%0A-%20Execution%20of%20parse_css%20failed%0A-%20Execution%20of%20%3CPostCssTransformedAsset%20as%20Asset%3E%3A%3Acontent%20failed%0A-%20Execution%20of%20PostCssTransformedAsset%3A%3Aprocess%20failed%0A-%20Execution%20of%20evaluate_webpack_loader%20failed%0A-%20Execution%20of%20%3CDiskFileSystem%20as%20FileSystem%3E%3A%3Aread%20failed%0A-%20reading%20file%20%22C%3A%5C%5CUsers%5C%5Calmaz%5C%5CDesktop%5C%5Cparacetamol.haze%5C%5Cscratch%5C%5Cchrome-poker-verify%5C%5CDefault%5C%5CSync%20Data%5C%5CLevelDB%5C%5CLOCK%22%0A-%20%D0%9F%D1%80%D0%BE%D1%86%D0%B5%D1%81%D1%81%20%D0%BD%D0%B5%20%D0%BC%D0%BE%D0%B6%D0%B5%D1%82%20%D0%BF%D0%BE%D0%BB%D1%83%D1%87%D0%B8%D1%82%D1%8C%20%D0%B4%D0%BE%D1%81%D1%82%D1%83%D0%BF%20%D0%BA%20%D1%84%D0%B0%D0%B9%D0%BB%D1%83%2C%20%D1%82%D0%B0%D0%BA%20%D0%BA%D0%B0%D0%BA%20%D1%87%D0%B0%D1%81%D1%82%D1%8C%20%D1%8D%D1%82%D0%BE%D0%B3%D0%BE%20%D1%84%D0%B0%D0%B9%D0%BB%D0%B0%20%D0%B7%D0%B0%D0%B1%D0%BB%D0%BE%D0%BA%D0%B8%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B0%20%D0%B4%D1%80%D1%83%D0%B3%D0%B8%D0%BC%20%D0%BF%D1%80%D0%BE%D1%86%D0%B5%D1%81%D1%81%D0%BE%D0%BC.%20%28os%20error%2033%29%0A%60%60%60&labels=Turbopack,Turbopack%20Panic%20Backtrace
+-----
+
+[browser] Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery. (src/components/poker/PokerTable.tsx:783:37)
+[browser] Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery. (src/components/poker/PokerTable.tsx:783:37)
+[browser] Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery. (src/components/poker/PokerTable.tsx:783:37)
+[browser] Card Image Load Error: /poker/cards/XX.svg 
+    at onError (src/components/poker/PokerCard.tsx:46:25)
+  44 |             className="w-full h-full object-contain scale-[3.2]"
+  45 |             onError={(e) => {
+> 46 |                 console.error('Card Image Load Error:', cardSrc);
+     |                         ^
+  47 |                 e.currentTarget.style.display = 'none';
+  48 |             }}
+  49 |         /> (src/components/poker/PokerCard.tsx:46:25)
+[browser] Card Image Load Error: /poker/cards/XX.svg 
+    at onError (src/components/poker/PokerCard.tsx:46:25)
+  44 |             className="w-full h-full object-contain scale-[3.2]"
+  45 |             onError={(e) => {
+> 46 |                 console.error('Card Image Load Error:', cardSrc);
+     |                         ^
+  47 |                 e.currentTarget.style.display = 'none';
+  48 |             }}
+  49 |         /> (src/components/poker/PokerCard.tsx:46:25)
+[browser] Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery. (src/components/poker/PokerTable.tsx:783:37)
+[browser] Card Image Load Error: /poker/cards/XX.svg 
+    at onError (src/components/poker/PokerCard.tsx:46:25)
+  44 |             className="w-full h-full object-contain scale-[3.2]"
+  45 |             onError={(e) => {
+> 46 |                 console.error('Card Image Load Error:', cardSrc);
+     |                         ^
+  47 |                 e.currentTarget.style.display = 'none';
+  48 |             }}
+  49 |         /> (src/components/poker/PokerCard.tsx:46:25)
+[browser] Card Image Load Error: /poker/cards/XX.svg 
+    at onError (src/components/poker/PokerCard.tsx:46:25)
+  44 |             className="w-full h-full object-contain scale-[3.2]"
+  45 |             onError={(e) => {
+> 46 |                 console.error('Card Image Load Error:', cardSrc);
+     |                         ^
+  47 |                 e.currentTarget.style.display = 'none';
+  48 |             }}
+  49 |         /> (src/components/poker/PokerCard.tsx:46:25)
+[browser] Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery. (src/components/poker/PokerTable.tsx:783:37)
+[browser] Card Image Load Error: /poker/cards/XX.svg 
+    at onError (src/components/poker/PokerCard.tsx:46:25)
+  44 |             className="w-full h-full object-contain scale-[3.2]"
+  45 |             onError={(e) => {
+> 46 |                 console.error('Card Image Load Error:', cardSrc);
+     |                         ^
+  47 |                 e.currentTarget.style.display = 'none';
+  48 |             }}
+  49 |         /> (src/components/poker/PokerCard.tsx:46:25)
+[browser] Card Image Load Error: /poker/cards/XX.svg 
+    at onError (src/components/poker/PokerCard.tsx:46:25)
+  44 |             className="w-full h-full object-contain scale-[3.2]"
+  45 |             onError={(e) => {
+> 46 |                 console.error('Card Image Load Error:', cardSrc);
+     |                         ^
+  47 |                 e.currentTarget.style.display = 'none';
+  48 |             }}
+  49 |         /> (src/components/poker/PokerCard.tsx:46:25)
+[browser] Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery. (src/components/poker/PokerTable.tsx:783:37)
+[browser] Card Image Load Error: /poker/cards/XX.svg 
+    at onError (src/components/poker/PokerCard.tsx:46:25)
+  44 |             className="w-full h-full object-contain scale-[3.2]"
+  45 |             onError={(e) => {
+> 46 |                 console.error('Card Image Load Error:', cardSrc);
+     |                         ^
+  47 |                 e.currentTarget.style.display = 'none';
+  48 |             }}
+  49 |         /> (src/components/poker/PokerCard.tsx:46:25)
+[browser] Card Image Load Error: /poker/cards/XX.svg 
+    at onError (src/components/poker/PokerCard.tsx:46:25)
+  44 |             className="w-full h-full object-contain scale-[3.2]"
+  45 |             onError={(e) => {
+> 46 |                 console.error('Card Image Load Error:', cardSrc);
+     |                         ^
+  47 |                 e.currentTarget.style.display = 'none';
+  48 |             }}
+  49 |         /> (src/components/poker/PokerCard.tsx:46:25)
