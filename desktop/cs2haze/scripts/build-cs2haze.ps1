@@ -1,5 +1,5 @@
 param(
-  [string]$RepoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path,
+  [string]$RepoRoot = (Resolve-Path "$PSScriptRoot\..\..\..").Path,
   [string]$UpdateRepository = $env:CS2HAZE_UPDATE_REPOSITORY
 )
 
