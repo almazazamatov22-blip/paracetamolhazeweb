@@ -10,14 +10,15 @@ try
     var primary = new PendingConnectTokenStore(testDirectory);
     var secondary = new PendingConnectTokenStore(testDirectory);
 
-    primary.Write("token-a");
+    primary.Write("token-a", "origin-a");
     var observed = primary.Read();
-    if (observed != "token-a")
+    if (observed?.Token != "token-a")
         throw new InvalidOperationException("Initial token was not readable.");
 
-    secondary.Write("token-b");
-    primary.DeleteIfMatches(observed);
-    if (primary.Read() != "token-b")
+    secondary.Write("token-b", "origin-b");
+    if (observed?.Token != null)
+        primary.DeleteIfMatches(observed.Token);
+    if (primary.Read()?.Token != "token-b")
         throw new InvalidOperationException("An older claim deleted a newer callback token.");
 
     primary.DeleteIfMatches("token-b");
@@ -26,11 +27,11 @@ try
 
     Parallel.For(0, 32, index =>
     {
-        new PendingConnectTokenStore(testDirectory).Write($"parallel-{index}");
+        new PendingConnectTokenStore(testDirectory).Write($"parallel-{index}", $"origin-{index}");
     });
 
     var finalToken = primary.Read();
-    if (string.IsNullOrWhiteSpace(finalToken) || !finalToken.StartsWith("parallel-"))
+    if (finalToken is null || !finalToken.Token.StartsWith("parallel-"))
         throw new InvalidOperationException("Parallel handoff left an invalid token file.");
 
     Console.WriteLine("cs2haze token-store smoke passed.");
