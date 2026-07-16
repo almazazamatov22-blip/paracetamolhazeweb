@@ -8,6 +8,35 @@ namespace CS2Haze.Launcher.Services;
 
 public sealed class AuthService(HttpClient http, LauncherConfig config, StorageService storage)
 {
+    private string GetValidBaseUrl(Action<string>? setStatus = null)
+    {
+        var state = storage.LoadState();
+        if (string.IsNullOrWhiteSpace(state.SelectedBaseUrl))
+        {
+            return config.ApiBaseUrl;
+        }
+
+        var allowlist = new[]
+        {
+            "https://paracetamolhaze.ru",
+            "https://paracetamolhaze.online",
+            "https://paracetamolhaze-six.vercel.app"
+        };
+
+        foreach (var allowed in allowlist)
+        {
+            if (string.Equals(state.SelectedBaseUrl, allowed, StringComparison.OrdinalIgnoreCase))
+            {
+                return state.SelectedBaseUrl;
+            }
+        }
+
+        state.SelectedBaseUrl = null;
+        storage.SaveState(state);
+        setStatus?.Invoke("Ранее сохранённый домен больше не поддерживается. Используется основной сервер.");
+        return config.ApiBaseUrl;
+    }
+
     public async Task<LauncherSession?> TryRestoreSessionAsync(
         LocalState state,
         CancellationToken cancellationToken
@@ -16,9 +45,11 @@ public sealed class AuthService(HttpClient http, LauncherConfig config, StorageS
         var refreshToken = storage.Unprotect(state.ProtectedRefreshToken);
         if (string.IsNullOrWhiteSpace(refreshToken)) return null;
 
+        var baseUrl = GetValidBaseUrl();
+
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            $"{config.ApiBaseUrl}/api/cs2/launcher/auth/refresh"
+            $"{baseUrl}/api/cs2/launcher/auth/refresh"
         );
         request.Content = JsonContent.Create(new { refreshToken });
         using var response = await http.SendAsync(request, cancellationToken);
@@ -38,7 +69,8 @@ public sealed class AuthService(HttpClient http, LauncherConfig config, StorageS
         var pendingSession = await TryClaimPendingTokenAsync(tokenStore, cancellationToken);
         if (pendingSession is not null) return pendingSession;
 
-        var connectUrl = "https://paracetamolhaze.ru/cs2haze/connect";
+        var baseUrl = GetValidBaseUrl(setStatus);
+        var connectUrl = $"{baseUrl.TrimEnd('/')}/cs2haze/connect";
         Process.Start(new ProcessStartInfo
         {
             FileName = connectUrl,
@@ -64,14 +96,16 @@ public sealed class AuthService(HttpClient http, LauncherConfig config, StorageS
         CancellationToken cancellationToken
     )
     {
-        var token = tokenStore.Read();
-        if (string.IsNullOrWhiteSpace(token)) return null;
+        var pending = tokenStore.Read();
+        if (pending == null || string.IsNullOrWhiteSpace(pending.Token)) return null;
+
+        var baseUrl = pending.Origin ?? GetValidBaseUrl();
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            $"{config.ApiBaseUrl}/api/cs2/launcher/auth/claim"
+            $"{baseUrl}/api/cs2/launcher/auth/claim"
         );
-        request.Content = JsonContent.Create(new { token });
+        request.Content = JsonContent.Create(new { token = pending.Token });
 
         HttpResponseMessage response;
         try
@@ -91,7 +125,7 @@ public sealed class AuthService(HttpClient http, LauncherConfig config, StorageS
         {
             if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized)
             {
-                tokenStore.DeleteIfMatches(token);
+                tokenStore.DeleteIfMatches(pending.Token);
                 return null;
             }
 
@@ -120,7 +154,15 @@ public sealed class AuthService(HttpClient http, LauncherConfig config, StorageS
             }
 
             if (session is null) return null;
-            tokenStore.DeleteIfMatches(token);
+            
+            if (!string.IsNullOrWhiteSpace(pending.Origin))
+            {
+                var state = storage.LoadState();
+                state.SelectedBaseUrl = pending.Origin;
+                storage.SaveState(state);
+            }
+            
+            tokenStore.DeleteIfMatches(pending.Token);
             return session;
         }
     }

@@ -1,6 +1,9 @@
 using System.Security.Principal;
+using System.Text.Json;
 
 namespace CS2Haze.Launcher.Services;
+
+public record PendingConnectToken(string Token, string? Origin);
 
 public sealed class PendingConnectTokenStore
 {
@@ -23,10 +26,10 @@ public sealed class PendingConnectTokenStore
             "cs2haze"
         );
         Directory.CreateDirectory(dataDirectory);
-        TokenPath = Path.Combine(dataDirectory, "pending-connect-token.txt");
+        TokenPath = Path.Combine(dataDirectory, "pending-connect-token.json");
     }
 
-    public void Write(string token)
+    public void Write(string token, string? origin)
     {
         if (string.IsNullOrWhiteSpace(token))
             throw new ArgumentException("Connect token is empty.", nameof(token));
@@ -36,7 +39,10 @@ public sealed class PendingConnectTokenStore
             var tempPath = $"{TokenPath}.{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
             try
             {
-                File.WriteAllText(tempPath, token);
+                var data = new PendingConnectToken(token, origin);
+                var json = JsonSerializer.Serialize(data);
+                File.WriteAllText(tempPath, json);
+                
                 for (var attempt = 1; ; attempt++)
                 {
                     try
@@ -61,20 +67,22 @@ public sealed class PendingConnectTokenStore
         });
     }
 
-    public string? Read()
+    public PendingConnectToken? Read()
     {
         return WithLock(() =>
         {
             if (!File.Exists(TokenPath)) return null;
             try
             {
-                return File.ReadAllText(TokenPath);
+                var content = File.ReadAllText(TokenPath);
+                // Maintain backward compatibility if it's not JSON
+                if (!content.TrimStart().StartsWith("{"))
+                {
+                    return new PendingConnectToken(content, null);
+                }
+                return JsonSerializer.Deserialize<PendingConnectToken>(content);
             }
-            catch (IOException)
-            {
-                return null;
-            }
-            catch (UnauthorizedAccessException)
+            catch (Exception)
             {
                 return null;
             }
@@ -87,20 +95,14 @@ public sealed class PendingConnectTokenStore
         {
             try
             {
-                if (File.Exists(TokenPath)
-                    && string.Equals(
-                        File.ReadAllText(TokenPath),
-                        token,
-                        StringComparison.Ordinal
-                    ))
+                if (!File.Exists(TokenPath)) return;
+                var current = Read();
+                if (current != null && string.Equals(current.Token, token, StringComparison.Ordinal))
                 {
                     File.Delete(TokenPath);
                 }
             }
-            catch (IOException)
-            {
-            }
-            catch (UnauthorizedAccessException)
+            catch (Exception)
             {
             }
         });

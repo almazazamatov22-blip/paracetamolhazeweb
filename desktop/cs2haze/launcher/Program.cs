@@ -27,7 +27,7 @@ internal static class Program
         catch { }
     }
 
-    private static string? ExtractConnectToken(string[] args)
+    private static (string? token, string? origin) ExtractConnectToken(string[] args)
     {
         foreach (var arg in args)
         {
@@ -43,6 +43,8 @@ internal static class Program
                         
                         if (string.Equals(target, "connect", StringComparison.OrdinalIgnoreCase))
                         {
+                            string? token = null;
+                            string? origin = null;
                             var query = uri.Query.TrimStart('?');
                             var pairs = query.Split('&');
                             foreach (var pair in pairs)
@@ -53,15 +55,65 @@ internal static class Program
                                     var key = pair.Substring(0, eq);
                                     if (string.Equals(key, "token", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        return Uri.UnescapeDataString(pair.Substring(eq + 1));
+                                        token = Uri.UnescapeDataString(pair.Substring(eq + 1));
+                                    }
+                                    else if (string.Equals(key, "origin", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        origin = Uri.UnescapeDataString(pair.Substring(eq + 1));
                                     }
                                 }
+                            }
+
+                            if (!string.IsNullOrEmpty(origin))
+                            {
+                                origin = ValidateAndNormalizeOrigin(origin);
+                                if (origin == null)
+                                {
+                                    // If an origin is provided but invalid, we reject the request.
+                                    return (null, null);
+                                }
+                            }
+
+                            if (!string.IsNullOrEmpty(token))
+                            {
+                                return (token, origin);
                             }
                         }
                     }
                 }
             }
         }
+        return (null, null);
+    }
+
+    private static string? ValidateAndNormalizeOrigin(string originRaw)
+    {
+        if (!Uri.TryCreate(originRaw, UriKind.Absolute, out var uri))
+            return null;
+
+        if (!string.Equals(uri.Scheme, "https", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (!string.IsNullOrEmpty(uri.UserInfo))
+            return null;
+
+        var normalized = uri.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped);
+
+        var allowlist = new[]
+        {
+            "https://paracetamolhaze.ru",
+            "https://paracetamolhaze.online",
+            "https://paracetamolhaze-six.vercel.app"
+        };
+
+        foreach (var allowed in allowlist)
+        {
+            if (string.Equals(normalized, allowed, StringComparison.OrdinalIgnoreCase))
+            {
+                return normalized;
+            }
+        }
+
         return null;
     }
 
@@ -70,11 +122,11 @@ internal static class Program
     {
         ApplicationConfiguration.Initialize();
 
-        var connectToken = ExtractConnectToken(args);
+        var extracted = ExtractConnectToken(args);
 
-        if (!string.IsNullOrWhiteSpace(connectToken))
+        if (!string.IsNullOrWhiteSpace(extracted.token))
         {
-            new PendingConnectTokenStore().Write(connectToken);
+            new PendingConnectTokenStore().Write(extracted.token, extracted.origin);
         }
 
         using var mutex = new Mutex(
@@ -83,9 +135,9 @@ internal static class Program
             out var createdNew
         );
         
-        if (!string.IsNullOrWhiteSpace(connectToken))
+        if (!string.IsNullOrWhiteSpace(extracted.token))
         {
-            LogProtocolActivity(args.Length, true, "connect", true, connectToken.Length, createdNew);
+            LogProtocolActivity(args.Length, true, "connect", true, extracted.token.Length, createdNew);
         }
         else if (args.Length > 0 && args[0].Trim(' ', '"', '\'').StartsWith("cs2haze:", StringComparison.OrdinalIgnoreCase))
         {
@@ -94,7 +146,7 @@ internal static class Program
         
         if (!createdNew)
         {
-            if (!string.IsNullOrWhiteSpace(connectToken))
+            if (!string.IsNullOrWhiteSpace(extracted.token))
             {
                 return;
             }

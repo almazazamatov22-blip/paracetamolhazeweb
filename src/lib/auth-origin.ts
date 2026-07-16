@@ -36,10 +36,6 @@ function sanitizeConfiguredUrl(value: string | undefined): string | null {
 }
 
 export function getRequestBaseUrl(request: NextRequest): string {
-  const configured = sanitizeConfiguredUrl(process.env.TWITCH_AUTH_BASE_URL);
-
-  if (configured) return configured;
-
   const proto =
     sanitizeProto(firstHeaderValue(request.headers.get('x-forwarded-proto'))) ??
     sanitizeProto(request.nextUrl.protocol.replace(':', ''));

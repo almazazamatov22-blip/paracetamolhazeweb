@@ -253,7 +253,7 @@ public sealed class MainForm : Form
             agent.Start(
                 installDirectory,
                 state.StreamerId,
-                config.AgentBaseUrl,
+                state.SelectedBaseUrl ?? config.AgentBaseUrl,
                 line => BeginInvoke(() => detail.Text = line)
             );
 

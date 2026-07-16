@@ -17,6 +17,7 @@ public sealed class LocalState
     public string? StreamerId { get; set; }
     public string? DisplayName { get; set; }
     public string? RuntimeVersion { get; set; }
+    public string? SelectedBaseUrl { get; set; }
 }
 
 public sealed class UpdateManifest

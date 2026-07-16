@@ -44,7 +44,7 @@ export default function ConnectPage() {
       if (!res.ok) throw new Error("Ошибка получения токена подключения");
       const data = await res.json();
       if (data.token) {
-        window.location.href = `cs2haze://connect?token=${encodeURIComponent(data.token)}`;
+        window.location.href = `cs2haze://connect?token=${encodeURIComponent(data.token)}&origin=${encodeURIComponent(window.location.origin)}`;
         // Показываем сообщение об успехе после небольшого таймаута
         setTimeout(() => {
           setConnecting(false);
