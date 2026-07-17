@@ -21,13 +21,32 @@ export async function POST(req: NextRequest) {
 
     const clientId = process.env.TWITCH_CLIENT_ID;
     const clientSecret = process.env.TWITCH_CLIENT_SECRET;
-    const eventSubSecret = process.env.TWITCH_EVENTSUB_SECRET;
-    const callbackUrl = process.env.TWITCH_EVENTSUB_CALLBACK_URL;
+    // Use TWITCH_CLIENT_SECRET as the webhook secret as requested
+    const webhookSecret = process.env.TWITCH_CLIENT_SECRET;
     
-    if (!eventSubSecret || eventSubSecret.length < 10 || !callbackUrl) {
-      console.warn('[OV_EVENTSUB] Missing TWITCH_EVENTSUB_SECRET or TWITCH_EVENTSUB_CALLBACK_URL');
+    if (!webhookSecret || webhookSecret.length < 10) {
+      console.warn('[OV_EVENTSUB] TWITCH_CLIENT_SECRET is missing or too short.');
       return NextResponse.json({ error: 'Ошибка конфигурации сервера (EventSub)' }, { status: 500 });
     }
+
+    const forwardedHost = req.headers.get('x-forwarded-host');
+    const host = forwardedHost || req.headers.get('host');
+    const protocol = req.headers.get('x-forwarded-proto') || 'https';
+    const normalizedHost = host?.split(',')[0].trim().toLowerCase();
+
+    const ALLOWED_EVENTSUB_HOSTS = new Set([
+      'paracetamolhaze.ru',
+      'www.paracetamolhaze.ru',
+      'paracetamolhaze-six.vercel.app',
+      'paracetamolhaze.online',
+      'localhost:3000'
+    ]);
+
+    if (!normalizedHost || !ALLOWED_EVENTSUB_HOSTS.has(normalizedHost)) {
+       return NextResponse.json({ error: 'Invalid callback host' }, { status: 400 });
+    }
+
+    const callbackUrl = `${protocol}://${normalizedHost}/api/ov_webhook`;
 
     // 1. Get User ID
     const authRes = await fetch('https://api.twitch.tv/helix/users', {
@@ -39,15 +58,16 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabase();
 
-    // Get current subscription ID from config
+    // Get current subscription ID and version from config
     const { data: configs } = await supabase
       .from('overlay_configs')
-      .select('eventsub_subscription_id')
+      .select('eventsub_subscription_id, settings')
       .eq('user_id', userId)
       .eq('overlay_type', 'fate');
       
-    // find first existing sub id if any
-    const savedSubId = configs?.[0]?.eventsub_subscription_id;
+    const fateConfig = configs?.[0];
+    const savedSubId = fateConfig?.eventsub_subscription_id;
+    const secretVersion = fateConfig?.settings?.eventsub_secret_version;
 
     // 2. Get App Token
     const appTokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
@@ -97,7 +117,8 @@ export async function POST(req: NextRequest) {
         if (
           savedSubId && sub.id === savedSubId && 
           sub.status === 'enabled' && 
-          sub.transport?.callback === callbackUrl
+          sub.transport?.callback === callbackUrl &&
+          secretVersion === 'client-secret-v1'
         ) {
            console.log('[OV_EVENTSUB] matching subscription found');
            existingSub = sub;
@@ -140,7 +161,7 @@ export async function POST(req: NextRequest) {
             transport: {
               method: 'webhook',
               callback: callbackUrl,
-              secret: eventSubSecret
+              secret: webhookSecret
             }
           })
         });
@@ -192,12 +213,16 @@ export async function POST(req: NextRequest) {
       console.log(`[OV_EVENTSUB] subscription created`);
     }
 
-    // 5. Update Supabase with new subId and status
+    // 5. Update Supabase with new subId, status, and secret_version
+    let updatedSettings = fateConfig?.settings || {};
+    updatedSettings.eventsub_secret_version = 'client-secret-v1';
+
     const { error: updateError } = await supabase
       .from('overlay_configs')
       .update({
         eventsub_status: status,
-        eventsub_subscription_id: subId
+        eventsub_subscription_id: subId,
+        settings: updatedSettings
       })
       .eq('user_id', userId)
       .eq('overlay_type', 'fate');

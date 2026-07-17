@@ -47,8 +47,8 @@ function verifyTwitchSignature(req: NextRequest, rawBody: string): boolean {
     return false;
   }
 
-  // Use TWITCH_EVENTSUB_SECRET
-  const secret = process.env.TWITCH_EVENTSUB_SECRET;
+  // Restore TWITCH_CLIENT_SECRET usage as per the working backup
+  const secret = process.env.TWITCH_CLIENT_SECRET;
 
   if (!secret || !msgSignature || !msgId || !msgTimestamp) return false;
 
