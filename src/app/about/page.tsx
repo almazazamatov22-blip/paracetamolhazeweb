@@ -1,7 +1,7 @@
 import { generateBaseMetadata } from "@/lib/seo";
 
 export const metadata = generateBaseMetadata({
-  title: "О проекте Paracetamol Haze",
+  title: "О проекте",
   description: "Paracetamol Haze — это набор бесплатных инструментов, интерактивов и игр для Twitch-стримеров.",
   path: "/about",
 });

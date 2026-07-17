@@ -11,8 +11,8 @@ export async function generateMetadata(
   const user = searchParams.user || 'Игрок';
   
   const title = score !== '0' 
-    ? `Я набрал ${score} в УГАДАЙ КАДР! А сколько сможешь ты?` 
-    : 'УГАДАЙ КАДР • Киноигра на ParacetamolHAZE';
+    ? `Я набрал ${score} очков в КиноКадре!` 
+    : 'КиноКадр — угадай фильм по кадру';
     
   const description = 'Угадывай фильмы и сериалы по кадрам в захватывающей игре от ParacetamolHAZE! 10 раундов, хитрые вопросы и мировой рейтинг.';
   

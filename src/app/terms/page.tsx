@@ -4,15 +4,18 @@ export const metadata = generateBaseMetadata({
   title: "Пользовательское соглашение",
   description: "Пользовательское соглашение проекта Paracetamol Haze.",
   path: "/terms",
+  noindex: true,
 });
 
 export default function TermsPage() {
   return (
     <main className="min-h-screen bg-background text-foreground py-16 px-4 sm:px-8 max-w-4xl mx-auto">
+      <div className="bg-yellow-900/30 border border-yellow-500/50 p-4 rounded-xl mb-8 text-yellow-200">
+        <strong>Черновик.</strong> Страница должна быть заполнена и утверждена владельцем проекта перед использованием в качестве официального юридического документа.
+      </div>
       <h1 className="text-4xl font-bold mb-8 text-white">Пользовательское соглашение</h1>
       
       <div className="space-y-6 text-gray-300 leading-relaxed">
-        <p><em>Последнее обновление: [TODO: Указать дату]</em></p>
         
         <h2 className="text-2xl font-bold text-white mt-8 mb-4">1. Общие положения</h2>
         <p>

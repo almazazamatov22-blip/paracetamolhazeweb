@@ -76,7 +76,7 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/overlays/:path*",
+        source: "/admin",
         headers: [
           {
             key: "X-Robots-Tag",
@@ -86,6 +86,60 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/admin/:path*",
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow",
+          },
+        ],
+      },
+      {
+        source: "/cs2xtwitch/admin",
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow",
+          },
+        ],
+      },
+      {
+        source: "/cs2xtwitch/admin/:path*",
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow",
+          },
+        ],
+      },
+      {
+        source: "/cs2xtwitch/history",
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow",
+          },
+        ],
+      },
+      {
+        source: "/cs2xtwitch/history/:path*",
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow",
+          },
+        ],
+      },
+      {
+        source: "/overlays",
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow",
+          },
+        ],
+      },
+      {
+        source: "/overlays/:path*",
         headers: [
           {
             key: "X-Robots-Tag",

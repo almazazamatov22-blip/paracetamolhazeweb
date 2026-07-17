@@ -66,7 +66,7 @@ export default function CS2TwitchSetupGuide() {
         <section id="step-2">
           <h2 className="text-2xl font-bold text-white mb-4">Шаг 2: Установка и запуск</h2>
           <p className="mb-4">
-            Поскольку программа работает с процессами игры и не имеет дорогостоящего сертификата разработчика, Windows SmartScreen может показать предупреждение. 
+            Windows SmartScreen может показать предупреждение, поскольку текущая версия установщика не подписана коммерческим сертификатом издателя.
           </p>
           <div className="bg-[#1a1a1a] p-6 rounded-xl border border-[#333] mb-4 text-sm">
             <p><strong>Система Windows защитила компьютер</strong></p>

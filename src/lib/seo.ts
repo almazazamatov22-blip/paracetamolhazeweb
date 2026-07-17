@@ -20,8 +20,6 @@ export const PUBLIC_INDEXABLE_ROUTES = [
   "/guides/cs2-twitch-setup",
   "/guides/obs-twitch-overlays",
   "/about",
-  "/privacy",
-  "/terms"
 ];
 
 export function getCanonicalUrl(path: string): string {
@@ -55,10 +53,10 @@ export function generateBaseMetadata({
     },
     robots: {
       index: !noindex,
-      follow: !noindex,
+      follow: true,
       googleBot: {
         index: !noindex,
-        follow: !noindex,
+        follow: true,
         "max-video-preview": -1,
         "max-image-preview": "large",
         "max-snippet": -1,

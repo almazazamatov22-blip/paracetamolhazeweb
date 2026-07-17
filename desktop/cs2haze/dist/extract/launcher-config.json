@@ -1,7 +1,0 @@
-{
-  "ApiBaseUrl": "https://paracetamolhaze.ru",
-  "AgentBaseUrl": "https://paracetamolhaze.ru",
-  "ManifestPath": "/api/cs2/launcher/manifest",
-  "RequireAuthentication": false,
-  "RequireSubscription": false
-}

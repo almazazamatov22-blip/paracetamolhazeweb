@@ -43,7 +43,7 @@ export default function OBSOverlaysGuide() {
 
       <div className="space-y-8 text-gray-300 leading-relaxed">
         <p>
-          Использование оверлеев делает ваши интерактивные трансляции ярче. Paracetamol Haze предоставляет готовые веб-оверлеи (Browser Sources), которые легко интегрируются в любую программу для стриминга (OBS Studio, Streamlabs, XSplit).
+          Использование оверлеев делает ваши интерактивные трансляции ярче. Paracetamol Haze предоставляет готовые веб-оверлеи (Browser Sources), которые легко интегрируются в OBS Studio.
         </p>
 
         <section>
