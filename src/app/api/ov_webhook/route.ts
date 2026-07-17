@@ -39,6 +39,14 @@ function verifyTwitchSignature(req: NextRequest, rawBody: string): boolean {
   const msgTimestamp = req.headers.get('twitch-eventsub-message-timestamp') || '';
   const msgSignature = req.headers.get('twitch-eventsub-message-signature') || '';
   
+  // Reject messages older than 10 minutes to prevent replay attacks
+  const msgTime = new Date(msgTimestamp).getTime();
+  const now = Date.now();
+  if (now - msgTime > 10 * 60 * 1000) {
+    console.warn('[OV_WEBHOOK] message too old, rejected');
+    return false;
+  }
+
   // Use TWITCH_EVENTSUB_SECRET
   const secret = process.env.TWITCH_EVENTSUB_SECRET;
 
@@ -96,7 +104,7 @@ export async function POST(req: NextRequest) {
     // 1. Verify Twitch signature
     const isValidSignature = verifyTwitchSignature(req, rawBody);
     if (!isValidSignature) {
-      console.warn('[OV_WEBHOOK] Twitch EventSub signature verification failed');
+      console.warn('[OV_WEBHOOK] Twitch EventSub signature verification failed or message too old');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
     }
 
@@ -116,6 +124,7 @@ export async function POST(req: NextRequest) {
             .from('overlay_configs')
             .update({ eventsub_status: 'active' })
             .eq('user_id', broadcasterId);
+          console.log('[OV_EVENTSUB] subscription verified');
           console.log('[OV_WEBHOOK] challenge accepted, eventsub_status set to active');
         }
       }
@@ -126,7 +135,25 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 3. Handle actual events
+    // 3. Handle revocation
+    if (messageType === 'revocation') {
+      const broadcasterId = data.subscription?.condition?.broadcaster_user_id;
+      console.log(`[OV_WEBHOOK] revocation received, status: ${data.subscription?.status}`);
+      if (broadcasterId) {
+        const supabaseUrl = getSupabaseUrl();
+        const supabaseKey = getSupabaseServerKey();
+        if (supabaseUrl && supabaseKey) {
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          await supabase
+            .from('overlay_configs')
+            .update({ eventsub_status: 'revoked' })
+            .eq('user_id', broadcasterId);
+        }
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    // 4. Handle actual events
     const { subscription, event } = data;
 
     if (subscription?.type === 'channel.channel_points_custom_reward_redemption.add') {
@@ -143,13 +170,6 @@ export async function POST(req: NextRequest) {
       if (!supabaseUrl || !supabaseKey) return NextResponse.json({ ok: true });
 
       const supabase = createClient(supabaseUrl, supabaseKey);
-
-      // Opportunistically confirm active status on first event
-      await supabase
-        .from('overlay_configs')
-        .update({ eventsub_status: 'active' })
-        .eq('user_id', streamerId)
-        .eq('eventsub_status', 'pending');
 
       const { data: configs, error: configError } = await supabase
         .from('overlay_configs')
@@ -344,7 +364,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error('[OV_WEBHOOK] Error:', err);
+    console.error('[OV_WEBHOOK] Error:', err.message);
     return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
   }
 }
