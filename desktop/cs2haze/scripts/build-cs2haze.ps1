@@ -137,6 +137,22 @@ if ($LASTEXITCODE -ne 0) {
   throw "Installer build failed with exit code $LASTEXITCODE."
 }
 
+Write-Host "Creating release manifest..."
+$agentContent = Get-Content $AgentJs -Raw
+$runtimeVersion = "2.0.6"
+if ($agentContent -match "AGENT_VERSION\s*=\s*'([^']+)'") {
+    $runtimeVersion = $matches[1]
+}
+
+$releaseJson = Join-Path $Dist "cs2haze-release.json"
+@{
+  releaseTag = "cs2haze-v$launcherVersion"
+  launcherVersion = $launcherVersion
+  launcherSha256 = $launcherHash
+  runtimeVersion = $runtimeVersion
+  runtimeSha256 = $hash
+} | ConvertTo-Json | Set-Content $releaseJson -Encoding utf8
+
 Write-Host "Done."
 Write-Host "Installer: $(Join-Path $Dist 'CS2Haze-Setup.exe')"
 Write-Host "Launcher update SHA256: $launcherHash"
