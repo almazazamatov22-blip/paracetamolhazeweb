@@ -1,5 +1,6 @@
 import { Metadata, ResolvingMetadata } from 'next';
 import KinokadrClient from './KinokadrClient';
+import { generateBaseMetadata } from '@/lib/seo';
 
 // Server-side metadata generation for rich social previews
 export async function generateMetadata(
@@ -20,22 +21,13 @@ export async function generateMetadata(
     ? `https://paracetamolhaze.ru/api/og/record?game=kinokadr&score=${score}&user=${encodeURIComponent(user)}`
     : 'https://paracetamolhaze.ru/kinokadr_og.png';
 
-  return {
+  return generateBaseMetadata({
     title,
     description,
-    openGraph: {
-      title,
-      description,
-      images: [ogImage],
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-      images: [ogImage],
-    },
-  };
+    path: "/kinokadr",
+    ogImage,
+    noindex: score !== '0'
+  });
 }
 
 export default function KinokadrPage() {

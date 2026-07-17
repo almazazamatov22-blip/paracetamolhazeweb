@@ -1,5 +1,6 @@
 import { Metadata, ResolvingMetadata } from 'next';
 import Client67 from './Client67';
+import { generateBaseMetadata } from '@/lib/seo';
 
 export async function generateMetadata(
   { searchParams }: { searchParams: { score?: string, user?: string } },
@@ -18,22 +19,13 @@ export async function generateMetadata(
     ? `https://paracetamolhaze.ru/api/og/record?game=67&score=${score}&user=${encodeURIComponent(user)}`
     : 'https://paracetamolhaze.ru/67_og.png';
 
-  return {
+  return generateBaseMetadata({
     title,
     description,
-    openGraph: {
-      title,
-      description,
-      images: [ogImage],
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-      images: [ogImage],
-    },
-  };
+    path: "/67",
+    ogImage,
+    noindex: score !== '0'
+  });
 }
 
 export default function Page67() {

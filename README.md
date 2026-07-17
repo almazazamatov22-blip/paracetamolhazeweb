@@ -63,6 +63,14 @@ AI coding tools such as Codex are useful here for review, debugging,
 test-writing, migration work, deployment checks, and security review of
 maintainer-owned code.
 
+## SEO & Discovery
+The repository has been technically optimized for indexing and clear presentation in search engines:
+- **Centralized Metadata Base (`src/lib/seo.ts`)**: Base parameters, canonical generation, default `openGraph` and `twitter` cards.
+- **`sitemap.ts` and `robots.ts`**: Automatically generated and explicitly map public vs. private routes. No outdated `robots.txt`.
+- **JSON-LD Schema**: Semantic structures (e.g. `SoftwareApplication`, `Game`, `BreadcrumbList`) are built into layouts for rich search results.
+- **X-Robots-Tag Headers**: System API routes, dashboards, and downloads explicitly declare `noindex, nofollow` in `next.config.ts`.
+- **GEO Content**: Essential keyword-rich paragraphs and descriptions directly injected into interactive layouts without breaking React hydration logic.
+
 ## Tech Stack
 
 - Next.js with the App Router

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react'
 import FloatingNicknames from '@/components/floating-nicknames'
+import { WebsiteJsonLd } from '@/components/seo/JsonLd'
 
 const DEFAULT_NICKS = [
   'paracetamolhaze', 'paracetamolHAZE', 'HAZE', 'r1ch_crazy', 'deluxe_2004',
@@ -142,6 +143,7 @@ export default function Home() {
 
   return (
     <main className="paracetamol-body">
+      <WebsiteJsonLd />
       <FloatingNicknames nicknames={DEFAULT_NICKS} />
       
       <div className="paracetamol-container" ref={containerRef}>
@@ -152,13 +154,22 @@ export default function Home() {
         </span>
 
         {/* Main Word */}
-        <div className="paracetamol-main-word">
+        <h1 className="paracetamol-main-word">
           <span className="paracetamol-word-container">
             <span className="paracetamol-word-base">PARACETAMOL</span>
             <span className="paracetamol-di-highlight">
               <span className="paracetamol-di-letters">HAZE</span>
             </span>
           </span>
+        </h1>
+
+        {/* SEO Introduction */}
+        <div className="sr-only sm:not-sr-only text-center max-w-2xl mx-auto mb-8 text-white/70 text-sm font-light">
+          <p>
+            Paracetamol Haze — это набор бесплатных инструментов, интерактивов и игр для Twitch-стримеров. 
+            Здесь собраны проекты, которые помогут разнообразить ваши трансляции и вовлечь зрителей в процесс.
+            Выберите нужный проект ниже, чтобы начать!
+          </p>
         </div>
 
         {/* Projects */}
@@ -180,6 +191,21 @@ export default function Home() {
                 </a>
               )
             })}
+          </div>
+        </div>
+
+        {/* Bottom SEO Block */}
+        <div className="text-center max-w-3xl mx-auto mt-12 mb-8 text-white/50 text-xs sm:text-sm font-light leading-relaxed">
+          <h2 className="text-white/70 font-semibold mb-2 uppercase tracking-widest text-xs">Инструменты для Twitch-стримеров</h2>
+          <p>
+            Сделайте свои трансляции незабываемыми с нашими бесплатными Twitch-интерактивами. 
+            От интеграции с играми до оверлеев для OBS — всё создано для активного взаимодействия со зрителями.
+          </p>
+          <div className="flex flex-wrap justify-center gap-4 mt-4">
+            <a href="/cs2xtwitch" className="hover:text-white/90 underline decoration-white/20 underline-offset-4">CS2 × Twitch</a>
+            <a href="/roz" className="hover:text-white/90 underline decoration-white/20 underline-offset-4">Розыгрыши (РОЗ)</a>
+            <a href="/projects/twitch-overlays" className="hover:text-white/90 underline decoration-white/20 underline-offset-4">Оверлеи Twitch</a>
+            <a href="/kinokadr" className="hover:text-white/90 underline decoration-white/20 underline-offset-4">КиноКадр</a>
           </div>
         </div>
 

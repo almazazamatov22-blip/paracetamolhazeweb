@@ -2036,6 +2036,25 @@ export default function Home() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* GEO SEO Block */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 mt-12 border-t border-[#333]">
+        <h2 className="text-2xl font-bold text-white mb-6">Инструменты для розыгрышей на Twitch</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-sm text-gray-400 leading-relaxed">
+          <div>
+            <h3 className="text-lg font-semibold text-purple-400 mb-3">Обычный розыгрыш</h3>
+            <p>Простой и быстрый способ разыграть приз среди зрителей. Просто задайте ключевое слово, и зрители, написавшие его в чат, автоматически станут участниками. Отличный инструмент для разогрева аудитории и быстрого интерактива.</p>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-emerald-400 mb-3">Лотерея за баллы</h3>
+            <p>Продвинутый режим, использующий награды за баллы канала (Channel Points). Зрители могут покупать неограниченное количество билетов, повышая свои шансы на победу. Идеально для крупных призов и сжигания накопленных баллов.</p>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-orange-400 mb-3">Аукцион</h3>
+            <p>Устройте настоящие торги за ваш приз! Зрители делают ставки в чате, а таймер отсчитывает время. Удобный интерфейс покажет самую высокую ставку и автоматически определит победителя после завершения аукциона.</p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

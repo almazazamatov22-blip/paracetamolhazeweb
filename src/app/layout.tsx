@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@/components/analytics";
+import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION, DEFAULT_LOCALE } from "@/lib/seo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,8 +15,40 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PARACETAMOL HAZE",
-  description: "Онлайн проекты Paracetamol HAZE",
+  metadataBase: new URL(SITE_URL),
+  applicationName: SITE_NAME,
+  title: {
+    default: `Интерактивы и игры для Twitch-стримов | ${SITE_NAME}`,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: DEFAULT_DESCRIPTION,
+  openGraph: {
+    title: `Интерактивы и игры для Twitch-стримов | ${SITE_NAME}`,
+    description: DEFAULT_DESCRIPTION,
+    siteName: SITE_NAME,
+    locale: DEFAULT_LOCALE,
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `Интерактивы и игры для Twitch-стримов | ${SITE_NAME}`,
+    description: DEFAULT_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  alternates: {
+    canonical: "/",
+  },
+  themeColor: "#111111",
 };
 
 export default function RootLayout({
@@ -28,6 +62,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
         {children}
+        <Analytics />
       </body>
     </html>
   );
