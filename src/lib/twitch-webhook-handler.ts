@@ -71,11 +71,14 @@ function getWeightedResult(settings: any) {
 }
 
 export async function handleTwitchWebhook(req: NextRequest) {
+  let messageType: string | null = null;
+  let messageId: string | null = null;
+  let messageClaimed = false;
+
   try {
     const rawBody = await req.text();
-    const messageType = req.headers.get('twitch-eventsub-message-type');
-    const messageId = req.headers.get('twitch-eventsub-message-id');
-    let messageClaimed = false;
+    messageType = req.headers.get('twitch-eventsub-message-type');
+    messageId = req.headers.get('twitch-eventsub-message-id');
 
     if (!verifyTwitchSignature(req, rawBody)) {
       return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
@@ -371,10 +374,51 @@ export async function handleTwitchWebhook(req: NextRequest) {
 
   } catch (err: any) {
     console.error('[TWITCH_WEBHOOK] Error:', err);
-    if (messageType === 'notification' && messageClaimed && messageId) {
-      await getSupabase().from('twitch_eventsub_messages').delete().eq('message_id', messageId);
-      console.log(`[TWITCH_WEBHOOK] Removed claim for ${messageId} due to error`);
+
+    if (
+      messageType === 'notification' &&
+      messageClaimed &&
+      messageId
+    ) {
+      try {
+        const supabase = getSupabase();
+
+        const { error: cleanupError } = await supabase
+          .from('twitch_eventsub_messages')
+          .delete()
+          .eq('message_id', messageId);
+
+        if (cleanupError) {
+          console.error(
+            '[TWITCH_WEBHOOK] Claim cleanup failed:',
+            cleanupError.message
+          );
+        } else {
+          console.log(
+            `[TWITCH_WEBHOOK] Removed claim for ${messageId}`
+          );
+        }
+      } catch (cleanupErr) {
+        console.error(
+          '[TWITCH_WEBHOOK] Claim cleanup exception:',
+          cleanupErr
+        );
+      }
     }
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+
+    return new Response(
+      JSON.stringify({
+        error:
+          err instanceof Error
+            ? err.message
+            : 'Internal webhook error'
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
   }
 }
