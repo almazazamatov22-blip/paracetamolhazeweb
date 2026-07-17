@@ -1,4 +1,4 @@
-import { generateBaseMetadata, SITE_URL } from "@/lib/seo";
+import { generateBaseMetadata } from "@/lib/seo";
 import HomeClient from "./HomeClient";
 
 export const metadata = generateBaseMetadata({

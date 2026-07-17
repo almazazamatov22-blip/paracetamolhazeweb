@@ -163,14 +163,6 @@ export default function Home() {
           </span>
         </h1>
 
-        {/* SEO Introduction */}
-        <div className="sr-only sm:not-sr-only text-center max-w-2xl mx-auto mb-8 text-white/70 text-sm font-light">
-          <p>
-            Paracetamol Haze — это набор бесплатных инструментов, интерактивов и игр для Twitch-стримеров. 
-            Здесь собраны проекты, которые помогут разнообразить ваши трансляции и вовлечь зрителей в процесс.
-            Выберите нужный проект ниже, чтобы начать!
-          </p>
-        </div>
 
         {/* Projects */}
         <div className="paracetamol-projects-section">
@@ -194,20 +186,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Bottom SEO Block */}
-        <div className="text-center max-w-3xl mx-auto mt-12 mb-8 text-white/50 text-xs sm:text-sm font-light leading-relaxed">
-          <h2 className="text-white/70 font-semibold mb-2 uppercase tracking-widest text-xs">Инструменты для Twitch-стримеров</h2>
-          <p>
-            Сделайте свои трансляции незабываемыми с нашими бесплатными Twitch-интерактивами. 
-            От интеграции с играми до оверлеев для OBS — всё создано для активного взаимодействия со зрителями.
-          </p>
-          <div className="flex flex-wrap justify-center gap-4 mt-4">
-            <a href="/cs2xtwitch" className="hover:text-white/90 underline decoration-white/20 underline-offset-4">CS2 × Twitch</a>
-            <a href="/roz" className="hover:text-white/90 underline decoration-white/20 underline-offset-4">Розыгрыши (РОЗ)</a>
-            <a href="/projects/twitch-overlays" className="hover:text-white/90 underline decoration-white/20 underline-offset-4">Оверлеи Twitch</a>
-            <a href="/kinokadr" className="hover:text-white/90 underline decoration-white/20 underline-offset-4">КиноКадр</a>
-          </div>
-        </div>
 
         {/* Bottom Line */}
         <div className="paracetamol-bottom-line">
