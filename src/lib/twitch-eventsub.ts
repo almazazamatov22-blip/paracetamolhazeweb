@@ -240,17 +240,25 @@ export async function sharedSubscribeHandler(req: NextRequest) {
          status = 'enabled'; // prevent downgrade from challenge race
       }
 
-      await supabase.from('twitch_eventsub_subscriptions')
-        .update({
+      const { error: saveSubError } = await supabase
+        .from('twitch_eventsub_subscriptions')
+        .upsert({
+          broadcaster_id: broadcasterId,
+          subscription_type: 'channel.channel_points_custom_reward_redemption.add',
           twitch_subscription_id: subId,
           callback_url: finalCallbackUrl,
           callback_host: finalCallbackHost,
           callback_updated_at: new Date().toISOString(),
-          status: status,
+          status,
+          secret_version: 'client-secret-v1',
           updated_at: new Date().toISOString()
-        })
-        .eq('broadcaster_id', broadcasterId)
-        .eq('subscription_type', 'channel.channel_points_custom_reward_redemption.add');
+        }, {
+          onConflict: 'broadcaster_id,subscription_type'
+        });
+
+      if (saveSubError) {
+        throw saveSubError;
+      }
 
       return Response.json({ success: true, status, subscriptionId: subId, callback: finalCallbackUrl });
     } finally {
