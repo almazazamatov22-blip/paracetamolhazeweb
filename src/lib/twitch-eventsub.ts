@@ -91,21 +91,6 @@ export async function sharedSubscribeHandler(req: NextRequest) {
     try {
       const appToken = await getAppToken();
 
-      const { data: dbSub } = await supabase
-        .from('twitch_eventsub_subscriptions')
-        .select('*')
-        .eq('broadcaster_id', broadcasterId)
-        .eq('subscription_type', 'channel.channel_points_custom_reward_redemption.add')
-        .maybeSingle();
-
-      if (mode === 'ensure' && dbSub && (dbSub.status === 'enabled' || dbSub.status === 'webhook_callback_verification_pending')) {
-        const allowedHosts = process.env.ALLOWED_EVENTSUB_HOSTS ? process.env.ALLOWED_EVENTSUB_HOSTS.split(',') : [];
-        if (allowedHosts.includes(dbSub.callback_host)) {
-          console.log(`[TWITCH_EVENTSUB] Ensure mode: sub already active on allowed host ${dbSub.callback_host}. Skipping.`);
-          return Response.json({ success: true, callback: dbSub.callback_url, subId: dbSub.twitch_subscription_id, status: dbSub.status });
-        }
-      }
-
       // Fetch from Twitch API with pagination
       let allSubs: any[] = [];
       let cursor: string | undefined = undefined;
@@ -131,25 +116,41 @@ export async function sharedSubscribeHandler(req: NextRequest) {
 
       let existingSub = null;
       let needsNewSub = true;
+      let finalCallbackUrl = callbackUrl;
+      let finalCallbackHost = normalizedHost;
 
       for (const sub of allSubs) {
         if (
           sub.type === 'channel.channel_points_custom_reward_redemption.add' && 
           sub.condition?.broadcaster_user_id === broadcasterId
         ) {
-          if (
-            (sub.status === 'enabled' || sub.status === 'webhook_callback_verification_pending') && 
-            sub.transport?.callback === callbackUrl
-          ) {
-            existingSub = sub;
-            needsNewSub = false;
-          } else {
-            console.log(`[TWITCH_EVENTSUB] Deleting mismatched sub ${sub.id}`);
-            await fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?id=${sub.id}`, {
-              method: 'DELETE',
-              headers: { 'Authorization': `Bearer ${appToken}`, 'Client-Id': clientId! }
-            });
+          if (sub.status === 'enabled' || sub.status === 'webhook_callback_verification_pending') {
+            const subHostname = new URL(sub.transport?.callback).host.toLowerCase();
+            
+            if (mode === 'ensure') {
+              if (ALLOWED_EVENTSUB_HOSTS.has(subHostname)) {
+                existingSub = sub;
+                needsNewSub = false;
+                finalCallbackUrl = sub.transport.callback;
+                finalCallbackHost = subHostname;
+                continue;
+              }
+            } else {
+              if (subHostname === normalizedHost) {
+                existingSub = sub;
+                needsNewSub = false;
+                finalCallbackUrl = sub.transport.callback;
+                finalCallbackHost = subHostname;
+                continue;
+              }
+            }
           }
+          
+          console.log(`[TWITCH_EVENTSUB] Deleting mismatched or old sub ${sub.id}`);
+          await fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?id=${sub.id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${appToken}`, 'Client-Id': clientId! }
+          });
         }
       }
 
@@ -170,7 +171,7 @@ export async function sharedSubscribeHandler(req: NextRequest) {
             condition: { broadcaster_user_id: broadcasterId },
             transport: {
               method: 'webhook',
-              callback: callbackUrl,
+              callback: finalCallbackUrl,
               secret: webhookSecret
             }
           })
@@ -200,7 +201,7 @@ export async function sharedSubscribeHandler(req: NextRequest) {
                  const conflictData = await fetchConflict.json();
                  const subConf = conflictData.data?.[0];
 
-                 if (subConf && subConf.transport?.callback === callbackUrl && (subConf.status === 'enabled' || subConf.status === 'webhook_callback_verification_pending')) {
+                 if (subConf && subConf.transport?.callback === finalCallbackUrl && (subConf.status === 'enabled' || subConf.status === 'webhook_callback_verification_pending')) {
                    console.log(`[TWITCH_EVENTSUB] Conflict sub is perfectly valid, adopting it.`);
                    subId = subConf.id;
                    status = subConf.status;
@@ -242,8 +243,8 @@ export async function sharedSubscribeHandler(req: NextRequest) {
       await supabase.from('twitch_eventsub_subscriptions')
         .update({
           twitch_subscription_id: subId,
-          callback_url: callbackUrl,
-          callback_host: req.headers.get('host') || new URL(req.url).host,
+          callback_url: finalCallbackUrl,
+          callback_host: finalCallbackHost,
           callback_updated_at: new Date().toISOString(),
           status: status,
           updated_at: new Date().toISOString()
@@ -251,7 +252,7 @@ export async function sharedSubscribeHandler(req: NextRequest) {
         .eq('broadcaster_id', broadcasterId)
         .eq('subscription_type', 'channel.channel_points_custom_reward_redemption.add');
 
-      return Response.json({ success: true, status, subscriptionId: subId, callback: callbackUrl });
+      return Response.json({ success: true, status, subscriptionId: subId, callback: finalCallbackUrl });
     } finally {
       await supabase.rpc('release_eventsub_lease', {
         p_broadcaster_id: broadcasterId,
