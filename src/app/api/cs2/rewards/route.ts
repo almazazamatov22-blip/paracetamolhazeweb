@@ -202,22 +202,22 @@ export async function POST(req: NextRequest) {
 
     // Save in Supabase
     const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from('cs2_rewards')
-      .insert({
-        streamer_id: streamerId,
-        name,
-        description: prompt,
-        action_type,
-        cost: Number(cost),
-        cooldown_seconds: cd,
-        enabled: true,
-        twitch_reward_id: twitchRewardId,
-      })
-      .select()
-      .single();
+    const { data, error } = await supabase.rpc('save_cs2_reward_binding', {
+        p_broadcaster_id: streamerId,
+        p_reward_id: twitchRewardId,
+        p_id: null,
+        p_name: name,
+        p_description: prompt,
+        p_action_type: action_type,
+        p_cost: Number(cost),
+        p_cooldown_seconds: cd,
+        p_enabled: true
+    });
 
-    if (error) throw error;
+    if (error) {
+        console.error('[cs2/rewards POST RPC error]', error);
+        throw error;
+    }
     return NextResponse.json({ reward: data });
   } catch (err: any) {
     console.error('[cs2/rewards POST]', err);
@@ -261,12 +261,17 @@ export async function PUT(req: NextRequest) {
     update.description = prompt;
     update.cooldown_seconds = cooldownSeconds;
 
-    const { data, error } = await supabase
-      .from('cs2_rewards')
-      .update(update)
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await supabase.rpc('save_cs2_reward_binding', {
+        p_broadcaster_id: streamerId,
+        p_reward_id: existing.twitch_reward_id,
+        p_id: id,
+        p_name: merged.name,
+        p_description: update.description,
+        p_action_type: merged.action_type,
+        p_cost: Number(merged.cost),
+        p_cooldown_seconds: update.cooldown_seconds,
+        p_enabled: merged.enabled
+    });
 
     if (error) throw error;
 
@@ -322,6 +327,12 @@ export async function DELETE(req: NextRequest) {
           'Client-Id': clientId!
         }
       }).catch(e => console.error('Failed to delete on twitch:', e));
+      
+      await supabase.rpc('delete_reward_binding', {
+        p_broadcaster_id: streamerId,
+        p_reward_id: reward.twitch_reward_id,
+        p_product_type: 'cs2'
+      });
     }
 
     const { error } = await supabase

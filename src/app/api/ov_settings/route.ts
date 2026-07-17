@@ -110,58 +110,59 @@ export async function POST(req: Request) {
 
         const supabase = getSupabase();
 
-        // Check if config exists for (user_id, overlay_type)
-        const { data: current, error: currentError } = await supabase
-            .from('overlay_configs')
-            .select('settings, assets')
-            .eq('user_id', userId)
-            .eq('overlay_type', type)
-            .maybeSingle();
+        let rpcError = null;
 
-        let error;
-
-        if (currentError && currentError.code !== 'PGRST116') {
-            // It might be using the old schema where overlay_type doesn't exist.
-            // But we created a migration. We assume migration is applied.
-            console.error('[OV_SETTINGS] Fetch current config error:', currentError);
-        }
-
-        if (!current && type === 'fate') {
-            // Attempt to check if old config exists to migrate assets
-            const { data: legacy } = await supabase
-                .from('overlay_configs')
-                .select('settings, assets')
-                .eq('user_id', userId)
-                .maybeSingle();
-            
-            const legacyAssets = legacy?.assets || {};
-            const legacySettings = legacy?.settings || {};
-
-            const { error: insertError } = await supabase
-                .from('overlay_configs')
-                .upsert({
-                    user_id: userId,
-                    overlay_type: type,
-                    settings: settings,
-                    assets: legacyAssets,
-                    updated_at: new Date().toISOString()
+        if (type === 'fate') {
+            const rewardId = settings.reward_id || settings.fate?.reward_id;
+            const { error } = await supabase.rpc('save_fate_reward_binding', {
+                p_broadcaster_id: userId,
+                p_reward_id: rewardId || '',
+                p_settings: settings
+            });
+            rpcError = error;
+        } else if (type === 'slots') {
+            const rewardId = settings.reward_id || settings.slots?.reward_id;
+            if (rewardId) {
+                const { error } = await supabase.rpc('save_slots_reward_binding', {
+                    p_broadcaster_id: userId,
+                    p_reward_id: rewardId,
+                    p_settings: settings
+                });
+                rpcError = error;
+            } else {
+                // Delete old bindings if no reward is set
+                await supabase.from('twitch_reward_bindings').delete().eq('broadcaster_id', userId).eq('product_type', 'slots');
+                const { error } = await supabase.from('overlay_configs').upsert({
+                    user_id: userId, overlay_type: type, settings, updated_at: new Date().toISOString()
                 }, { onConflict: 'user_id, overlay_type' });
-            error = insertError;
+                rpcError = error;
+            }
+        } else if (type === 'roz') {
+            const roz = settings.roz || settings;
+            const lotteryId = roz.lottery_reward_id;
+            const auctionIds = Array.isArray(roz.auction_reward_ids) ? roz.auction_reward_ids : [];
+            const ids = [];
+            if (lotteryId) ids.push(lotteryId);
+            ids.push(...auctionIds);
+
+            const { error } = await supabase.rpc('save_roz_reward_bindings', {
+                p_broadcaster_id: userId,
+                p_reward_ids: ids,
+                p_settings: settings
+            });
+            rpcError = error;
         } else {
-            const { error: upsertError } = await supabase
-                .from('overlay_configs')
-                .upsert({
-                    user_id: userId,
-                    overlay_type: type,
-                    settings: settings,
-                    assets: current?.assets || {},
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id, overlay_type' });
-            error = upsertError;
+            const { error } = await supabase.from('overlay_configs').upsert({
+                user_id: userId, overlay_type: type, settings, updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id, overlay_type' });
+            rpcError = error;
         }
 
-        if (error) {
-            console.error('[OV_SETTINGS] Upsert error:', error);
+        if (rpcError) {
+            console.error('[OV_SETTINGS] Upsert/RPC error:', rpcError);
+            if (rpcError.message?.includes('уже используется в')) {
+                return NextResponse.json({ error: rpcError.message }, { status: 409 });
+            }
             return NextResponse.json({ error: 'Ошибка при сохранении в базу данных' }, { status: 500 });
         }
         
