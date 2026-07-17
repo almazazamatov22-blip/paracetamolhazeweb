@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as crypto from 'crypto';
 import { getSupabaseServerKey, getSupabaseUrl } from '@/lib/supabase-env';
 import { addAuctionBid, addLotteryEntry, normalizeRozState } from '@/lib/roz-state';
+import { ACTION_REGISTRY } from '@/lib/cs2-actions';
 
 function getSupabase() {
   const supabaseUrl = getSupabaseUrl();
@@ -17,9 +18,10 @@ function verifyTwitchSignature(req: NextRequest, rawBody: string): boolean {
   const msgSignature = req.headers.get('twitch-eventsub-message-signature') || '';
   
   const msgTime = new Date(msgTimestamp).getTime();
+  if (!Number.isFinite(msgTime)) return false;
   const now = Date.now();
-  if (now - msgTime > 10 * 60 * 1000) {
-    console.warn('[TWITCH_WEBHOOK] message too old, rejected');
+  if (now - msgTime > 10 * 60 * 1000 || msgTime - now > 10 * 60 * 1000) {
+    console.warn('[TWITCH_WEBHOOK] message too old or in the future, rejected');
     return false;
   }
 
@@ -93,11 +95,12 @@ export async function handleTwitchWebhook(req: NextRequest) {
         
       if (replayError && replayError.code === '23505') { // Unique violation
         console.log(`[TWITCH_WEBHOOK] Duplicate message ignored: ${messageId}`);
-        // For challenge, we MUST still return the challenge text even if it's a replay
         if (messageType === 'webhook_callback_verification') {
           return new Response(data.challenge, { status: 200, headers: { 'Content-Type': 'text/plain' } });
         }
         return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      } else if (replayError) {
+        throw new Error('Failed to save message log: ' + replayError.message);
       }
     }
 
@@ -140,12 +143,17 @@ export async function handleTwitchWebhook(req: NextRequest) {
     const userId = event.user_id;
 
     // A. Consult Registry First
-    const { data: binding } = await supabase
+    const { data: binding, error: bindingError } = await supabase
       .from('twitch_reward_bindings')
       .select('product_type, resource_id')
       .eq('broadcaster_id', streamerId)
       .eq('twitch_reward_id', twitchRewardId)
       .maybeSingle();
+
+    if (bindingError) {
+      if (messageId) await supabase.from('twitch_eventsub_messages').delete().eq('message_id', messageId);
+      throw bindingError;
+    }
 
     let productType = binding?.product_type;
     let resourceId = binding?.resource_id;
@@ -200,13 +208,22 @@ export async function handleTwitchWebhook(req: NextRequest) {
 
     // C. Dispatch
     if (productType === 'fate') {
-      const min = 1;
-      const max = 100;
+      const { data: config, error: configError } = await supabase.from('overlay_configs').select('settings').eq('id', resourceId).eq('user_id', streamerId).eq('overlay_type', 'fate').maybeSingle();
+      if (configError) {
+        if (messageId) await supabase.from('twitch_eventsub_messages').delete().eq('message_id', messageId);
+        throw configError;
+      }
+      const fateSettings = config?.settings?.fate || config?.settings || {};
+      
+      const min = Number(fateSettings.min_val) || 1;
+      let max = Number(fateSettings.max_val) || 100;
+      if (max < min) max = min;
+      
       const match = userMessage.match(/\d+/);
       const userChoice = match ? parseInt(match[0]) : 0;
       const result = Math.floor(Math.random() * (max - min + 1)) + min;
       
-      await supabase.from('overlay_events').insert({
+      const { error: eventError } = await supabase.from('overlay_events').insert({
         user_id: streamerId,
         overlay_type: 'fate',
         event_type: 'reward_redemption',
@@ -216,15 +233,30 @@ export async function handleTwitchWebhook(req: NextRequest) {
         reward_name: event.reward?.title || '',
         viewer_id: userId,
         viewer_name: userName,
-        viewer_avatar: null, // Avoid API calls
+        viewer_avatar: null,
         user_input: userMessage,
         payload: { userChoice, result },
         status: 'pending'
       });
+
+      if (eventError) {
+        if (eventError.code === '23505') return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        if (messageId) await supabase.from('twitch_eventsub_messages').delete().eq('message_id', messageId);
+        throw eventError;
+      }
     } 
     else if (productType === 'cs2') {
-      const { data: reward } = await supabase.from('cs2_rewards').select('*').eq('id', resourceId).single();
+      const { data: reward, error: rewardError } = await supabase.from('cs2_rewards').select('*').eq('id', resourceId).eq('streamer_id', streamerId).eq('enabled', true).maybeSingle();
+      if (rewardError) {
+        if (messageId) await supabase.from('twitch_eventsub_messages').delete().eq('message_id', messageId);
+        throw rewardError;
+      }
       if (reward) {
+        const actionConfig = ACTION_REGISTRY[reward.action_type];
+        if (!actionConfig) {
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        
         if (reward.cooldown_seconds > 0) {
           const cooldownAgo = new Date(Date.now() - reward.cooldown_seconds * 1000).toISOString();
           const { data: recentExec } = await supabase
@@ -242,33 +274,23 @@ export async function handleTwitchWebhook(req: NextRequest) {
           }
         }
         
-        const ACTION_REGISTRY: any = {
-           drop: { durationMs: 0 }, drop_c4: { durationMs: 0 }, drop_all: { durationMs: 0 },
-           burn: { durationMs: 0 }, blind: { durationMs: 0 }, 
-           slap: { durationMs: 0 }, heal: { durationMs: 0 }, 
-           kill: { durationMs: 0 }, move: { durationMs: 0 },
-           give_money: { durationMs: 0 }, take_money: { durationMs: 0 },
-           give_defuser: { durationMs: 0 },
-           give_weapon: { durationMs: 0 }, give_nade: { durationMs: 0 },
-           armor: { durationMs: 0 },
-           speed: { durationMs: 15000 }, slowness: { durationMs: 15000 },
-           low_gravity: { durationMs: 15000 }, fov: { durationMs: 15000 },
-           invert_mouse: { durationMs: 15000 }, no_shoot: { durationMs: 15000 },
-           pacifist: { durationMs: 15000 }
-        };
-        const actionConfig = ACTION_REGISTRY[reward.action_type] || { durationMs: 0 };
-
-        await supabase.from('cs2_reward_queue').insert({
+        const { error: queueError } = await supabase.from('cs2_reward_queue').insert({
           streamer_id: streamerId,
           reward_id: reward.id,
           redemption_id: event.id,
           user_name: userName,
-          user_avatar: null, // Avoid API calls
+          user_avatar: null,
           action_type: reward.action_type,
           reward_name: reward.name,
           duration_ms: actionConfig.durationMs,
           status: 'pending'
         });
+
+        if (queueError) {
+          if (queueError.code === '23505') return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+          if (messageId) await supabase.from('twitch_eventsub_messages').delete().eq('message_id', messageId);
+          throw queueError;
+        }
       }
     }
     else if (productType === 'slots' || productType === 'roz') {
@@ -315,11 +337,16 @@ export async function handleTwitchWebhook(req: NextRequest) {
          }
 
          if (assetsChanged || settingsChanged) {
-           await supabase.from('overlay_configs').update({
+           const { error: updateError } = await supabase.from('overlay_configs').update({
              settings: allSettings,
              assets,
              updated_at: new Date().toISOString()
            }).eq('id', resourceId);
+           
+           if (updateError) {
+             if (messageId) await supabase.from('twitch_eventsub_messages').delete().eq('message_id', messageId);
+             throw updateError;
+           }
          }
        }
     }

@@ -45,6 +45,8 @@ const ALLOWED_EVENTSUB_HOSTS = new Set([
 ]);
 
 export async function sharedSubscribeHandler(req: NextRequest) {
+  const mode = req.nextUrl.searchParams.get('mode') === 'reconnect' ? 'reconnect' : 'ensure';
+  
   try {
     const token = req.cookies.get('twitch_token')?.value;
     if (!token) return Response.json({ error: 'Необходима авторизация Twitch' }, { status: 401 });
@@ -88,6 +90,21 @@ export async function sharedSubscribeHandler(req: NextRequest) {
 
     try {
       const appToken = await getAppToken();
+
+      const { data: dbSub } = await supabase
+        .from('twitch_eventsub_subscriptions')
+        .select('*')
+        .eq('broadcaster_id', broadcasterId)
+        .eq('subscription_type', 'channel.channel_points_custom_reward_redemption.add')
+        .maybeSingle();
+
+      if (mode === 'ensure' && dbSub && (dbSub.status === 'enabled' || dbSub.status === 'webhook_callback_verification_pending')) {
+        const allowedHosts = process.env.ALLOWED_EVENTSUB_HOSTS ? process.env.ALLOWED_EVENTSUB_HOSTS.split(',') : [];
+        if (allowedHosts.includes(dbSub.callback_host)) {
+          console.log(`[TWITCH_EVENTSUB] Ensure mode: sub already active on allowed host ${dbSub.callback_host}. Skipping.`);
+          return Response.json({ success: true, callback: dbSub.callback_url, subId: dbSub.twitch_subscription_id, status: dbSub.status });
+        }
+      }
 
       // Fetch from Twitch API with pagination
       let allSubs: any[] = [];
@@ -213,15 +230,23 @@ export async function sharedSubscribeHandler(req: NextRequest) {
       }
 
       // Update DB
-      await supabase
-        .from('twitch_eventsub_subscriptions')
+      let finalCurrent = null;
+      if (subId) {
+        const { data: fc } = await supabase.from('twitch_eventsub_subscriptions').select('status, twitch_subscription_id').eq('broadcaster_id', broadcasterId).eq('subscription_type', 'channel.channel_points_custom_reward_redemption.add').maybeSingle();
+        finalCurrent = fc;
+      }
+      if (finalCurrent?.status === 'enabled' && finalCurrent?.twitch_subscription_id === subId && status !== 'enabled') {
+         status = 'enabled'; // prevent downgrade from challenge race
+      }
+
+      await supabase.from('twitch_eventsub_subscriptions')
         .update({
           twitch_subscription_id: subId,
           callback_url: callbackUrl,
-          callback_host: normalizedHost,
+          callback_host: req.headers.get('host') || new URL(req.url).host,
           callback_updated_at: new Date().toISOString(),
           status: status,
-          secret_version: 'client-secret-v1'
+          updated_at: new Date().toISOString()
         })
         .eq('broadcaster_id', broadcasterId)
         .eq('subscription_type', 'channel.channel_points_custom_reward_redemption.add');
