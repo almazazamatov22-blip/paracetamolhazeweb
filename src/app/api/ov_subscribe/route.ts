@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     
     if (!eventSubSecret || eventSubSecret.length < 10) {
       console.warn('[OV_EVENTSUB] TWITCH_EVENTSUB_SECRET is missing or too short.');
-      return NextResponse.json({ error: 'Ошибка конфигурации сервера: не задан TWITCH_EVENTSUB_SECRET' }, { status: 500 });
+      return NextResponse.json({ error: 'Ошибка конфигурации сервера' }, { status: 500 });
     }
 
     const protocol = req.headers.get('x-forwarded-proto') || 'https';
@@ -40,6 +40,17 @@ export async function POST(req: NextRequest) {
     const userId = authData.data?.[0]?.id;
     if (!userId) return NextResponse.json({ error: 'Ошибка авторизации Twitch' }, { status: 401 });
 
+    const supabase = getSupabase();
+
+    // Get current subscription ID from config
+    const { data: configs } = await supabase
+      .from('overlay_configs')
+      .select('eventsub_subscription_id, overlay_type')
+      .eq('user_id', userId);
+      
+    // find first existing sub id if any
+    const savedSubId = configs?.find(c => c.eventsub_subscription_id)?.eventsub_subscription_id;
+
     // 2. Get App Token
     const appTokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
       method: 'POST',
@@ -52,7 +63,7 @@ export async function POST(req: NextRequest) {
     });
     const appTokenData = await appTokenRes.json();
     const appToken = appTokenData.access_token;
-    if (!appToken) return NextResponse.json({ error: 'Не удалось получить App Token от Twitch' }, { status: 500 });
+    if (!appToken) return NextResponse.json({ error: 'Не удалось получить App Token' }, { status: 500 });
 
     // 3. Get existing subscriptions
     const getSubsRes = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
@@ -72,12 +83,15 @@ export async function POST(req: NextRequest) {
           sub.type === 'channel.channel_points_custom_reward_redemption.add' && 
           sub.condition?.broadcaster_user_id === userId
         ) {
-          if (sub.status === 'enabled' && sub.transport?.callback === callbackUrl) {
+          if (
+            savedSubId && sub.id === savedSubId && 
+            sub.status === 'enabled' && 
+            sub.transport?.callback === callbackUrl
+          ) {
              existingSub = sub;
              needsNewSub = false;
-             break;
-          } else {
-             // If disabled or wrong callback, we should delete it and recreate
+          } else if (sub.transport?.callback === callbackUrl || sub.id === savedSubId) {
+             // Delete old/invalid subscription
              try {
                await fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?id=${sub.id}`, {
                  method: 'DELETE',
@@ -86,7 +100,7 @@ export async function POST(req: NextRequest) {
                    'Client-Id': clientId!
                  }
                });
-               console.log(`[OV_EVENTSUB] Deleted invalid subscription ${sub.id}`);
+               console.log(`[OV_EVENTSUB] old subscription deleted`);
              } catch (e) {
                console.error(`[OV_EVENTSUB] Failed to delete subscription ${sub.id}`, e);
              }
@@ -96,7 +110,7 @@ export async function POST(req: NextRequest) {
     }
 
     let subId = existingSub?.id;
-    let status = existingSub ? 'already_exists' : 'pending';
+    let status = existingSub ? 'active' : 'pending';
 
     // 4. Create new if needed
     if (needsNewSub) {
@@ -127,18 +141,15 @@ export async function POST(req: NextRequest) {
       }
       
       subId = subResData.data?.[0]?.id;
-      status = 'active';
+      status = 'pending'; // Explicitly pending until webhook challenge succeeds
+      console.log(`[OV_EVENTSUB] new subscription created`);
     }
 
-    // 5. Update Supabase
-    const supabase = getSupabase();
-    // Assuming 'fate' as default since this is called from the dashboard for fate overlays.
-    // However, the EventSub is tied to the user, not just one overlay.
-    // Let's update all configs for this user.
+    // 5. Update Supabase with new subId and status
     const { error: updateError } = await supabase
       .from('overlay_configs')
       .update({
-        eventsub_status: 'active',
+        eventsub_status: status,
         eventsub_subscription_id: subId
       })
       .eq('user_id', userId);
@@ -147,11 +158,7 @@ export async function POST(req: NextRequest) {
       console.error('[OV_EVENTSUB] Supabase update error:', updateError);
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      eventSubStatus: status, 
-      subId 
-    });
+    return NextResponse.json({ success: true });
 
   } catch (err: any) {
     console.error('[OV_EVENTSUB] Internal Error:', err);

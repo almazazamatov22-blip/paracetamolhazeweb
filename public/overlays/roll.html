@@ -119,7 +119,7 @@
 
         const urlParams = new URLSearchParams(window.location.search);
         const userId = urlParams.get('id');
-        let supabase = null;
+        let supabaseClient = null;
         let realtimeChannel = null;
         
         let isRunning = false;
@@ -129,12 +129,15 @@
         async function init() {
             if (!userId) return;
 
+            console.log('[FATE_OBS] Initialization started', { userId });
+
             try {
                 const res = await fetch('/api/ov_env');
                 const env = await res.json();
                 if(!env.supabaseUrl || !env.supabaseAnonKey) throw new Error('No Supabase Env');
                 
-                supabase = window.supabase.createClient(env.supabaseUrl, env.supabaseAnonKey);
+                supabaseClient = window.supabase.createClient(env.supabaseUrl, env.supabaseAnonKey);
+                console.log('[FATE_OBS] Supabase client created');
                 
                 // Initial load
                 await loadConfig();
@@ -147,13 +150,13 @@
                 setInterval(processQueue, 500);
 
             } catch (e) {
-                console.error("Initialization error:", e);
+                console.error('[FATE_OBS] Initialization error:', e);
             }
         }
 
         async function loadConfig() {
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('overlay_configs')
                     .select('settings, assets')
                     .eq('user_id', userId)
@@ -161,21 +164,27 @@
                     .maybeSingle();
 
                 if (error && error.code !== 'PGRST116') {
-                    console.error("Error loading config:", error);
+                    console.error("[FATE_OBS] Config error:", error);
                 }
 
                 if (!data) {
                     // Try fallback
-                    const { data: legacy } = await supabase
+                    const { data: legacy, error: legacyError } = await supabaseClient
                         .from('overlay_configs')
                         .select('settings, assets')
                         .eq('user_id', userId)
                         .maybeSingle();
+                        
+                    if (legacyError && legacyError.code !== 'PGRST116') {
+                        console.error("[FATE_OBS] Legacy config error:", legacyError);
+                    }
                     if(legacy) applyConfig(legacy);
                 } else {
                     applyConfig(data);
                 }
-            } catch (e) { console.error("Load config error:", e); }
+            } catch (e) { 
+                console.error("[FATE_OBS] Load config error:", e); 
+            }
         }
 
         function applyConfig(config) {
@@ -205,7 +214,7 @@
 
         async function fetchPendingEvents() {
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('overlay_events')
                     .select('*')
                     .eq('user_id', userId)
@@ -214,7 +223,7 @@
                     .order('created_at', { ascending: true });
 
                 if (error) {
-                    console.error("Fetch events error:", error);
+                    console.error("[FATE_OBS] Pending events error:", error);
                     return;
                 }
 
@@ -225,15 +234,18 @@
                         }
                     });
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) { 
+                console.error("[FATE_OBS] Fetch events exception:", e); 
+            }
         }
 
         function setupRealtime() {
-            realtimeChannel = supabase.channel('obs_fate_' + userId)
+            realtimeChannel = supabaseClient.channel('obs_fate_' + userId)
                 .on(
                     'postgres_changes',
                     { event: 'INSERT', schema: 'public', table: 'overlay_events', filter: `user_id=eq.${userId}` },
                     (payload) => {
+                        console.log('[FATE_OBS] Event received:', payload.new);
                         const evt = payload.new;
                         if (evt.overlay_type === 'fate' && evt.status === 'pending') {
                             if (!eventQueue.some(e => e.id === evt.id) && evt.id !== currentlyProcessingId) {
@@ -253,15 +265,21 @@
                     }
                 )
                 .subscribe(async (status) => {
+                    console.log('[FATE_OBS] Realtime status:', status);
                     if (status === 'SUBSCRIBED') {
-                        console.log("Supabase Realtime connected");
                         // Fetch missed events just in case
                         await fetchPendingEvents();
                     } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                        console.log("Supabase Realtime disconnected/error");
+                        console.error('[FATE_OBS] Realtime error:', status);
                     }
                 });
         }
+
+        window.addEventListener('beforeunload', () => {
+             if (realtimeChannel && supabaseClient) {
+                 supabaseClient.removeChannel(realtimeChannel);
+             }
+        });
 
         async function processQueue() {
             if (isRunning || eventQueue.length === 0) return;
@@ -272,29 +290,37 @@
 
             try {
                 // Try to claim atomically
-                const { data: claimed, error } = await supabase.rpc('claim_overlay_event', {
+                const { data: claimed, error } = await supabaseClient.rpc('claim_overlay_event', {
                     p_event_id: evt.id,
                     p_user_id: userId
                 });
 
                 if (error) {
-                    console.error("Claim error:", error);
+                    console.error("[FATE_OBS] Claim error:", error);
                     isRunning = false;
                     currentlyProcessingId = null;
                     return;
                 }
 
                 if (claimed) {
+                    console.log('[FATE_OBS] Event claimed:', evt.id);
+                    console.log('[FATE_OBS] Animation started:', evt.id);
                     await animate(evt);
                     
                     // Mark completed
-                    await supabase
+                    const { error: completeError } = await supabaseClient
                         .from('overlay_events')
                         .update({ status: 'completed', completed_at: new Date().toISOString() })
                         .eq('id', evt.id);
+                        
+                    if (completeError) {
+                        console.error('[FATE_OBS] Complete error:', completeError);
+                    } else {
+                        console.log('[FATE_OBS] Event completed:', evt.id);
+                    }
                 }
             } catch (e) {
-                console.error("Process error:", e);
+                console.error("[FATE_OBS] Process exception:", e);
             }
 
             isRunning = false;
@@ -303,7 +329,12 @@
 
         function play(id) {
             const a = document.getElementById(id);
-            if (a && a.src) { a.currentTime = 0; a.play().catch(e => { }); }
+            if (a && a.src) { 
+                a.currentTime = 0; 
+                a.play().catch(e => {
+                    console.error(`[FATE_OBS] Audio play error for ${id}:`, e);
+                }); 
+            }
         }
 
         const sleep = ms => new Promise(r => setTimeout(r, ms));

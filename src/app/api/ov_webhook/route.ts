@@ -39,17 +39,24 @@ function verifyTwitchSignature(req: NextRequest, rawBody: string): boolean {
   const msgTimestamp = req.headers.get('twitch-eventsub-message-timestamp') || '';
   const msgSignature = req.headers.get('twitch-eventsub-message-signature') || '';
   
-  // Try EventSub Secret first, fallback to Client Secret if not found
-  const secret = process.env.TWITCH_EVENTSUB_SECRET || process.env.TWITCH_CLIENT_SECRET!;
+  // Use TWITCH_EVENTSUB_SECRET
+  const secret = process.env.TWITCH_EVENTSUB_SECRET;
 
-  if (!msgSignature || !msgId || !msgTimestamp) return false;
+  if (!secret || !msgSignature || !msgId || !msgTimestamp) return false;
 
   const hmacMessage = msgId + msgTimestamp + rawBody;
   const expected = 'sha256=' + crypto.createHmac('sha256', secret)
     .update(hmacMessage)
     .digest('hex');
 
-  return expected === msgSignature;
+  const expectedBuffer = Buffer.from(expected);
+  const signatureBuffer = Buffer.from(msgSignature);
+
+  if (expectedBuffer.length !== signatureBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
 }
 
 function getWeightedResult(settings: any) {
@@ -90,7 +97,6 @@ export async function POST(req: NextRequest) {
     const isValidSignature = verifyTwitchSignature(req, rawBody);
     if (!isValidSignature) {
       console.warn('[OV_WEBHOOK] Twitch EventSub signature verification failed');
-      // For strictness required by prompt: "не доверять данным без проверки подписи"
       return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
     }
 
@@ -98,20 +104,33 @@ export async function POST(req: NextRequest) {
 
     // 2. Handle verification challenge
     if (messageType === 'webhook_callback_verification') {
+      console.log('[OV_WEBHOOK] challenge received');
+      const broadcasterId = data.subscription?.condition?.broadcaster_user_id;
+      
+      if (broadcasterId) {
+        const supabaseUrl = getSupabaseUrl();
+        const supabaseKey = getSupabaseServerKey();
+        if (supabaseUrl && supabaseKey) {
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          await supabase
+            .from('overlay_configs')
+            .update({ eventsub_status: 'active' })
+            .eq('user_id', broadcasterId);
+          console.log('[OV_WEBHOOK] challenge accepted, eventsub_status set to active');
+        }
+      }
+
       return new Response(data.challenge, {
         status: 200,
         headers: { 'Content-Type': 'text/plain' }
       });
     }
 
-    // Return 200 immediately to acknowledge receipt if it's an event
-    // But since Vercel serverless might kill background tasks if we return early,
-    // we process it first unless it's too long.
-    
     // 3. Handle actual events
     const { subscription, event } = data;
 
     if (subscription?.type === 'channel.channel_points_custom_reward_redemption.add') {
+      console.log('[OV_WEBHOOK] redemption received');
       const streamerId = event.broadcaster_user_id || event.broadcaster_id;
       const twitchRewardId = event.reward.id;
       const userName = event.user_name || event.user_login;
@@ -124,6 +143,13 @@ export async function POST(req: NextRequest) {
       if (!supabaseUrl || !supabaseKey) return NextResponse.json({ ok: true });
 
       const supabase = createClient(supabaseUrl, supabaseKey);
+
+      // Opportunistically confirm active status on first event
+      await supabase
+        .from('overlay_configs')
+        .update({ eventsub_status: 'active' })
+        .eq('user_id', streamerId)
+        .eq('eventsub_status', 'pending');
 
       const { data: configs, error: configError } = await supabase
         .from('overlay_configs')
@@ -190,6 +216,8 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ ok: true });
       }
 
+      console.log(`[OV_WEBHOOK] reward matched: ${matchedType || 'roz'}`);
+
       let appToken: string | null = null;
       let userAvatar: string | null = null;
       let assetsChanged = false;
@@ -207,7 +235,6 @@ export async function POST(req: NextRequest) {
       };
 
       if (matchedType === 'fate') {
-        // --- NEW SUPABASE REALTIME ARCHITECTURE ---
         const avatar = await loadUserAvatar();
         let typeSettings = allSettings.fate || allSettings;
         if (Object.keys(typeSettings).length === 0 && allSettings.reward_id) {
@@ -242,9 +269,10 @@ export async function POST(req: NextRequest) {
 
         if (insertError) {
           console.error('[OV_WEBHOOK] Failed to insert event:', insertError);
+        } else {
+          console.log('[OV_WEBHOOK] event inserted');
         }
       } else if (matchedType === 'slots') {
-        // --- LEGACY SLOTS LOGIC ---
         const typeSettings = allSettings.slots || {};
         const avatar = await loadUserAvatar();
 
@@ -299,7 +327,6 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Only update overlay_configs if assets or settings changed (for slots or roz)
       if (assetsChanged || settingsChanged) {
         const { error: updateError } = await supabase
           .from('overlay_configs')
