@@ -294,6 +294,31 @@ export default function cs2xtwitchPage() {
           </div>
         </section>
 
+        {/* GEO Informational Section */}
+        <section className="cs2-info-section animate-slide-up" aria-labelledby="geo-title">
+          <div className="cs2-section-heading">
+            <h2 id="geo-title">Интерактивный CS2 для Twitch-стримеров</h2>
+          </div>
+          <div className="cs2-info-content">
+            <article>
+              <h3>Что такое CS2 × Twitch?</h3>
+              <p>Это бесплатная интеграция, которая позволяет зрителям вашей трансляции напрямую влиять на игровой процесс в Counter-Strike 2. Используя баллы канала Twitch (Channel Points), зрители могут активировать различные визуальные и геймплейные эффекты: от безобидных звуков до блокировки прыжка или инверсии мыши.</p>
+            </article>
+            <article>
+              <h3>Как это работает?</h3>
+              <p>Вы скачиваете легковесный клиент <strong>CS2Haze</strong>, который работает в фоновом режиме. Он подключается к нашему серверу для отслеживания событий с вашего Twitch-канала. Как только зритель покупает награду в чате, приложение мгновенно передает команду в CS2 через встроенные возможности игры.</p>
+            </article>
+            <article>
+              <h3>Кому это подходит?</h3>
+              <p>Это приложение связывает события из CS2 (убийства, смерти, раунды) с вашим Twitch-каналом в реальном времени. Оно помогает повысить вовлечённость аудитории и дать зрителям больше способов участвовать в трансляции с помощью баллов канала.</p>
+            </article>
+            <article>
+              <h3>Требования</h3>
+              <p>Вам понадобится ОС Windows 10 или Windows 11, аккаунт Twitch со статусом Компаньона или Партнера (для создания наград за баллы) и установленная игра Counter-Strike 2.</p>
+            </article>
+          </div>
+        </section>
+
         <nav className="cs2-nav animate-fade-in" aria-label="Навигация CS2 Interactive">
           {user && (
             <>
@@ -306,7 +331,6 @@ export default function cs2xtwitchPage() {
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');
         .cs2-page {
           --bg: #090a0f;
           --panel: #14161f;
@@ -318,7 +342,7 @@ export default function cs2xtwitchPage() {
           min-height: 100vh;
           background: var(--bg);
           color: var(--text);
-          font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+          font-family: var(--font-outfit), 'Outfit', system-ui, -apple-system, sans-serif;
           position: relative;
           overflow-x: hidden;
         }
@@ -576,6 +600,12 @@ export default function cs2xtwitchPage() {
         .cs2-nav-link:hover { color: white; background: #222633; }
         .cs2-nav-back { color: #646978; }
 
+        .cs2-info-section { max-width: 900px; margin: 0 auto; padding: 40px 0; border-top: 1px solid rgba(255,255,255,0.05); }
+        .cs2-info-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+        .cs2-info-content article h3 { color: #f5f7fb; font-size: 18px; font-weight: 700; margin: 0 0 12px 0; }
+        .cs2-info-content article p { color: #8d93a5; font-size: 15px; line-height: 1.6; margin: 0; }
+        .cs2-info-content article strong { color: #cda9ff; font-weight: 600; }
+
         @media (max-width: 900px) {
           .cs2-launch-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
           .cs2-control-grid { grid-template-columns: 1fr; }
@@ -588,7 +618,7 @@ export default function cs2xtwitchPage() {
           .cs2-tagline { font-size: 14px; }
           .cs2-user-card { flex-wrap: wrap; justify-content: center; }
           .cs2-user-status { display: none; }
-          .cs2-launch-grid, .cs2-actions-grid { grid-template-columns: 1fr; }
+          .cs2-launch-grid, .cs2-actions-grid, .cs2-info-content { grid-template-columns: 1fr; }
           .cs2-launch-card { min-height: auto; padding: 22px 18px 18px; }
           .cs2-smartscreen-preview { max-width: 250px; align-self: center; }
           .cs2-section-heading h2 { font-size: 24px; }
