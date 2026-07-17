@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "7Vf4Ul+8NAk=",
+  "dgSpecHash": "FAKqHdEPkbU=",
   "success": true,
-  "projectFilePath": "C:\\Users\\almaz\\Desktop\\paracetamol.haze\\desktop\\cs2haze\\tests\\CS2Haze.UpdateSmoke.csproj",
+  "projectFilePath": "C:\\Users\\almaz\\Desktop\\paracetamol.haze\\desktop\\cs2haze\\tests\\CS2Haze.TokenStoreSmoke.csproj",
   "expectedPackageFiles": [],
   "logs": []
 }

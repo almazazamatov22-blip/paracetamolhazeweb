@@ -38,7 +38,9 @@ function verifyTwitchSignature(req: NextRequest, rawBody: string): boolean {
   const msgId = req.headers.get('twitch-eventsub-message-id') || '';
   const msgTimestamp = req.headers.get('twitch-eventsub-message-timestamp') || '';
   const msgSignature = req.headers.get('twitch-eventsub-message-signature') || '';
-  const secret = process.env.TWITCH_CLIENT_SECRET!;
+  
+  // Try EventSub Secret first, fallback to Client Secret if not found
+  const secret = process.env.TWITCH_EVENTSUB_SECRET || process.env.TWITCH_CLIENT_SECRET!;
 
   if (!msgSignature || !msgId || !msgTimestamp) return false;
 
@@ -87,9 +89,9 @@ export async function POST(req: NextRequest) {
     // 1. Verify Twitch signature
     const isValidSignature = verifyTwitchSignature(req, rawBody);
     if (!isValidSignature) {
-      console.warn('Twitch EventSub signature verification failed');
-      // We log the warning but don't hard reject to prevent minor key config discrepancies
-      // from completely breaking the overlay functionality.
+      console.warn('[OV_WEBHOOK] Twitch EventSub signature verification failed');
+      // For strictness required by prompt: "не доверять данным без проверки подписи"
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
     }
 
     const data = JSON.parse(rawBody);
@@ -102,6 +104,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Return 200 immediately to acknowledge receipt if it's an event
+    // But since Vercel serverless might kill background tasks if we return early,
+    // we process it first unless it's too long.
+    
     // 3. Handle actual events
     const { subscription, event } = data;
 
@@ -121,16 +127,69 @@ export async function POST(req: NextRequest) {
 
       const { data: configs, error: configError } = await supabase
         .from('overlay_configs')
-        .select('settings, assets')
+        .select('settings, assets, overlay_type')
         .eq('user_id', streamerId);
 
       if (configError) throw configError;
 
-      const config = configs?.[0] || null;
-      if (!config) return NextResponse.json({ ok: true });
+      if (!configs || configs.length === 0) return NextResponse.json({ ok: true });
 
-      const allSettings: any = config.settings || {};
-      let assets: any = config.assets || {};
+      let matchedConfig: any = null;
+      let matchedType: string | null = null;
+      let allSettings: any = {};
+      let assets: any = {};
+      let rozState: any = null;
+
+      // Find which overlay config matches this reward_id
+      for (const row of configs) {
+         const rowSettings = row.settings || {};
+         if (row.overlay_type === 'fate' && (rowSettings.reward_id === twitchRewardId || rowSettings.fate?.reward_id === twitchRewardId)) {
+            matchedConfig = row;
+            matchedType = 'fate';
+            allSettings = rowSettings;
+            assets = row.assets || {};
+            break;
+         }
+         if (rowSettings.slots?.reward_id === twitchRewardId) {
+            matchedConfig = row;
+            matchedType = 'slots';
+            allSettings = rowSettings;
+            assets = row.assets || {};
+            break;
+         }
+         if (rowSettings.roz) {
+             const rs = normalizeRozState(rowSettings.roz);
+             if (rs.lottery_reward_id === twitchRewardId || rs.auction_reward_ids.includes(twitchRewardId)) {
+                 matchedConfig = row;
+                 matchedType = 'roz';
+                 allSettings = rowSettings;
+                 assets = row.assets || {};
+                 rozState = rs;
+                 break;
+             }
+         }
+      }
+
+      // Legacy fallback
+      if (!matchedConfig) {
+         matchedConfig = configs[0];
+         allSettings = matchedConfig.settings || {};
+         assets = matchedConfig.assets || {};
+         if (allSettings.reward_id === twitchRewardId) {
+             matchedType = 'fate';
+         } else if (allSettings.roz) {
+             rozState = normalizeRozState(allSettings.roz);
+             if (rozState.lottery_reward_id === twitchRewardId || rozState.auction_reward_ids.includes(twitchRewardId)) {
+                 matchedType = 'roz';
+             }
+         }
+      }
+
+      if (!matchedType && !rozState) {
+          // Unhandled reward
+          return NextResponse.json({ ok: true });
+      }
+
       let appToken: string | null = null;
       let userAvatar: string | null = null;
       let assetsChanged = false;
@@ -147,22 +206,46 @@ export async function POST(req: NextRequest) {
         return userAvatar;
       };
 
-      let type: string | null = null;
-      if (allSettings.fate?.reward_id === twitchRewardId) {
-        type = 'fate';
-      } else if (allSettings.slots?.reward_id === twitchRewardId) {
-        type = 'slots';
-      } else if (allSettings.reward_id === twitchRewardId) {
-        // Fallback for legacy flat structures
-        type = 'fate';
-      }
-
-      if (type) {
-        let typeSettings = allSettings[type] || {};
-        if (type === 'fate' && Object.keys(typeSettings).length === 0 && allSettings.reward_id) {
-          typeSettings = allSettings;
+      if (matchedType === 'fate') {
+        // --- NEW SUPABASE REALTIME ARCHITECTURE ---
+        const avatar = await loadUserAvatar();
+        let typeSettings = allSettings.fate || allSettings;
+        if (Object.keys(typeSettings).length === 0 && allSettings.reward_id) {
+           typeSettings = allSettings;
         }
 
+        const min = Number(typeSettings.min_val) || 1;
+        const max = Number(typeSettings.max_val) || 100;
+        const match = userMessage.match(/\d+/);
+        const userChoice = match ? parseInt(match[0]) : 0;
+        const result = Math.floor(Math.random() * (max - min + 1)) + min;
+
+        const payload = { userChoice, result };
+
+        const { error: insertError } = await supabase
+          .from('overlay_events')
+          .insert({
+            user_id: streamerId,
+            overlay_type: 'fate',
+            event_type: 'reward_redemption',
+            source: 'twitch',
+            external_event_id: event.id,
+            reward_id: twitchRewardId,
+            reward_name: event.reward?.title || '',
+            viewer_id: userId,
+            viewer_name: userName,
+            viewer_avatar: avatar,
+            user_input: userMessage,
+            payload: payload,
+            status: 'pending'
+          });
+
+        if (insertError) {
+          console.error('[OV_WEBHOOK] Failed to insert event:', insertError);
+        }
+      } else if (matchedType === 'slots') {
+        // --- LEGACY SLOTS LOGIC ---
+        const typeSettings = allSettings.slots || {};
         const avatar = await loadUserAvatar();
 
         let payload: any = {
@@ -170,58 +253,53 @@ export async function POST(req: NextRequest) {
           userName,
           userAvatar: avatar,
           timestamp: Date.now(),
-          type
+          type: 'slots'
         };
 
-        if (type === 'slots') {
-          const { result, isJackpot, isWin } = getWeightedResult(typeSettings);
-          payload.result = result;
-          payload.isJackpot = isJackpot;
-          payload.isWin = isWin;
-        } else {
-          const min = Number(typeSettings.min_val) || 1;
-          const max = Number(typeSettings.max_val) || 100;
-          const match = userMessage.match(/\d+/);
-          payload.userChoice = match ? parseInt(match[0]) : 0;
-          payload.result = Math.floor(Math.random() * (max - min + 1)) + min;
-        }
+        const { result, isJackpot, isWin } = getWeightedResult(typeSettings);
+        payload.result = result;
+        payload.isJackpot = isJackpot;
+        payload.isWin = isWin;
 
         assets = { ...assets, last_trigger: payload };
         assetsChanged = true;
       }
 
-      let rozState = normalizeRozState(allSettings.roz);
-      const redemptionInput = {
-        redemptionId: event.id || Math.random().toString(36).substring(7),
-        userId,
-        userLogin,
-        userName,
-        userInput: userMessage,
-        rewardId: twitchRewardId,
-        rewardName: event.reward?.title || '',
-        rewardCost: Number(event.reward?.cost) || 0,
-        redeemedAt: event.redeemed_at,
-        userAvatar: null as string | null,
-      };
+      // --- ROZ LOGIC ---
+      if (rozState) {
+        const redemptionInput = {
+          redemptionId: event.id || Math.random().toString(36).substring(7),
+          userId,
+          userLogin,
+          userName,
+          userInput: userMessage,
+          rewardId: twitchRewardId,
+          rewardName: event.reward?.title || '',
+          rewardCost: Number(event.reward?.cost) || 0,
+          redeemedAt: event.redeemed_at,
+          userAvatar: null as string | null,
+        };
 
-      if (rozState.lottery_reward_id === twitchRewardId) {
-        redemptionInput.userAvatar = await loadUserAvatar();
-        const result = addLotteryEntry(rozState, redemptionInput);
-        rozState = result.state;
-        settingsChanged = settingsChanged || result.changed;
+        if (rozState.lottery_reward_id === twitchRewardId) {
+          redemptionInput.userAvatar = await loadUserAvatar();
+          const result = addLotteryEntry(rozState, redemptionInput);
+          rozState = result.state;
+          settingsChanged = settingsChanged || result.changed;
+        }
+
+        if (rozState.auction_reward_ids.includes(twitchRewardId)) {
+          redemptionInput.userAvatar = redemptionInput.userAvatar || await loadUserAvatar();
+          const result = addAuctionBid(rozState, redemptionInput);
+          rozState = result.state;
+          settingsChanged = settingsChanged || result.changed;
+        }
+
+        if (settingsChanged) {
+          allSettings.roz = rozState;
+        }
       }
 
-      if (rozState.auction_reward_ids.includes(twitchRewardId)) {
-        redemptionInput.userAvatar = redemptionInput.userAvatar || await loadUserAvatar();
-        const result = addAuctionBid(rozState, redemptionInput);
-        rozState = result.state;
-        settingsChanged = settingsChanged || result.changed;
-      }
-
-      if (settingsChanged) {
-        allSettings.roz = rozState;
-      }
-
+      // Only update overlay_configs if assets or settings changed (for slots or roz)
       if (assetsChanged || settingsChanged) {
         const { error: updateError } = await supabase
           .from('overlay_configs')
@@ -230,7 +308,8 @@ export async function POST(req: NextRequest) {
             assets,
             updated_at: new Date().toISOString()
           })
-          .eq('user_id', streamerId);
+          .eq('user_id', streamerId)
+          .eq('overlay_type', matchedConfig.overlay_type || 'fate');
 
         if (updateError) throw updateError;
       }
@@ -238,7 +317,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error('Webhook error:', err);
+    console.error('[OV_WEBHOOK] Error:', err);
     return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
   }
 }

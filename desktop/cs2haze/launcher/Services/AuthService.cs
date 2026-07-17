@@ -69,15 +69,23 @@ public sealed class AuthService(HttpClient http, LauncherConfig config, StorageS
         var pendingSession = await TryClaimPendingTokenAsync(tokenStore, cancellationToken);
         if (pendingSession is not null) return pendingSession;
 
-        var baseUrl = GetValidBaseUrl(setStatus);
-        var connectUrl = $"{baseUrl.TrimEnd('/')}/cs2haze/connect";
-        Process.Start(new ProcessStartInfo
+        var state = storage.LoadState();
+        if (string.IsNullOrWhiteSpace(state.SelectedBaseUrl))
         {
-            FileName = connectUrl,
-            UseShellExecute = true,
-        });
+            setStatus("Откройте сайт, с которого установили CS2Haze, и нажмите Подключить компьютер");
+        }
+        else
+        {
+            var baseUrl = GetValidBaseUrl((s) => setStatus(s));
+            var connectUrl = $"{baseUrl.TrimEnd('/')}/cs2haze/connect";
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = connectUrl,
+                UseShellExecute = true,
+            });
 
-        setStatus("Подтвердите вход на открывшемся сайте…");
+            setStatus("Подтвердите вход на открывшемся сайте…");
+        }
 
         var expireTime = DateTimeOffset.UtcNow.AddMinutes(5);
 
@@ -91,7 +99,7 @@ public sealed class AuthService(HttpClient http, LauncherConfig config, StorageS
         throw new TimeoutException("Время подтверждения входа истекло.");
     }
 
-    private async Task<LauncherSession?> TryClaimPendingTokenAsync(
+    public async Task<LauncherSession?> TryClaimPendingTokenAsync(
         PendingConnectTokenStore tokenStore,
         CancellationToken cancellationToken
     )

@@ -1,14 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServerKey, getSupabaseUrl } from '@/lib/supabase-env';
 
 export const runtime = 'nodejs';
 
+function getSupabase() {
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseKey = getSupabaseServerKey();
+
+  if (!supabaseUrl || !supabaseKey) throw new Error('Supabase env missing');
+  return createClient(supabaseUrl, supabaseKey);
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const token = req.cookies.get('twitch_token')?.value;
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const cookieStore = await cookies();
+    const token = cookieStore.get('twitch_token')?.value;
+    if (!token) return NextResponse.json({ error: 'Необходима авторизация Twitch' }, { status: 401 });
 
     const clientId = process.env.TWITCH_CLIENT_ID;
     const clientSecret = process.env.TWITCH_CLIENT_SECRET;
+    const eventSubSecret = process.env.TWITCH_EVENTSUB_SECRET;
+    
+    if (!eventSubSecret || eventSubSecret.length < 10) {
+      console.warn('[OV_EVENTSUB] TWITCH_EVENTSUB_SECRET is missing or too short.');
+      return NextResponse.json({ error: 'Ошибка конфигурации сервера: не задан TWITCH_EVENTSUB_SECRET' }, { status: 500 });
+    }
+
     const protocol = req.headers.get('x-forwarded-proto') || 'https';
     const host = req.headers.get('host');
     const callbackUrl = `${protocol}://${host}/api/ov_webhook`;
@@ -19,7 +38,7 @@ export async function POST(req: NextRequest) {
     });
     const authData = await authRes.json();
     const userId = authData.data?.[0]?.id;
-    if (!userId) return NextResponse.json({ error: 'Auth fail' }, { status: 401 });
+    if (!userId) return NextResponse.json({ error: 'Ошибка авторизации Twitch' }, { status: 401 });
 
     // 2. Get App Token
     const appTokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
@@ -33,40 +52,109 @@ export async function POST(req: NextRequest) {
     });
     const appTokenData = await appTokenRes.json();
     const appToken = appTokenData.access_token;
+    if (!appToken) return NextResponse.json({ error: 'Не удалось получить App Token от Twitch' }, { status: 500 });
 
-    // 3. Register Product EventSub
-    const subRes = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
-      method: 'POST',
+    // 3. Get existing subscriptions
+    const getSubsRes = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
       headers: {
         'Authorization': `Bearer ${appToken}`,
-        'Client-Id': clientId!,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        type: 'channel.channel_points_custom_reward_redemption.add',
-        version: '1',
-        condition: { broadcaster_user_id: userId },
-        transport: {
-          method: 'webhook',
-          callback: callbackUrl,
-          secret: clientSecret
+        'Client-Id': clientId!
+      }
+    });
+    const subsData = await getSubsRes.json();
+    
+    let existingSub = null;
+    let needsNewSub = true;
+    
+    if (subsData.data && Array.isArray(subsData.data)) {
+      for (const sub of subsData.data) {
+        if (
+          sub.type === 'channel.channel_points_custom_reward_redemption.add' && 
+          sub.condition?.broadcaster_user_id === userId
+        ) {
+          if (sub.status === 'enabled' && sub.transport?.callback === callbackUrl) {
+             existingSub = sub;
+             needsNewSub = false;
+             break;
+          } else {
+             // If disabled or wrong callback, we should delete it and recreate
+             try {
+               await fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?id=${sub.id}`, {
+                 method: 'DELETE',
+                 headers: {
+                   'Authorization': `Bearer ${appToken}`,
+                   'Client-Id': clientId!
+                 }
+               });
+               console.log(`[OV_EVENTSUB] Deleted invalid subscription ${sub.id}`);
+             } catch (e) {
+               console.error(`[OV_EVENTSUB] Failed to delete subscription ${sub.id}`, e);
+             }
+          }
         }
+      }
+    }
+
+    let subId = existingSub?.id;
+    let status = existingSub ? 'already_exists' : 'pending';
+
+    // 4. Create new if needed
+    if (needsNewSub) {
+      const subRes = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${appToken}`,
+          'Client-Id': clientId!,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          type: 'channel.channel_points_custom_reward_redemption.add',
+          version: '1',
+          condition: { broadcaster_user_id: userId },
+          transport: {
+            method: 'webhook',
+            callback: callbackUrl,
+            secret: eventSubSecret
+          }
+        })
+      });
+
+      const subResData = await subRes.json();
+      
+      if (!subRes.ok) {
+         console.error('[OV_EVENTSUB] Registration failed:', subResData);
+         return NextResponse.json({ error: subResData.message || 'Ошибка подписки EventSub' }, { status: subRes.status });
+      }
+      
+      subId = subResData.data?.[0]?.id;
+      status = 'active';
+    }
+
+    // 5. Update Supabase
+    const supabase = getSupabase();
+    // Assuming 'fate' as default since this is called from the dashboard for fate overlays.
+    // However, the EventSub is tied to the user, not just one overlay.
+    // Let's update all configs for this user.
+    const { error: updateError } = await supabase
+      .from('overlay_configs')
+      .update({
+        eventsub_status: 'active',
+        eventsub_subscription_id: subId
       })
+      .eq('user_id', userId);
+      
+    if (updateError) {
+      console.error('[OV_EVENTSUB] Supabase update error:', updateError);
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      eventSubStatus: status, 
+      subId 
     });
 
-    const subData = await subRes.json();
-    
-    if (subRes.status === 409) {
-        return NextResponse.json({ success: true, message: 'Already subscribed' });
-    }
-
-    if (!subRes.ok) {
-       return NextResponse.json({ error: subData.message || 'Subscription failed' }, { status: subRes.status });
-    }
-
-    return NextResponse.json({ success: true, subId: subData.data?.[0]?.id });
-
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[OV_EVENTSUB] Internal Error:', err);
+    return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }

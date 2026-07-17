@@ -13,9 +13,9 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\almaz\\Desktop\\paracetamol.haze\\desktop\\cs2haze\\tests\\CS2Haze.UpdateSmoke.csproj",
-      "projectName": "CS2Haze.UpdateSmoke",
-      "projectPath": "C:\\Users\\almaz\\Desktop\\paracetamol.haze\\desktop\\cs2haze\\tests\\CS2Haze.UpdateSmoke.csproj",
+      "projectUniqueName": "C:\\Users\\almaz\\Desktop\\paracetamol.haze\\desktop\\cs2haze\\tests\\CS2Haze.TokenStoreSmoke.csproj",
+      "projectName": "CS2Haze.TokenStoreSmoke",
+      "projectPath": "C:\\Users\\almaz\\Desktop\\paracetamol.haze\\desktop\\cs2haze\\tests\\CS2Haze.TokenStoreSmoke.csproj",
       "packagesPath": "C:\\Users\\almaz\\.nuget\\packages\\",
       "outputPath": "C:\\Users\\almaz\\Desktop\\paracetamol.haze\\desktop\\cs2haze\\tests\\obj\\",
       "projectStyle": "PackageReference",

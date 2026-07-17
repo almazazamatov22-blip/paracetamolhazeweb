@@ -46,11 +46,11 @@ export async function GET(req: NextRequest) {
     if (rewardsError) throw rewardsError;
     const rewards = rewardsData ?? [];
 
-    // 2. Fetch history (recent 500)
+    // 2. Fetch history from queue (recent 500)
     const { data: historyData, error: historyError } = await supabase
-      .from('cs2_history')
-      .select('id, streamer_id, user_name, user_avatar, reward_name, action_type, executed_at')
-      .order('executed_at', { ascending: false })
+      .from('cs2_reward_queue')
+      .select('id, streamer_id, user_name, user_avatar, reward_name, action_type, status, created_at, started_at, finished_at, error_message')
+      .order('created_at', { ascending: false })
       .limit(500);
     if (historyError) throw historyError;
     const history = historyData ?? [];
@@ -123,10 +123,12 @@ export async function GET(req: NextRequest) {
 
     history.forEach(h => {
       if (h.streamer_id && streamersAgg[h.streamer_id]) {
-        streamersAgg[h.streamer_id].activationsCount++;
+        if (h.status === 'done') {
+          streamersAgg[h.streamer_id].activationsCount++;
+        }
         const currentLast = streamersAgg[h.streamer_id].lastActivation;
-        if (!currentLast || new Date(h.executed_at) > new Date(currentLast)) {
-          streamersAgg[h.streamer_id].lastActivation = h.executed_at;
+        if (!currentLast || new Date(h.created_at) > new Date(currentLast)) {
+          streamersAgg[h.streamer_id].lastActivation = h.created_at;
         }
       }
     });

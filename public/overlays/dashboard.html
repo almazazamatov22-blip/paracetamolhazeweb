@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Дашборд | Fate Overlays</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --bg: #0d0d0f;
@@ -16,6 +17,8 @@
             --border: rgba(255,255,255,0.1);
             --radius: 12px;
             --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,32 +31,35 @@
         .nav-label { font-size: 10px; text-transform: uppercase; color: var(--text-dim); letter-spacing: 1.5px; margin-bottom: 16px; display: block; }
         .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; color: var(--text-dim); text-decoration: none; font-size: 14px; transition: 0.2s; margin-bottom: 4px; border: none; background: transparent; width: 100%; cursor: pointer; text-align: left; }
         .nav-item:hover, .nav-item.active { background: rgba(147, 51, 234, 0.1); color: var(--text); }
-        .nav-item svg { width: 18px; opacity: 0.7; pointer-events: none; }
         .user-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 16px; border-radius: 12px; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
         .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: #1c1c21; }
         .user-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .user-status { font-size: 10px; color: var(--success); }
-        .logout { margin-top: auto; color: #ef4444; }
+        .logout { margin-top: auto; color: var(--error); }
 
         /* --- CONTENT --- */
         .content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-        .header { padding: 24px 40px; border-bottom: 1px solid var(--border); }
+        .header { padding: 24px 40px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .header h2 { font-size: 22px; font-weight: 700; }
-        .main-grid { display: grid; grid-template-columns: 420px 1fr; gap: 24px; padding: 40px; flex: 1; min-height: 0; }
+        .main-grid { display: grid; grid-template-columns: 420px 1fr; gap: 24px; padding: 40px; flex: 1; min-height: 0; overflow-y: auto; }
+
+        /* --- STATUS BADGES --- */
+        .system-status { display: flex; gap: 16px; font-size: 12px; }
+        .status-item { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 6px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); }
+        .status-dot.active { background: var(--success); box-shadow: 0 0 8px var(--success); }
+        .status-dot.warning { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
+        .status-dot.error { background: var(--error); box-shadow: 0 0 8px var(--error); }
 
         /* --- CARDS & UI --- */
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; display: flex; flex-direction: column; }
-        .card-title { font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
-        .section-scroll { flex: 1; overflow-y: auto; padding-right: 8px; }
-        .section-scroll::-webkit-scrollbar { width: 4px; }
-        .section-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
-
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; display: flex; flex-direction: column; margin-bottom: 24px; }
+        .card-title { font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
         .obs-box { background: #000; padding: 16px; border-radius: 8px; font-family: monospace; font-size: 12px; color: var(--accent); word-break: break-all; margin-bottom: 16px; border: 1px solid var(--border); }
         select, input { width: 100%; background: #1c1c21; border: 1px solid var(--border); border-radius: 8px; padding: 12px; color: #fff; outline: none; margin-bottom: 12px; font-family: inherit; }
         .label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; }
 
         .btn { background: var(--accent); color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; font-size: 14px; }
         .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-outline { background: transparent; border: 1px solid var(--border); color: #fff; }
         .btn-outline:hover { background: var(--border); }
 
@@ -63,84 +69,81 @@
         .asset-name { font-weight: 600; font-size: 14px; color: #fff; }
         .asset-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
         
-        .status-badge { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 16px; color: var(--text-dim); }
-        .status-badge.loaded { color: var(--success); }
-        .status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #333; }
-        .status-badge.loaded .dot { background: var(--success); box-shadow: 0 0 10px var(--success); }
-        
         .toast { position: fixed; bottom: 24px; right: 24px; background: var(--accent); color: #fff; padding: 12px 24px; border-radius: 8px; transform: translateY(100px); transition: 0.3s; z-index: 10000; }
         .toast.show { transform: translateY(0); }
     </style>
 </head>
 <body>
-
     <div class="sidebar">
         <div class="logo">FATE.OVERLAYS</div>
         <div class="user-card">
             <img id="user-avatar" class="user-avatar">
             <div class="user-info">
                 <div id="username" class="user-name">...</div>
-                <div class="user-status">● Доступ активен</div>
             </div>
         </div>
         <div class="nav-section">
             <span class="nav-label">Оверлеи</span>
-            <button class="nav-item active" onclick="location.reload()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                РОЛЛ
-            </button>
+            <button class="nav-item active" onclick="location.reload()">РОЛЛ</button>
         </div>
         <div class="nav-section">
             <span class="nav-label">Аккаунт</span>
-            <a href="/" class="nav-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                ГЛАВНАЯ
-            </a>
+            <a href="/" class="nav-item">ГЛАВНАЯ</a>
         </div>
-        <a href="/api/auth/logout" class="nav-item logout">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-            ВЫЙТИ
-        </a>
+        <a href="/api/auth/logout" class="nav-item logout">ВЫЙТИ</a>
     </div>
 
     <div class="content">
-        <div class="header"><h2>ДАШБОРД — РОЛЛ</h2></div>
+        <div class="header">
+            <h2>ДАШБОРД — РОЛЛ</h2>
+            <div class="system-status">
+                <div class="status-item">
+                    <div class="status-dot" id="dot-realtime"></div>
+                    <span id="text-realtime">Realtime: Подключение...</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-dot" id="dot-eventsub"></div>
+                    <span id="text-eventsub">EventSub: Проверка...</span>
+                </div>
+            </div>
+        </div>
         
-        <div id="roll-view">
-            <div class="main-grid">
-                <div style="display: flex; flex-direction: column; gap: 24px;">
-                    <div class="card">
-                        <div class="card-title">OBS Browser Source</div>
-                        <div class="obs-box" id="obs-url">...</div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                            <button class="btn btn-outline" onclick="copyUrl()">КОПИРОВАТЬ</button>
-                            <button class="btn" style="background: #22c55e;" onclick="testOverlay()">ТЕСТ</button>
-                        </div>
-                    </div>
-                    <div class="card" style="flex: 1;">
-                        <div class="card-title">Настройки</div>
-                        <div class="section-scroll">
-                            <form id="settings-form" onsubmit="saveSettings(event)">
-                                <label class="label">Награда Twitch</label>
-                                <div style="display: flex; gap: 8px; margin-bottom: 20px;">
-                                    <select id="reward-select" name="reward_id" style="margin-bottom: 0;"></select>
-                                    <button type="button" class="btn btn-outline" onclick="fetchRewards()" style="padding: 10px;">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-                                    </button>
-                                </div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
-                                    <div><label class="label">Мин Число</label><input type="number" name="min_val" value="1"></div>
-                                    <div><label class="label">Макс Число</label><input type="number" name="max_val" value="100"></div>
-                                </div>
-                                <button type="submit" id="save-btn" class="btn" style="width: 100%;">СОХРАНИТЬ ВЫБОР</button>
-                            </form>
-                        </div>
+        <div class="main-grid">
+            <div>
+                <div class="card">
+                    <div class="card-title">OBS Browser Source</div>
+                    <div class="obs-box" id="obs-url">...</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <button class="btn btn-outline" onclick="copyUrl()">КОПИРОВАТЬ</button>
+                        <button class="btn" style="background: var(--success);" onclick="testOverlay()">ТЕСТ</button>
                     </div>
                 </div>
-
                 <div class="card">
-                    <div class="card-title">Ассеты</div>
-                    <div class="section-scroll" id="asset-list">
+                    <div class="card-title">Настройки Награды</div>
+                    <form id="settings-form" onsubmit="saveSettings(event)">
+                        <label class="label">Награда Twitch (С вводом текста)</label>
+                        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+                            <select id="reward-select" name="reward_id" style="margin-bottom: 0;"></select>
+                            <button type="button" class="btn btn-outline" onclick="fetchRewards()" style="padding: 10px;">↻</button>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                            <div><label class="label">Мин Число</label><input type="number" name="min_val" id="min_val" value="1"></div>
+                            <div><label class="label">Макс Число</label><input type="number" name="max_val" id="max_val" value="100"></div>
+                        </div>
+                        <button type="submit" id="save-btn" class="btn" style="width: 100%;">СОХРАНИТЬ ВЫБОР</button>
+                    </form>
+                    
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                        <button id="sub-btn" type="button" class="btn btn-outline" style="width: 100%; border-color: var(--warning); color: var(--warning);" onclick="checkEventSub()">Подключить EventSub</button>
+                        <div style="font-size: 11px; color: var(--text-dim); margin-top: 8px; text-align: center;">Если награда не срабатывает, нажмите эту кнопку для обновления подписки Twitch.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <div class="card-title">Ассеты (Обновляются мгновенно)</div>
+                    <div id="asset-list">
                         <!-- Dynamic Assets -->
                     </div>
                 </div>
@@ -152,6 +155,9 @@
 
     <script>
         let currentUser = null;
+        let supabase = null;
+        let realtimeChannel = null;
+
         const assetTemplates = [
             { id: 'panel_bg', name: 'Фон панели', meta: 'Рекомендуемо: 1600x210' },
             { id: 'reward_icon', name: 'Иконка награды', meta: 'Рекомендуемо: 200x200' },
@@ -171,15 +177,111 @@
                 
                 document.getElementById('username').textContent = data.display_name;
                 document.getElementById('user-avatar').src = data.profile_image_url;
+                // Currently using userId for OBS, but for security a public token is recommended later.
                 document.getElementById('obs-url').textContent = `${window.location.origin}/overlays/roll.html?id=${data.id}`;
                 
                 renderAssets();
-                loadSettings();
-                loadAssetStatuses();
                 fetchRewards();
+                
+                await initSupabase();
+                loadSettings();
             } catch (e) { 
                 console.error('Init error:', e);
             }
+        }
+
+        async function initSupabase() {
+            try {
+                const res = await fetch('/api/ov_env');
+                const env = await res.json();
+                if(!env.supabaseUrl || !env.supabaseAnonKey) throw new Error('No Supabase Env');
+                
+                supabase = window.supabase.createClient(env.supabaseUrl, env.supabaseAnonKey);
+                
+                setupRealtime();
+            } catch(e) {
+                console.error("Supabase init error:", e);
+                updateStatus('realtime', 'error', 'Realtime: Ошибка');
+            }
+        }
+
+        function setupRealtime() {
+            if(!supabase || !currentUser) return;
+            
+            updateStatus('realtime', 'warning', 'Realtime: Подключение...');
+
+            realtimeChannel = supabase.channel('dashboard_changes')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'overlay_configs', filter: `user_id=eq.${currentUser.id}` },
+                    (payload) => {
+                        console.log("Config changed:", payload);
+                        if (payload.new && payload.new.overlay_type === 'fate') {
+                           applyConfigState(payload.new);
+                        }
+                    }
+                )
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        updateStatus('realtime', 'active', 'Realtime: Подключён');
+                    } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                        updateStatus('realtime', 'error', 'Realtime: Отключён');
+                    }
+                });
+        }
+
+        function updateStatus(type, state, text) {
+            const dot = document.getElementById(`dot-${type}`);
+            const span = document.getElementById(`text-${type}`);
+            if(!dot || !span) return;
+            
+            dot.className = 'status-dot ' + state;
+            span.textContent = text;
+        }
+
+        async function loadSettings() {
+            if(!currentUser) return;
+            try {
+                const res = await fetch(`/api/ov_settings?userId=${currentUser.id}&type=fate`);
+                const config = await res.json();
+                applyConfigState(config);
+            } catch (e) {
+                console.error("Load settings error", e);
+            }
+        }
+
+        function applyConfigState(config) {
+            const s = config.settings || config; // fallback for api structure
+            if (s.reward_id) {
+                const sel = document.getElementById('reward-select');
+                // Avoid overwriting selected option if user is currently selecting
+                if (sel.options.length <= 1 || !Array.from(sel.options).some(o => o.value === s.reward_id)) {
+                   sel.innerHTML = `<option value="${s.reward_id}">${s.reward_name || 'Привязанная награда'}</option>` + sel.innerHTML;
+                }
+                sel.value = s.reward_id;
+            }
+            if (s.min_val) document.getElementById('min_val').value = s.min_val;
+            if (s.max_val) document.getElementById('max_val').value = s.max_val;
+
+            const evStatus = config.eventsub_status || s.eventsub_status;
+            if (evStatus === 'active') {
+                updateStatus('eventsub', 'active', 'EventSub: Активен');
+                document.getElementById('sub-btn').style.display = 'none';
+            } else if (evStatus === 'pending') {
+                updateStatus('eventsub', 'warning', 'EventSub: Ожидание');
+                document.getElementById('sub-btn').style.display = 'block';
+            } else {
+                updateStatus('eventsub', 'error', 'EventSub: Не активен');
+                document.getElementById('sub-btn').style.display = 'block';
+            }
+
+            const assets = config.assets || config; // fallback
+            assetTemplates.forEach(a => {
+                const badge = document.getElementById(`status-${a.id}`);
+                if (badge && assets[a.id]) {
+                    badge.innerHTML = `<span style="color:var(--success)">✔ Загружено</span>`;
+                }
+            });
         }
 
         function renderAssets() {
@@ -191,31 +293,13 @@
                         <div class="asset-name">${a.name}</div>
                         <div class="asset-meta">${a.meta}</div>
                     </div>
-                    <div id="status-${a.id}" class="status-badge">
-                        <div class="dot"></div>
-                        <span class="status-text">Ожидание</span>
+                    <div id="status-${a.id}" style="font-size: 11px; margin-right: 15px; color: var(--text-dim);">
+                        Ожидание
                     </div>
-                    <button class="btn btn-outline" onclick="document.getElementById('file-${a.id}').click()" style="padding: 10px 20px; font-size: 13px;">ВЫБРАТЬ</button>
+                    <button class="btn btn-outline" onclick="document.getElementById('file-${a.id}').click()" style="padding: 8px 16px; font-size: 12px;">ЗАГРУЗИТЬ</button>
                     <input type="file" id="file-${a.id}" hidden onchange="uploadFile(this, '${a.id}')">
                 </div>
             `).join('');
-        }
-
-        async function loadSettings() {
-            if(!currentUser) return;
-            try {
-                const res = await fetch(`/api/ov_settings?userId=${currentUser.id}`);
-                const s = await res.json();
-                const f = document.getElementById('settings-form');
-                if (s.reward_id) {
-                    const sel = document.getElementById('reward-select');
-                    sel.innerHTML = `<option value="${s.reward_id}">${s.reward_name || 'Привязанная награда'}</option>`;
-                }
-                if(f) {
-                    f.min_val.value = s.min_val || 1;
-                    f.max_val.value = s.max_val || 100;
-                }
-            } catch (e) {}
         }
 
         async function fetchRewards() {
@@ -234,12 +318,13 @@
         async function saveSettings(e) {
             e.preventDefault();
             const btn = document.getElementById('save-btn');
-            btn.style.opacity = '0.5'; btn.textContent = '...';
+            btn.disabled = true; btn.textContent = 'СОХРАНЕНИЕ...';
             const f = e.target;
             const sel = document.getElementById('reward-select');
             const opt = sel.options[sel.selectedIndex];
+            
             try {
-                const settingsRes = await fetch('/api/ov_settings', {
+                const res = await fetch('/api/ov_settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -247,27 +332,53 @@
                         settings: {
                             reward_id: sel.value,
                             reward_name: opt ? opt.textContent : '',
-                            min_val: f.min_val.value,
-                            max_val: f.max_val.value
+                            min_val: parseInt(f.min_val.value),
+                            max_val: parseInt(f.max_val.value)
                         }
                     })
                 });
-                const settingsData = await settingsRes.json().catch(() => ({}));
-                if (!settingsRes.ok) throw new Error(settingsData.error || 'Settings save failed');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Ошибка сохранения');
+                
+                showToast('Настройки сохранены в БД');
+                
+                // Now check EventSub separately
+                checkEventSub();
 
+            } catch (e) { 
+                showToast(e.message || 'Ошибка!', true); 
+            } finally { 
+                btn.disabled = false; btn.textContent = 'СОХРАНИТЬ ВЫБОР'; 
+            }
+        }
+
+        async function checkEventSub() {
+            const btn = document.getElementById('sub-btn');
+            if (btn) { btn.disabled = true; btn.textContent = 'Подключение...'; }
+            try {
+                updateStatus('eventsub', 'warning', 'EventSub: Проверка...');
                 const subRes = await fetch('/api/ov_subscribe', { method: 'POST' });
-                const subData = await subRes.json().catch(() => ({}));
+                const subData = await subRes.json();
+                
                 if (!subRes.ok) throw new Error(subData.error || 'Subscription failed');
-                showToast('Настройки обновлены');
-            } catch (e) { showToast(e.message || 'Ошибка!', true); }
-            finally { btn.style.opacity = '1'; btn.textContent = 'СОХРАНИТЬ ВЫБОР'; }
+                
+                if (subData.eventSubStatus === 'active' || subData.eventSubStatus === 'already_exists') {
+                   updateStatus('eventsub', 'active', 'EventSub: Активен');
+                   if(btn) btn.style.display = 'none';
+                   showToast('Twitch подписка активна');
+                }
+            } catch (e) {
+                updateStatus('eventsub', 'error', 'EventSub: Ошибка');
+                showToast(e.message || 'Ошибка подписки Twitch', true);
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = 'Подключить EventSub'; }
+            }
         }
 
         async function uploadFile(input, key) {
             const file = input.files[0]; if (!file) return;
             const badge = document.getElementById(`status-${key}`);
-            const text = badge.querySelector('.status-text');
-            text.textContent = 'Загрузка...';
+            badge.innerHTML = `<span style="color:var(--warning)">Загрузка...</span>`;
 
             const reader = new FileReader();
             reader.onload = async () => {
@@ -275,51 +386,44 @@
                     const res = await fetch('/api/ov_upload', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: file.name, type: file.type, data: reader.result.split(',')[1], key })
+                        body: JSON.stringify({ 
+                            name: file.name, 
+                            type: file.type, 
+                            data: reader.result.split(',')[1], 
+                            key,
+                            overlay_type: 'fate'
+                        })
                     });
                     const d = await res.json();
                     if (!res.ok) throw new Error(d.error || 'Upload failed');
-                    if (d.url) { 
-                        badge.classList.add('loaded');
-                        text.textContent = 'Загружено';
-                        showToast('Файл готов');
-                    }
-                } catch (e) { text.textContent = 'Ошибка'; showToast(e.message || 'Ошибка загрузки', true); }
+                    // We don't need to manually update badge to success, 
+                    // realtime subscription to overlay_configs will trigger applyConfigState
+                    showToast('Файл загружен');
+                } catch (e) { 
+                    badge.innerHTML = `<span style="color:var(--error)">Ошибка</span>`;
+                    showToast(e.message || 'Ошибка загрузки', true); 
+                }
             };
             reader.readAsDataURL(file);
-        }
-
-        async function loadAssetStatuses() {
-            if(!currentUser) return;
-            try {
-                const res = await fetch(`/api/ov_upload?userId=${currentUser.id}`);
-                const assets = await res.json();
-                Object.keys(assets).forEach(key => {
-                    const badge = document.getElementById(`status-${key}`);
-                    if (badge && assets[key]) {
-                        badge.classList.add('loaded');
-                        badge.querySelector('.status-text').textContent = 'Загружено';
-                    }
-                });
-            } catch (e) {}
         }
 
         function copyUrl() {
             const url = document.getElementById('obs-url').textContent;
             navigator.clipboard.writeText(url);
-            showToast('Скопировано');
+            showToast('Ссылка скопирована');
         }
 
         async function testOverlay() {
             try { 
+                showToast('Отправка теста...');
                 const res = await fetch('/api/ov_test', { 
                     method: 'POST', 
                     headers: {'Content-Type': 'application/json'}, 
                     body: JSON.stringify({ type: 'fate' }) 
                 }); 
-                const data = await res.json().catch(() => ({}));
+                const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Test failed');
-                showToast('Тест запущен'); 
+                showToast('Событие теста создано'); 
             }
             catch (e) { showToast(e.message || 'Ошибка теста', true); }
         }
@@ -327,9 +431,10 @@
         function showToast(msg, isError = false) {
             const t = document.getElementById('toast');
             if(!t) return;
-            t.textContent = msg; t.style.background = isError ? '#ef4444' : 'var(--accent)';
+            t.textContent = msg; 
+            t.style.background = isError ? 'var(--error)' : 'var(--success)';
             t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 3000);
+            setTimeout(() => t.classList.remove('show'), 4000);
         }
 
         init();

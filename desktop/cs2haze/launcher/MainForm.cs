@@ -211,8 +211,14 @@ public sealed class MainForm : Form
 
             if (config.RequireAuthentication)
             {
-                SetState("Проверка входа…", "Используем существующий аккаунт сайта.", true);
-                session = await authService.TryRestoreSessionAsync(state, cancellation.Token);
+                var tokenStore = new PendingConnectTokenStore(storage.DataDirectory);
+                session = await authService.TryClaimPendingTokenAsync(tokenStore, cancellation.Token);
+
+                if (session is null)
+                {
+                    SetState("Проверка входа…", "Используем существующий аккаунт сайта.", true);
+                    session = await authService.TryRestoreSessionAsync(state, cancellation.Token);
+                }
 
                 if (session is null)
                 {

@@ -1,0 +1,15 @@
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\CS2Haze.TokenStoreSmoke.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\CS2Haze.TokenStoreSmoke.AssemblyInfoInputs.cache
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\CS2Haze.TokenStoreSmoke.AssemblyInfo.cs
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\CS2Haze.TokenStoreSmoke.csproj.CoreCompileInputs.cache
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\CS2Haze.TokenStoreSmoke.sourcelink.json
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\bin\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\CS2Haze.TokenStoreSmoke.exe
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\bin\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\CS2Haze.TokenStoreSmoke.deps.json
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\bin\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\CS2Haze.TokenStoreSmoke.runtimeconfig.json
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\bin\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\CS2Haze.TokenStoreSmoke.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\bin\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\CS2Haze.TokenStoreSmoke.pdb
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\CS2Haze.TokenStoreSmoke.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\refint\CS2Haze.TokenStoreSmoke.dll
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\CS2Haze.TokenStoreSmoke.pdb
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\CS2Haze.TokenStoreSmoke.genruntimeconfig.cache
+C:\Users\almaz\Desktop\paracetamol.haze\desktop\cs2haze\tests\obj\CS2Haze.TokenStoreSmoke\Debug\net8.0-windows\ref\CS2Haze.TokenStoreSmoke.dll

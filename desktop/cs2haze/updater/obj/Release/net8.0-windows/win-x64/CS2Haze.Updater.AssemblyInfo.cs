@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("cs2haze-updater")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+57857acbaa31c8dfb4cd49328e1605ae56e759b7")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6356aa8ca835972a986ab22c3f9b2e6ae9c3589a")]
 [assembly: System.Reflection.AssemblyProductAttribute("cs2haze-updater")]
 [assembly: System.Reflection.AssemblyTitleAttribute("cs2haze-updater")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

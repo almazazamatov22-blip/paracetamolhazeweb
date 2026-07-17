@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
     <meta charset="UTF-8">
     <title>Fate Overlay</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=Martian+Mono:wght@800&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=Martian+Mono:wght@800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --panel-top: 40px;
@@ -24,226 +23,57 @@
             --label-bg: rgba(0, 0, 0, 0.45);
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            width: 1620px;
-            height: 290px;
-            overflow: hidden;
-            background: transparent;
-            font-family: 'Inter', sans-serif;
-            color: white;
+            width: 1620px; height: 290px;
+            overflow: hidden; background: transparent;
+            font-family: 'Inter', sans-serif; color: white;
         }
 
         #wrap {
-            position: absolute;
-            left: 50%;
-            top: -310px; /* Start way above */
-            width: 1600px;
-            height: 210px;
-            transform: translateX(-50%);
-            opacity: 0;
+            position: absolute; left: 50%; top: -310px; 
+            width: 1600px; height: 210px;
+            transform: translateX(-50%); opacity: 0;
             border-radius: var(--panel-radius);
             background-color: var(--panel-bg-color);
-            background-size: cover;
-            background-position: center;
+            background-size: cover; background-position: center;
             box-shadow: 0 14px 45px rgba(0, 0, 0, .45);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            display: flex; align-items: center; justify-content: space-between;
             padding: 0 40px;
             transition: top 650ms cubic-bezier(0.19, 1, 0.22, 1), opacity 300ms ease;
             border: 1px solid rgba(255, 255, 255, 0.05);
             z-index: 9999;
         }
 
-        #wrap.show {
-            top: var(--panel-top);
-            opacity: 1;
-        }
+        #wrap.show { top: var(--panel-top); opacity: 1; }
+        #wrap.hide { top: -310px; opacity: 0; }
 
-        #wrap.hide {
-            top: -310px;
-            opacity: 0;
-        }
+        #left-side { display: flex; align-items: center; gap: 20px; flex: 1; }
+        #user { font-size: var(--name-size); font-weight: 900; color: var(--white); text-shadow: 0 6px 20px rgba(0, 0, 0, .6); text-transform: uppercase; }
+        #avatar { width: 110px; height: 110px; border-radius: 12px; background: #222; object-fit: cover; box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4); }
 
-        /* Nick and Avatar at way left */
-        #left-side {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            flex: 1;
-        }
+        #center-side { display: flex; align-items: center; gap: 30px; justify-content: center; flex: 2; }
+        .col { text-align: center; }
+        .labelWrap { display: inline-block; background: var(--label-bg); border-radius: 8px; padding: 4px 12px; margin-bottom: 6px; }
+        .label { font-size: 16px; font-weight: 800; color: var(--muted); text-transform: uppercase; line-height: 1; }
+        .num { font-size: var(--num-size); font-weight: 900; font-family: 'Martian Mono', monospace; color: var(--num-color); line-height: 1; min-width: 160px; text-shadow: 0 8px 24px rgba(0, 0, 0, .7); }
+        #vs { font-size: var(--vs-size); font-weight: 900; color: var(--white); opacity: 1; text-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); }
 
-        #user {
-            font-size: var(--name-size);
-            font-weight: 900;
-            color: var(--white);
-            text-shadow: 0 6px 20px rgba(0, 0, 0, .6);
-            text-transform: uppercase;
-        }
+        #right-side { display: flex; align-items: center; gap: 20px; justify-content: flex-end; flex: 1.5; }
+        #rewardTitle { font-size: var(--title-size); font-weight: 900; color: var(--white); text-align: center; text-transform: uppercase; max-width: 300px; line-height: 1.1; }
+        #rewardImg { width: 150px; height: 150px; display: flex; align-items: center; justify-content: center; }
+        #rewardImg img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.4)); }
 
-        #avatar {
-            width: 110px;
-            height: 110px;
-            border-radius: 12px;
-            background: #222;
-            object-fit: cover;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-        }
+        #badge { position: absolute; right: 150px; bottom: -25px; font-size: 32px; font-weight: 900; padding: 8px 30px; border-radius: 99px; opacity: 0; transform: scale(.8); transition: all 0.3s; z-index: 50; }
+        #badge.show { opacity: 1; transform: scale(1) translateY(-15px); }
+        #badge.win { background: var(--green); color: white; box-shadow: 0 8px 20px rgba(40, 209, 124, 0.4); }
+        #badge.lose { background: var(--red); color: white; }
 
-        /* Center Section (Label + Numbers) */
-        #center-side {
-            display: flex;
-            align-items: center;
-            gap: 30px;
-            justify-content: center;
-            flex: 2;
-        }
-
-        .col {
-            text-align: center;
-        }
-
-        .labelWrap {
-            display: inline-block;
-            background: var(--label-bg);
-            border-radius: 8px;
-            padding: 4px 12px;
-            margin-bottom: 6px;
-        }
-
-        .label {
-            font-size: 16px;
-            font-weight: 800;
-            color: var(--muted);
-            text-transform: uppercase;
-            line-height: 1;
-        }
-
-        .num {
-            font-size: var(--num-size);
-            font-weight: 900;
-            font-family: 'Martian Mono', monospace;
-            color: var(--num-color);
-            line-height: 1;
-            min-width: 160px;
-            text-shadow: 0 8px 24px rgba(0, 0, 0, .7);
-        }
-
-        #vs {
-            font-size: var(--vs-size);
-            font-weight: 900;
-            color: var(--white);
-            opacity: 1;
-            /* Forced opaque */
-            text-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
-        }
-
-        /* Right Section (Reward) */
-        #right-side {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            justify-content: flex-end;
-            flex: 1.5;
-        }
-
-        #rewardTitle {
-            font-size: var(--title-size);
-            font-weight: 900;
-            color: var(--white);
-            text-align: center;
-            /* Centered as requested */
-            text-transform: uppercase;
-            max-width: 300px;
-            line-height: 1.1;
-        }
-
-        #rewardImg {
-            width: 150px;
-            height: 150px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        #rewardImg img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.4));
-        }
-
-        #badge {
-            position: absolute;
-            right: 150px;
-            bottom: -25px;
-            font-size: 32px;
-            font-weight: 900;
-            padding: 8px 30px;
-            border-radius: 99px;
-            opacity: 0;
-            transform: scale(.8);
-            transition: all 0.3s;
-            z-index: 50;
-        }
-
-        #badge.show {
-            opacity: 1;
-            transform: scale(1) translateY(-15px);
-        }
-
-        #badge.win {
-            background: var(--green);
-            color: white;
-            box-shadow: 0 8px 20px rgba(40, 209, 124, 0.4);
-        }
-
-        #badge.lose {
-            background: var(--red);
-            color: white;
-        }
-
-        .rollFlash {
-            animation: flash .1s linear infinite;
-        }
-
-        @keyframes flash {
-
-            0%,
-            100% {
-                opacity: 1
-            }
-
-            50% {
-                opacity: .4
-            }
-        }
-
-        .shake {
-            animation: shake .4s ease-in-out;
-        }
-
-        @keyframes shake {
-
-            0%,
-            100% {
-                transform: translate(0, 0);
-            }
-
-            25% {
-                transform: translate(-10px, 0);
-            }
-
-            75% {
-                transform: translate(10px, 0);
-            }
-        }
+        .rollFlash { animation: flash .1s linear infinite; }
+        @keyframes flash { 0%, 100% { opacity: 1 } 50% { opacity: .4 } }
+        .shake { animation: shake .4s ease-in-out; }
+        @keyframes shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-10px, 0); } 75% { transform: translate(10px, 0); } }
     </style>
 </head>
 
@@ -256,16 +86,12 @@
 
         <div id="center-side">
             <div class="col">
-                <div class="labelWrap">
-                    <div class="label">Число зрителя</div>
-                </div>
+                <div class="labelWrap"><div class="label">Число зрителя</div></div>
                 <div class="num" id="pickNum">00</div>
             </div>
             <div id="vs">VS</div>
             <div class="col">
-                <div class="labelWrap">
-                    <div class="label">Число рандома</div>
-                </div>
+                <div class="labelWrap"><div class="label">Число рандома</div></div>
                 <div class="num" id="rollNum">00</div>
             </div>
         </div>
@@ -278,78 +104,201 @@
         <div id="badge"></div>
     </div>
 
-    <audio id="sIn" src="/overlays/defaults/sounds/in.mp3" preload="auto"></audio>
-    <audio id="sRoll" src="/overlays/defaults/sounds/roll.mp3" preload="auto"></audio>
-    <audio id="sWin" src="/overlays/defaults/sounds/win.mp3" preload="auto"></audio>
-    <audio id="sLose" src="/overlays/defaults/sounds/lose.mp3" preload="auto"></audio>
-    <audio id="sOut" src="/overlays/defaults/sounds/out.mp3" preload="auto"></audio>
+    <audio id="sIn" preload="auto"></audio>
+    <audio id="sRoll" preload="auto"></audio>
+    <audio id="sWin" preload="auto"></audio>
+    <audio id="sLose" preload="auto"></audio>
+    <audio id="sOut" preload="auto"></audio>
 
     <script>
         const T_IN = 650;
         const T_STAND = 1000;
         const T_ROLL = 3000;
-        const T_AFTER = 2000; // Updated to 2 seconds
+        const T_AFTER = 2000;
         const T_OUT = 650;
 
         const urlParams = new URLSearchParams(window.location.search);
         const userId = urlParams.get('id');
+        let supabase = null;
+        let realtimeChannel = null;
+        
         let isRunning = false;
-        let lastTriggerId = null;
-        let triggerBaselineReady = false;
-        const pageStartedAt = Date.now();
+        const eventQueue = [];
+        let currentlyProcessingId = null;
 
-        async function loadAssets() {
+        async function init() {
             if (!userId) return;
+
             try {
-                const res = await fetch(`/api/ov_upload?userId=${userId}`);
-                const assets = await res.json();
-                if (assets.panel_bg) document.getElementById('wrap').style.backgroundImage = `url(${assets.panel_bg})`;
-                const rewardImage = assets.reward_icon || assets.reward_img;
-                if (rewardImage) document.getElementById('rewardImg').innerHTML = `<img src="${rewardImage}">`;
-                [
-                    ['sIn', assets.sound_in || assets.s_in],
-                    ['sRoll', assets.sound_loop || assets.sound_roll || assets.s_roll],
-                    ['sWin', assets.sound_win || assets.s_win],
-                    ['sLose', assets.sound_lose || assets.s_lose],
-                    ['sOut', assets.sound_out || assets.s_out]
-                ].forEach(([id, url]) => {
-                    const audio = document.getElementById(id);
-                    if (audio && url) audio.src = url;
+                const res = await fetch('/api/ov_env');
+                const env = await res.json();
+                if(!env.supabaseUrl || !env.supabaseAnonKey) throw new Error('No Supabase Env');
+                
+                supabase = window.supabase.createClient(env.supabaseUrl, env.supabaseAnonKey);
+                
+                // Initial load
+                await loadConfig();
+                await fetchPendingEvents();
+
+                // Subscriptions
+                setupRealtime();
+                
+                // Start queue processor
+                setInterval(processQueue, 500);
+
+            } catch (e) {
+                console.error("Initialization error:", e);
+            }
+        }
+
+        async function loadConfig() {
+            try {
+                const { data, error } = await supabase
+                    .from('overlay_configs')
+                    .select('settings, assets')
+                    .eq('user_id', userId)
+                    .eq('overlay_type', 'fate')
+                    .maybeSingle();
+
+                if (error && error.code !== 'PGRST116') {
+                    console.error("Error loading config:", error);
+                }
+
+                if (!data) {
+                    // Try fallback
+                    const { data: legacy } = await supabase
+                        .from('overlay_configs')
+                        .select('settings, assets')
+                        .eq('user_id', userId)
+                        .maybeSingle();
+                    if(legacy) applyConfig(legacy);
+                } else {
+                    applyConfig(data);
+                }
+            } catch (e) { console.error("Load config error:", e); }
+        }
+
+        function applyConfig(config) {
+            const assets = config.assets || {};
+            const settings = config.settings || {};
+            const fateSettings = settings.fate || settings;
+
+            if (assets.panel_bg) document.getElementById('wrap').style.backgroundImage = `url(${assets.panel_bg})`;
+            const rewardImage = assets.reward_icon || assets.reward_img;
+            if (rewardImage) document.getElementById('rewardImg').innerHTML = `<img src="${rewardImage}">`;
+            
+            if (fateSettings.reward_name) document.getElementById('rewardTitle').textContent = fateSettings.reward_name;
+
+            [
+                ['sIn', assets.sound_in || assets.s_in || '/overlays/defaults/sounds/in.mp3'],
+                ['sRoll', assets.sound_loop || assets.sound_roll || assets.s_roll || '/overlays/defaults/sounds/roll.mp3'],
+                ['sWin', assets.sound_win || assets.s_win || '/overlays/defaults/sounds/win.mp3'],
+                ['sLose', assets.sound_lose || assets.s_lose || '/overlays/defaults/sounds/lose.mp3'],
+                ['sOut', assets.sound_out || assets.s_out || '/overlays/defaults/sounds/out.mp3']
+            ].forEach(([id, url]) => {
+                const audio = document.getElementById(id);
+                if (audio && url && audio.src !== url && audio.src !== window.location.origin + url) {
+                    audio.src = url;
+                }
+            });
+        }
+
+        async function fetchPendingEvents() {
+            try {
+                const { data, error } = await supabase
+                    .from('overlay_events')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .eq('overlay_type', 'fate')
+                    .eq('status', 'pending')
+                    .order('created_at', { ascending: true });
+
+                if (error) {
+                    console.error("Fetch events error:", error);
+                    return;
+                }
+
+                if (data && data.length > 0) {
+                    data.forEach(evt => {
+                        if (!eventQueue.some(e => e.id === evt.id) && evt.id !== currentlyProcessingId) {
+                            eventQueue.push(evt);
+                        }
+                    });
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function setupRealtime() {
+            realtimeChannel = supabase.channel('obs_fate_' + userId)
+                .on(
+                    'postgres_changes',
+                    { event: 'INSERT', schema: 'public', table: 'overlay_events', filter: `user_id=eq.${userId}` },
+                    (payload) => {
+                        const evt = payload.new;
+                        if (evt.overlay_type === 'fate' && evt.status === 'pending') {
+                            if (!eventQueue.some(e => e.id === evt.id) && evt.id !== currentlyProcessingId) {
+                                eventQueue.push(evt);
+                            }
+                        }
+                    }
+                )
+                .on(
+                    'postgres_changes',
+                    { event: 'UPDATE', schema: 'public', table: 'overlay_configs', filter: `user_id=eq.${userId}` },
+                    (payload) => {
+                        const cfg = payload.new;
+                        if (cfg.overlay_type === 'fate' || !cfg.overlay_type) {
+                            applyConfig(cfg);
+                        }
+                    }
+                )
+                .subscribe(async (status) => {
+                    if (status === 'SUBSCRIBED') {
+                        console.log("Supabase Realtime connected");
+                        // Fetch missed events just in case
+                        await fetchPendingEvents();
+                    } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                        console.log("Supabase Realtime disconnected/error");
+                    }
                 });
-            } catch (e) { }
         }
 
-        async function loadSettings() {
-            if (!userId) return;
-            try {
-                const res = await fetch(`/api/ov_settings?userId=${userId}`);
-                const settings = await res.json();
-                if (settings.reward_name) document.getElementById('rewardTitle').textContent = settings.reward_name;
-            } catch (e) { }
-        }
+        async function processQueue() {
+            if (isRunning || eventQueue.length === 0) return;
+            
+            const evt = eventQueue.shift();
+            currentlyProcessingId = evt.id;
+            isRunning = true;
 
-        async function checkTrigger(isInitial = false) {
-            if ((isRunning && !isInitial) || !userId) return;
             try {
-                const res = await fetch(`/api/ov_trigger?userId=${userId}&type=fate&t=${Date.now()}`);
-                const data = await res.json();
-                if (!data || !data.triggerId) {
-                    triggerBaselineReady = true;
+                // Try to claim atomically
+                const { data: claimed, error } = await supabase.rpc('claim_overlay_event', {
+                    p_event_id: evt.id,
+                    p_user_id: userId
+                });
+
+                if (error) {
+                    console.error("Claim error:", error);
+                    isRunning = false;
+                    currentlyProcessingId = null;
                     return;
                 }
 
-                if (!triggerBaselineReady) {
-                    triggerBaselineReady = true;
-                    lastTriggerId = data.triggerId;
-                    if ((Number(data.timestamp) || 0) > pageStartedAt) animate(data);
-                    return;
+                if (claimed) {
+                    await animate(evt);
+                    
+                    // Mark completed
+                    await supabase
+                        .from('overlay_events')
+                        .update({ status: 'completed', completed_at: new Date().toISOString() })
+                        .eq('id', evt.id);
                 }
+            } catch (e) {
+                console.error("Process error:", e);
+            }
 
-                if (data.triggerId !== lastTriggerId) {
-                    lastTriggerId = data.triggerId;
-                    animate(data);
-                }
-            } catch (e) { }
+            isRunning = false;
+            currentlyProcessingId = null;
         }
 
         function play(id) {
@@ -359,8 +308,8 @@
 
         const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-        async function animate(data) {
-            isRunning = true;
+        async function animate(evt) {
+            const data = evt.payload || {};
             const wrap = document.getElementById('wrap');
             const userEl = document.getElementById('user');
             const avatarEl = document.getElementById('avatar');
@@ -375,9 +324,9 @@
             rollEl.classList.remove('rollFlash');
             rollEl.style.color = "var(--white)";
 
-            userEl.textContent = data.userName;
-            if (data.userAvatar) avatarEl.src = data.userAvatar;
-            pickEl.textContent = data.userChoice.toString().padStart(2, '0');
+            userEl.textContent = evt.viewer_name || "PLAYER";
+            if (evt.viewer_avatar) avatarEl.src = evt.viewer_avatar;
+            pickEl.textContent = (data.userChoice || 0).toString().padStart(2, '0');
             rollEl.textContent = "00";
 
             wrap.classList.remove('hide');
@@ -398,7 +347,7 @@
 
             let resultNum = Number(data.result);
             if (!Number.isFinite(resultNum) || resultNum <= 0) {
-                resultNum = data.isTest ? (Math.random() > 0.5 ? data.userChoice : Math.floor(Math.random() * 99 + 1)) : Math.floor(Math.random() * 99 + 1);
+                resultNum = Math.floor(Math.random() * 99 + 1);
             }
             rollEl.textContent = resultNum.toString().padStart(2, '0');
 
@@ -414,31 +363,11 @@
             wrap.classList.remove('show');
             wrap.classList.add('hide');
             await sleep(T_OUT);
-
-            isRunning = false;
         }
 
-        if (userId) {
-            loadAssets();
-            loadSettings();
+        // Start
+        init();
 
-            // Check if we are in instant test mode from URL params
-            const isTestMode = urlParams.get('test') === '1';
-            if (isTestMode) {
-                const data = {
-                    userName: urlParams.get('userName') || 'PLAYER',
-                    userChoice: parseInt(urlParams.get('userChoice')) || 0,
-                    userAvatar: urlParams.get('userAvatar') || '',
-                    isTest: true
-                };
-                // Small delay to ensure styles/assets are ready
-                setTimeout(() => animate(data), 500);
-            } else {
-                checkTrigger(true);
-                setInterval(() => checkTrigger(false), 1500);
-            }
-        }
     </script>
 </body>
-
 </html>
