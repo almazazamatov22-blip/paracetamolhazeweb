@@ -1,13 +1,24 @@
-import { Metadata, ResolvingMetadata } from 'next';
+import { Metadata } from 'next';
 import Client67 from './Client67';
 import { generateBaseMetadata } from '@/lib/seo';
 
-export async function generateMetadata(
-  { searchParams }: { searchParams: { score?: string, user?: string } },
-  parent: ResolvingMetadata
-): Promise<Metadata> {
-  const score = searchParams.score || '0';
-  const user = searchParams.user || 'Игрок';
+type MetadataSearchParams = Promise<{
+  score?: string | string[];
+  user?: string | string[];
+}>;
+
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: MetadataSearchParams;
+}): Promise<Metadata> {
+  const resolvedSearchParams = await searchParams;
+  const score = firstParam(resolvedSearchParams.score) || '0';
+  const user = firstParam(resolvedSearchParams.user) || 'Игрок';
   
   const title = score !== '0' 
     ? `Я выжал ${score} в 67! А сколько сможешь ты?` 
