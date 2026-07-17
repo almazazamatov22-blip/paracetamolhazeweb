@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { TwitchConsentNotice } from '@/components/legal/TwitchConsentNotice'
 
 const ACTION_ICONS: Record<string, string> = {
   drop_weapon:   '🔫',
@@ -63,7 +64,8 @@ export default function CS2HistoryPage() {
         <div className="hist-center">
           <h1>🔐 Требуется авторизация</h1>
           <a href="/auth/twitch?source=cs2" className="hist-btn hist-btn-twitch">Войти через Twitch</a>
-          <a href="/cs2" className="hist-back">← Назад</a>
+          <TwitchConsentNotice />
+          <a href="/cs2" className="hist-back mt-2">← Назад</a>
         </div>
         <style>{histStyles}</style>
       </main>

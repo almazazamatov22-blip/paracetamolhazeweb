@@ -25,6 +25,9 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { signIn, signOut, useSession } from '@/lib/67/authHook';
+import { PlayerAvatar } from './PlayerAvatar';
+import { useAuthChannel } from '@/lib/67/authHook';
+import { TwitchConsentNotice } from '@/components/legal/TwitchConsentNotice';
 import { supabase } from '@/lib/supabase';
 
 type Phase = 'waiting' | 'lobby' | 'input' | 'voting' | 'reveal' | 'leaderboard';
@@ -1223,6 +1226,7 @@ export default function BredClient() {
                 <ChevronLeft size={18} aria-hidden="true" />
                 назад
               </button>
+              <TwitchConsentNotice />
             </div>
           </div>
         </div>
@@ -1313,6 +1317,7 @@ export default function BredClient() {
                     Telegram
                   </a>
                 </div>
+                <TwitchConsentNotice />
               </>
             )}
           </div>

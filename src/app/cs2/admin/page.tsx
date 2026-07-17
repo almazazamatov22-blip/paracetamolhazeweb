@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { TwitchConsentNotice } from '@/components/legal/TwitchConsentNotice'
 
 import { ACTION_REGISTRY } from '@/lib/cs2-actions';
 
@@ -171,7 +172,8 @@ export default function CS2AdminPage() {
             </svg>
             Войти через Twitch
           </a>
-          <a href="/cs2" className="adm-back">← Назад</a>
+          <TwitchConsentNotice />
+          <a href="/cs2" className="adm-back mt-2">← Назад</a>
         </div>
         <style>{adminStyles}</style>
       </main>

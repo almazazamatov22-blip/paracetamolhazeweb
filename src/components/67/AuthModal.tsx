@@ -5,6 +5,7 @@ import { useAppStore } from '@/lib/67/store';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Button } from '@/components/67/ui/button';
+import { TwitchConsentNotice } from '@/components/legal/TwitchConsentNotice';
 
 /**
  * No longer a login form — just a prompt to sign in via Twitch
@@ -55,6 +56,8 @@ export function AuthModal() {
           >
             Играть без аккаунта (результат не сохранится)
           </button>
+
+          <TwitchConsentNotice />
         </motion.div>
       </motion.div>
     </AnimatePresence>

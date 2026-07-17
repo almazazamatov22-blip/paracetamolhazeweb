@@ -192,6 +192,13 @@ export default function Home() {
           <span className="paracetamol-bottom-left">Offline</span>
           <span className="paracetamol-bottom-right">online</span>
         </div>
+
+        {/* Legal Links */}
+        <div className="mt-8 flex justify-center gap-4 text-[10px] text-white/40 uppercase tracking-widest font-mono">
+          <a href="/privacy" className="hover:text-white/80 transition-colors">Политика конфиденциальности</a>
+          <span className="opacity-50">|</span>
+          <a href="/terms" className="hover:text-white/80 transition-colors">Условия использования</a>
+        </div>
       </div>
     </main>
   )
