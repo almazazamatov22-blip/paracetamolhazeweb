@@ -25,7 +25,7 @@ export default function OBSOverlaysGuide() {
               "@type": "ListItem",
               position: 2,
               name: "Оверлеи",
-              item: `${SITE_URL}/projects/twitch-overlays`
+              item: `${SITE_URL}/overlays`
             },
             {
               "@type": "ListItem",
