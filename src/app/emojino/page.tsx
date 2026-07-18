@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/67/ui/button'; 
 import { AuthProvider, useSession, signIn, signOut } from '@/lib/67/authHook'; 
 import { supabase } from '@/lib/supabase';
+import { TwitchConsentNotice } from "@/components/legal/TwitchConsentNotice";
 
 // ============ TYPES ============
 interface EmojinoState {
@@ -429,9 +430,12 @@ function EmojinoContent() {
                   <span className="text-xs font-bold">{session.user.name}</span>
                 </button>
              ) : (
-                <Button className="bg-[#9146FF] hover:bg-[#7c3aed] text-white rounded-xl h-11 px-6 text-sm font-bold shadow-lg" onClick={() => signIn('emojino')}>
-                   Войти через Twitch
-                </Button>
+                <div className="flex flex-col items-center">
+                  <Button className="bg-[#9146FF] hover:bg-[#7c3aed] text-white rounded-xl h-11 px-6 text-sm font-bold shadow-lg" onClick={() => signIn('emojino')}>
+                     Войти через Twitch
+                  </Button>
+                  <TwitchConsentNotice />
+                </div>
              )}
           </div>
         </div>
