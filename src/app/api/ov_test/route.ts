@@ -90,37 +90,36 @@ export async function POST(req: NextRequest) {
     const allSettings: any = matchedConfig?.settings || {};
     const globalAssets: any = matchedConfig?.assets || {};
 
-    let settings = allSettings[type] || {};
-    if (type === 'fate' && Object.keys(settings).length === 0 && allSettings.reward_id) {
-      settings = allSettings;
-    }
+    const settings =
+      type === 'fate'
+        ? (allSettings.fate && typeof allSettings.fate === 'object' ? allSettings.fate : allSettings)
+        : (allSettings[type] && typeof allSettings[type] === 'object' ? allSettings[type] : allSettings);
 
     if (type === 'fate') {
       if (!internal_id) {
           return NextResponse.json({ error: 'internal_id required' }, { status: 400 });
       }
 
-      let reward = null;
-      let isLegacy = false;
+      const rewards = Array.isArray(settings.rewards) ? settings.rewards : [];
 
-      if (internal_id === 'legacy-reward') {
-          if (!settings.rewards) {
-              isLegacy = true;
-              reward = {
-                  internal_id: 'legacy-reward',
-                  reward_id: settings.reward_id,
-                  min_val: settings.min_val || 1,
-                  max_val: settings.max_val || 100,
-                  reward_name: settings.reward_name || 'Legacy Test Reward'
-              };
-          }
-      } else {
-          if (!matchedConfig) {
-              return NextResponse.json({ error: 'Fate config not found' }, { status: 404 });
-          }
-          if (settings.rewards && Array.isArray(settings.rewards)) {
-              reward = settings.rewards.find((r: any) => r.internal_id === internal_id);
-          }
+      let reward = rewards.find((r: any) => r.internal_id === internal_id);
+
+      const requestedRewardId = typeof body.reward_id === 'string' ? body.reward_id.trim() : '';
+      if (!reward && requestedRewardId) {
+          reward = rewards.find((r: any) => r.reward_id === requestedRewardId);
+      }
+
+      let isLegacy = false;
+      if (!reward && internal_id === 'legacy-reward' && settings.reward_id) {
+          isLegacy = true;
+          reward = {
+              internal_id: 'legacy-reward',
+              reward_id: settings.reward_id,
+              title: settings.title || settings.reward_name || 'Награда',
+              reward_name: settings.reward_name || settings.title || 'Награда',
+              min_val: settings.min_val ?? 1,
+              max_val: settings.max_val ?? 100
+          };
       }
 
       if (!reward) {
@@ -154,7 +153,7 @@ export async function POST(req: NextRequest) {
       }
 
       const payload = {
-         fate_reward_internal_id: reward?.internal_id || 'legacy-test',
+         fate_reward_internal_id: reward?.internal_id || 'legacy-reward',
          userChoice,
          result,
          isTest: true,
@@ -170,7 +169,7 @@ export async function POST(req: NextRequest) {
           source: 'dashboard',
           external_event_id: 'test_' + Math.random().toString(36).substring(7),
           reward_id: reward?.reward_id || 'test_reward',
-          reward_name: reward?.reward_name || 'Тестовая награда',
+          reward_name: reward?.title || reward?.reward_name || 'Тестовая награда',
           viewer_id: userId,
           viewer_name: userName || 'TEST_USER',
           viewer_avatar: userAvatar || '',

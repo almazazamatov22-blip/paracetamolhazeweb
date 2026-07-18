@@ -123,12 +123,7 @@
                     <div class="card">
                         <div class="card-title">Настройки Награды</div>
                         <form id="settings-form" onsubmit="saveSettings(event)">
-                            <label class="label">Награда Twitch (С вводом текста)</label>
-                            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                                <select id="reward-select" name="reward_id" onchange="onTwitchRewardChange()" style="margin-bottom: 0;"></select>
-                                <button type="button" class="btn btn-outline" onclick="fetchTwitchRewards()" style="padding: 10px;" title="Обновить список">↻</button>
-                                <button type="button" class="btn btn-outline" onclick="showCreateTwitchModal()" style="padding: 10px;" title="Создать новую награду в Twitch">+</button>
-                            </div>
+
 
                             <label class="label">Название (отображается в Twitch)</label>
                             <input type="text" id="tw_title" placeholder="Fate Roll" />
@@ -152,11 +147,11 @@
                     <div class="card">
                         <div class="card-title">Действия</div>
                         <div style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px;">
-                            <button class="btn" style="background: var(--success);" onclick="testOverlay()">ТЕСТ НАГРАДЫ</button>
+                            <button id="test-btn" class="btn" style="background: var(--success);" onclick="testOverlay()">ТЕСТ НАГРАДЫ</button>
                         </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                            <button class="btn btn-outline" onclick="deleteCurrentReward()" title="Удалить только эту карточку из Fate (Награда в Twitch останется)">УДАЛИТЬ ИЗ FATE</button>
-                            <button class="btn btn-danger" onclick="deleteTwitchReward()" title="Удалить текущую привязанную награду в Twitch">УДАЛИТЬ В TWITCH</button>
+                            <button id="remove-fate-btn" class="btn btn-outline" onclick="deleteCurrentReward()" title="Удалить только эту карточку из Fate (Награда в Twitch останется)">УДАЛИТЬ ИЗ FATE</button>
+                            <button id="delete-twitch-btn" class="btn btn-danger" onclick="deleteTwitchReward()" title="Удалить текущую привязанную награду в Twitch">УДАЛИТЬ В TWITCH</button>
                         </div>
                     </div>
                 </div>
@@ -175,22 +170,7 @@
     <!-- Hidden OBS element for clipboard -->
     <div id="obs-url" class="hidden"></div>
 
-    <div id="twitch-modal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center;">
-        <div class="card" style="width: 400px; margin: 0;">
-            <div class="card-title">Создать награду в Twitch</div>
-            <label class="label">Название</label>
-            <input type="text" id="tw-title-create" placeholder="Fate Roll" />
-            <label class="label">Описание</label>
-            <input type="text" id="tw-desc-create" placeholder="Введите число для Fate Roll" />
-            <label class="label">Стоимость (баллы)</label>
-            <input type="number" id="tw-cost-create" value="1000" />
 
-            <div style="display: flex; gap: 12px; margin-top: 16px;">
-                <button class="btn btn-outline" style="flex: 1;" onclick="document.getElementById('twitch-modal').classList.add('hidden')">ОТМЕНА</button>
-                <button class="btn" style="flex: 1;" onclick="createTwitchReward()">СОЗДАТЬ</button>
-            </div>
-        </div>
-    </div>
 
     <div id="toast" class="toast"></div>
 
@@ -201,7 +181,7 @@
 
         let fateRewards = [];
         let currentRewardId = null;
-        let twitchRewardsList = [];
+
 
         const assetTemplates = [
             { id: 'panel_bg', name: 'Фон панели', meta: 'Рекомендуемо: 1600x210' },
@@ -214,102 +194,60 @@
         ];
 
         function generateUUID() {
+            if (window.crypto && crypto.randomUUID) {
+                return crypto.randomUUID();
+            }
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
                 var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
                 return v.toString(16);
             });
         }
 
-        function showCreateTwitchModal() {
-            if (!currentRewardId) {
-                showToast('Сначала выберите или создайте карточку Fate', true);
-                return;
-            }
-            document.getElementById('tw-title-create').value = '';
-            document.getElementById('tw-desc-create').value = '';
-            document.getElementById('tw-cost-create').value = '1000';
-            document.getElementById('twitch-modal').classList.remove('hidden');
-        }
-
-        function onTwitchRewardChange() {
-            const sel = document.getElementById('reward-select');
-            const tw = twitchRewardsList.find(r => r.id === sel.value);
-            if (tw) {
-                document.getElementById('tw_title').value = tw.title;
-                document.getElementById('tw_desc').value = tw.prompt || '';
-                document.getElementById('tw_cost').value = tw.cost || 1000;
-            } else {
-                document.getElementById('tw_title').value = '';
-                document.getElementById('tw_desc').value = '';
-                document.getElementById('tw_cost').value = '';
-            }
-        }
-
-        async function createTwitchReward() {
-            const title = document.getElementById('tw-title-create').value.trim();
-            const desc = document.getElementById('tw-desc-create').value.trim();
-            const cost = parseInt(document.getElementById('tw-cost-create').value);
-
-            if (!title || isNaN(cost) || cost <= 0) {
-                showToast('Введите корректное название и стоимость', true);
-                return;
-            }
-
-            document.getElementById('twitch-modal').classList.add('hidden');
-            showToast('Создание в Twitch...');
-
-            try {
-                const res = await fetch('/api/ov_rewards', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, description: desc, cost })
-                });
-
-                if (!res.ok) {
-                    const data = await res.json();
-                    throw new Error(data.error || 'Ошибка создания награды');
-                }
-
-                const data = await res.json();
-                showToast('Twitch награда создана!');
-
-                await fetchTwitchRewards();
-
-                const sel = document.getElementById('reward-select');
-                if (data.reward && data.reward.id) {
-                    sel.value = data.reward.id;
-                    onTwitchRewardChange();
-                    const reward = fateRewards.find(r => r.internal_id === currentRewardId);
-                    if (reward) {
-                        reward.reward_id = data.reward.id;
-                        reward.title = data.reward.title;
-                        reward.reward_name = data.reward.title;
-                        reward.description = data.reward.prompt;
-                        reward.cost = data.reward.cost;
-                        await persistRewards();
-                        showToast('Карточка сохранена!');
-                        renderRewardsList();
+        async function persistRewards() {
+            const response = await fetch('/api/ov_settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    type: 'fate',
+                    settings: {
+                        version: 2,
+                        rewards: fateRewards.map(
+                            ({
+                                assets,
+                                _isNew,
+                                _needsBinding,
+                                ...reward
+                            }) => reward
+                        )
                     }
-                }
-            } catch (e) {
-                showToast(e.message, true);
-                console.error(e);
+                })
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Ошибка сохранения локальных настроек');
             }
+
+            return data;
         }
 
         async function deleteTwitchReward() {
             if (!currentRewardId) return;
-            const sel = document.getElementById('reward-select');
-            const twId = sel.value;
+            const reward = fateRewards.find(item => item.internal_id === currentRewardId);
+            const twId = reward?.reward_id;
+
             if (!twId) {
-                showToast('Эта карточка не привязана ни к одной Twitch-награде', true);
+                showToast('Карточка ещё не создана в Twitch', true);
                 return;
             }
             if (!confirm('Вы уверены, что хотите удалить эту награду ИЗ TWITCH? Это действие необратимо.')) return;
 
             showToast('Удаление из Twitch...');
-            let deletedInTwitch = false;
             try {
+                let deletedInTwitch = false;
                 const res = await fetch('/api/ov_rewards', {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
@@ -317,7 +255,7 @@
                 });
 
                 if (!res.ok) {
-                    const d = await res.json();
+                    const d = await res.json().catch(() => ({}));
                     if (res.status === 404 || d.error?.includes('не найдена') || d.error?.includes('уже удалена')) {
                         console.warn('Already deleted in Twitch');
                         deletedInTwitch = true;
@@ -334,7 +272,7 @@
                     try {
                         await persistRewards();
                         showToast('Награда удалена из Twitch и локально');
-                        await fetchTwitchRewards();
+                        await loadSettings();
 
                         currentRewardId = fateRewards.length > 0 ? fateRewards[0].internal_id : null;
                         if (currentRewardId) {
@@ -344,7 +282,7 @@
                             hideEditor();
                         }
                     } catch (persistErr) {
-                        showToast('Награда удалена из Twitch, но локальную привязку удалить не удалось. Нажмите "Удалить из Fate" и повторите сохранение.', true);
+                        showToast('Награда удалена из Twitch, но локальную привязку удалить не удалось.', true);
                         await loadSettings();
                     }
                 }
@@ -372,7 +310,7 @@
                 document.getElementById('user-avatar').src = data.profile_image_url;
                 document.getElementById('obs-url').textContent = `${window.location.origin}/overlays/roll.html?id=${data.id}`;
 
-                await fetchTwitchRewards();
+
                 await loadSettings();
                 await initSupabase();
 
@@ -441,37 +379,6 @@
             }
         }
 
-        async function fetchTwitchRewards() {
-            try {
-                const res = await fetch('/api/ov_rewards');
-                if (!res.ok) throw new Error('Failed to fetch rewards');
-                twitchRewardsList = await res.json();
-                updateRewardSelect();
-            } catch (e) {
-                console.error('Fetch rewards error:', e);
-            }
-        }
-
-        function updateRewardSelect() {
-            const sel = document.getElementById('reward-select');
-            if(!sel) return;
-            const cur = sel.value;
-            sel.innerHTML = '';
-
-            const defOpt = document.createElement('option');
-            defOpt.value = '';
-            defOpt.textContent = 'Выберите награду...';
-            sel.appendChild(defOpt);
-
-            for (const r of twitchRewardsList) {
-                const opt = document.createElement('option');
-                opt.value = r.id;
-                opt.textContent = r.title;
-                if (r.id === cur) opt.selected = true;
-                sel.appendChild(opt);
-            }
-        }
-
         async function loadSettings() {
             if(!currentUser) return;
             const res = await fetch(`/api/ov_settings?userId=${currentUser.id}&type=fate`);
@@ -529,7 +436,15 @@
 
                 const item = document.createElement('div');
                 item.className = 'reward-item' + (r.internal_id === currentRewardId ? ' active' : '');
-                item.addEventListener('click', () => selectReward(r.internal_id));
+                item.addEventListener('click', () => {
+                    const unfinished = fateRewards.find(item => item._isNew || item._needsBinding);
+                    if (unfinished && unfinished.internal_id !== r.internal_id) {
+                        showToast('Сначала завершите или удалите создаваемую награду', true);
+                        selectReward(unfinished.internal_id);
+                        return;
+                    }
+                    selectReward(r.internal_id);
+                });
 
                 const infoDiv = document.createElement('div');
                 const titleDiv = document.createElement('div');
@@ -571,34 +486,70 @@
             document.getElementById('editor-container').classList.remove('hidden');
             document.getElementById('assets-container').classList.remove('hidden');
 
-            const sel = document.getElementById('reward-select');
+            const btn = document.getElementById('save-btn');
+            const testBtn = document.getElementById('test-btn');
+            const removeFateBtn = document.getElementById('remove-fate-btn');
+            const deleteTwitchBtn = document.getElementById('delete-twitch-btn');
 
-            if (reward.reward_id && !Array.from(sel.options).some(o => o.value === reward.reward_id)) {
-                const opt = document.createElement('option');
-                opt.value = reward.reward_id;
-                opt.textContent = reward.reward_name || 'Неизвестно';
-                sel.appendChild(opt);
+            if (removeFateBtn && deleteTwitchBtn) {
+                if (reward._needsBinding && reward.reward_id) {
+                    removeFateBtn.disabled = true;
+                    removeFateBtn.title = 'Сначала повторите привязку или удалите награду в Twitch';
+                    deleteTwitchBtn.disabled = false;
+                } else {
+                    removeFateBtn.disabled = false;
+                    removeFateBtn.title = 'Удалить только эту карточку из Fate';
+                    deleteTwitchBtn.disabled = !reward.reward_id;
+                }
             }
 
-            sel.value = reward.reward_id || '';
-            const twitchReward = twitchRewardsList.find(item => item.id === reward.reward_id);
-            document.getElementById('tw_title').value = reward.title ?? reward.reward_name ?? twitchReward?.title ?? '';
-            document.getElementById('tw_desc').value = reward.description ?? twitchReward?.prompt ?? '';
-            document.getElementById('tw_cost').value = reward.cost ?? twitchReward?.cost ?? '';
-            document.getElementById('min_val').value = reward.min_val !== undefined ? reward.min_val : 1;
-            document.getElementById('max_val').value = reward.max_val !== undefined ? reward.max_val : 100;
+            if (reward._needsBinding && reward.reward_id) {
+                document.getElementById('tw_title').value = reward.title || '';
+                document.getElementById('tw_desc').value = reward.description || '';
+                document.getElementById('tw_cost').value = reward.cost || 100;
+                document.getElementById('min_val').value = reward.min_val !== undefined ? reward.min_val : 1;
+                document.getElementById('max_val').value = reward.max_val !== undefined ? reward.max_val : 100;
+
+                btn.textContent = 'ПОВТОРИТЬ ПРИВЯЗКУ';
+                if (testBtn) testBtn.disabled = true;
+            } else if (reward._isNew || !reward.reward_id) {
+                document.getElementById('tw_title').value = reward.title || '';
+                document.getElementById('tw_desc').value = reward.description || '';
+                document.getElementById('tw_cost').value = reward.cost || 100;
+                document.getElementById('min_val').value = reward.min_val !== undefined ? reward.min_val : 1;
+                document.getElementById('max_val').value = reward.max_val !== undefined ? reward.max_val : 100;
+
+                btn.textContent = 'СОЗДАТЬ НАГРАДУ';
+                if (testBtn) testBtn.disabled = true;
+            } else {
+                document.getElementById('tw_title').value = reward.title || reward.reward_name || '';
+                document.getElementById('tw_desc').value = reward.description || '';
+                document.getElementById('tw_cost').value = reward.cost || 100;
+                document.getElementById('min_val').value = reward.min_val !== undefined ? reward.min_val : 1;
+                document.getElementById('max_val').value = reward.max_val !== undefined ? reward.max_val : 100;
+
+                btn.textContent = 'СОХРАНИТЬ ИЗМЕНЕНИЯ';
+                if (testBtn) testBtn.disabled = false;
+            }
 
             renderAssets(reward.assets || {});
         }
 
         function createReward() {
+            const draft = fateRewards.find(reward => reward._isNew || reward._needsBinding);
+            if (draft) {
+                selectReward(draft.internal_id);
+                showToast('Сначала завершите создание текущей награды', true);
+                return;
+            }
+
             const newReward = {
                 internal_id: generateUUID(),
                 reward_id: '',
-                title: 'Новая награда',
-                reward_name: 'Новая награда',
+                title: '',
+                reward_name: '',
                 description: '',
-                cost: 1000,
+                cost: 100,
                 min_val: 1,
                 max_val: 100,
                 enabled: true,
@@ -607,94 +558,183 @@
             };
             fateRewards.push(newReward);
             selectReward(newReward.internal_id);
-            showToast('Создана новая карточка. Выберите или создайте награду в Twitch.');
-        }
-
-        function syncCurrentRewardFromEditor() {
-            const reward = fateRewards.find(r => r.internal_id === currentRewardId);
-            if (!reward) throw new Error('Награда не выбрана');
-
-            const select = document.getElementById('reward-select');
-
-            reward.reward_id = select.value;
-            reward.title = document.getElementById('tw_title').value.trim() || 'Без названия';
-            reward.reward_name = reward.title;
-            reward.description = document.getElementById('tw_desc').value.trim();
-            reward.cost = Number(document.getElementById('tw_cost').value);
-            reward.min_val = Number(document.getElementById('min_val').value);
-            reward.max_val = Number(document.getElementById('max_val').value);
-        }
-
-        async function persistRewards() {
-            const response = await fetch('/api/ov_settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: 'fate',
-                    settings: {
-                        version: 2,
-                        rewards: fateRewards.map(({ assets, _isNew, ...reward }) => reward)
-                    }
-                })
-            });
-
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(data.error || 'Ошибка сохранения локальных настроек');
-            }
-
-            fateRewards.forEach(r => delete r._isNew);
+            showToast('Заполните поля и нажмите "Создать награду"');
         }
 
         async function saveSettings(event) {
             if (event) event.preventDefault();
+            if (!currentRewardId) return;
+
+            const reward = fateRewards.find(r => r.internal_id === currentRewardId);
+            if (!reward) return;
+
+            const btn = document.getElementById('save-btn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'СОХРАНЕНИЕ...';
+
+            const testBtn = document.getElementById('test-btn');
+            if (testBtn) testBtn.disabled = true;
+
+            // disable delete buttons
+            const delButtons = document.querySelectorAll('.btn-danger, .btn-outline[title*="Удалить"]');
+            delButtons.forEach(b => b.disabled = true);
+
             try {
-                const btn = document.getElementById('save-btn');
-                btn.disabled = true; btn.textContent = 'СОХРАНЕНИЕ...';
+                const title = document.getElementById('tw_title').value.trim();
+                const desc = document.getElementById('tw_desc').value.trim();
+                const cost = Number(document.getElementById('tw_cost').value);
+                const min = Number(document.getElementById('min_val').value);
+                const max = Number(document.getElementById('max_val').value);
 
-                const sel = document.getElementById('reward-select');
-                const selectedTwitchId = sel.value;
-
-                if (!selectedTwitchId) {
-                    throw new Error('Привяжите карточку к награде в Twitch перед сохранением!');
+                if (!title) {
+                    throw new Error('Введите название награды');
+                }
+                if (!Number.isInteger(cost) || cost <= 0) {
+                    throw new Error('Стоимость должна быть положительным целым числом');
+                }
+                if (!Number.isInteger(min) || !Number.isInteger(max) || min >= max) {
+                    throw new Error('Мин и макс должны быть целыми числами, мин меньше макс');
                 }
 
-                const newTitle = document.getElementById('tw_title').value.trim();
-                const newDesc = document.getElementById('tw_desc').value.trim();
-                const newCost = Number(document.getElementById('tw_cost').value);
+                if (reward._needsBinding && reward.reward_id) {
+                    reward.min_val = min;
+                    reward.max_val = max;
+                    await persistRewards();
+                    await loadSettings();
 
-                const twitchReward = twitchRewardsList.find(r => r.id === selectedTwitchId);
+                    const canonicalReward = fateRewards.find(r => r.reward_id === reward.reward_id);
+                    if (!canonicalReward) throw new Error('Награда не найдена после привязки');
+                    selectReward(canonicalReward.internal_id);
+                    showToast('Привязка успешна!');
+                } else if (reward._isNew) {
+                    const res = await fetch('/api/ov_rewards', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title, description: desc, cost })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Ошибка создания награды в Twitch');
 
-                if (twitchReward && (twitchReward.title !== newTitle || twitchReward.prompt !== newDesc || twitchReward.cost !== newCost)) {
+                    const twitchId = data.reward.id;
+
+                    reward.reward_id = twitchId;
+                    reward.title = title;
+                    reward.reward_name = title;
+                    reward.description = desc;
+                    reward.cost = cost;
+                    reward.min_val = min;
+                    reward.max_val = max;
+
+                    try {
+                        await persistRewards();
+                    } catch (err) {
+                        let deleteResponse = null;
+                        let deleteData = {};
+
+                        try {
+                            deleteResponse = await fetch('/api/ov_rewards', {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: twitchId })
+                            });
+                            deleteData = await deleteResponse.json().catch(() => ({}));
+                        } catch (deleteError) {
+                            console.error('Failed to rollback Twitch reward', deleteError);
+                        }
+
+                        if (deleteResponse?.ok) {
+                            reward.reward_id = '';
+                            reward._isNew = true;
+                            reward._needsBinding = false;
+
+                            btn.textContent = 'СОЗДАТЬ НАГРАДУ';
+                            btn.disabled = false;
+                            if (testBtn) testBtn.disabled = true;
+
+                            selectReward(reward.internal_id);
+
+                            showToast('Награда не сохранилась в Fate и была удалена из Twitch. Повторите создание.', true);
+                            return;
+                        }
+
+                        reward._isNew = false;
+                        reward._needsBinding = true;
+
+                        btn.textContent = 'ПОВТОРИТЬ ПРИВЯЗКУ';
+                        btn.disabled = false;
+                        if (testBtn) testBtn.disabled = true;
+
+                        showToast(deleteData.error || 'Награда создана в Twitch, но не привязана. Нажмите “Повторить привязку”.', true);
+                        return;
+                    }
+
+                    await loadSettings();
+
+                    const canonicalReward = fateRewards.find(r => r.reward_id === twitchId);
+                    if (!canonicalReward) {
+                        throw new Error('Награда создана, но не найдена в сохранённой конфигурации');
+                    }
+                    selectReward(canonicalReward.internal_id);
+                    showToast('Награда успешно создана!');
+                } else {
                     const patchRes = await fetch('/api/ov_rewards', {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id: selectedTwitchId, title: newTitle, description: newDesc, cost: newCost })
+                        body: JSON.stringify({ id: reward.reward_id, title, description: desc, cost })
                     });
                     if (!patchRes.ok) {
                         const d = await patchRes.json().catch(()=>({}));
                         throw new Error(d.error || 'Ошибка обновления Twitch награды');
                     }
-                    await fetchTwitchRewards();
+
+                    reward.title = title;
+                    reward.reward_name = title;
+                    reward.description = desc;
+                    reward.cost = cost;
+                    reward.min_val = min;
+                    reward.max_val = max;
+
+                    await persistRewards();
+                    await loadSettings();
+                    showToast('Настройки сохранены');
+
+                    const canonicalReward = fateRewards.find(r => r.reward_id === reward.reward_id);
+                    if (canonicalReward) selectReward(canonicalReward.internal_id);
                 }
-
-                syncCurrentRewardFromEditor();
-                await persistRewards();
-
-                showToast('Настройки сохранены');
-                renderRewardsList();
-                renderAssets(fateRewards.find(r => r.internal_id === currentRewardId)?.assets || {});
-
             } catch(e) {
                 showToast(e.message || 'Ошибка!', true);
+                if (btn.textContent !== 'ПОВТОРИТЬ ПРИВЯЗКУ') {
+                    btn.textContent = originalText;
+                }
             } finally {
-                const btn = document.getElementById('save-btn');
-                btn.disabled = false; btn.textContent = 'СОХРАНИТЬ ВЫБОР';
+                if (btn.textContent !== 'ПОВТОРИТЬ ПРИВЯЗКУ') {
+                    btn.disabled = false;
+                }
+                if (testBtn && reward && !reward._isNew && !reward._needsBinding && reward.reward_id) {
+                    testBtn.disabled = false;
+                }
+                const removeFateBtn = document.getElementById('remove-fate-btn');
+                const deleteTwitchBtn = document.getElementById('delete-twitch-btn');
+                if (removeFateBtn) {
+                    removeFateBtn.disabled = !!(reward && reward._needsBinding && reward.reward_id);
+                }
+                if (deleteTwitchBtn) {
+                    deleteTwitchBtn.disabled = !!(reward && !reward.reward_id);
+                }
             }
         }
 
         async function deleteCurrentReward() {
             if (!currentRewardId) return;
+
+            const reward = fateRewards.find(item => item.internal_id === currentRewardId);
+
+            if (reward?._needsBinding && reward.reward_id) {
+                showToast('Эта награда уже создана в Twitch. Сначала повторите привязку или удалите её в Twitch.', true);
+                return;
+            }
+
             if (!confirm('Удалить эту награду ИЗ FATE? Награда в самом Twitch останется нетронутой.')) return;
 
             fateRewards = fateRewards.filter(r => r.internal_id !== currentRewardId);
@@ -711,7 +751,7 @@
                 console.error('Delete error:', e);
                 loadSettings();
             } finally {
-                btn.disabled = false; btn.textContent = 'СОХРАНИТЬ ВЫБОР';
+                btn.disabled = false;
                 if (currentRewardId) selectReward(currentRewardId);
                 else {
                     renderRewardsList();
@@ -725,7 +765,7 @@
             if(!container) return;
 
             const reward = fateRewards.find(r => r.internal_id === currentRewardId);
-            const isDisabled = reward && reward._isNew;
+            const isDisabled = !reward || reward._isNew || reward._needsBinding || !reward.reward_id;
 
             container.innerHTML = assetTemplates.map(a => {
                 const isLoaded = !!assets[a.id];
@@ -794,12 +834,16 @@
 
         async function testOverlay() {
             if (!currentRewardId) return;
+            const reward = fateRewards.find(r => r.internal_id === currentRewardId);
+            if (!reward || reward._isNew || reward._needsBinding || !reward.reward_id) return;
             try {
                 showToast('Отправка теста...');
+                const btn = document.getElementById('test-btn');
+                if (btn) btn.disabled = true;
                 const res = await fetch('/api/ov_test', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ type: 'fate', internal_id: currentRewardId })
+                    body: JSON.stringify({ type: 'fate', internal_id: currentRewardId, reward_id: reward.reward_id })
                 });
                 if (!res.ok) {
                     const data = await res.json();
@@ -810,6 +854,12 @@
             catch (e) {
                 showToast(e.message || 'Ошибка теста', true);
                 console.error('Test overlay error:', e);
+            } finally {
+                const btn = document.getElementById('test-btn');
+                if (btn && currentRewardId) {
+                    const r = fateRewards.find(rew => rew.internal_id === currentRewardId);
+                    if (r && !r._isNew && !r._needsBinding && Boolean(r.reward_id)) btn.disabled = false;
+                }
             }
         }
 
