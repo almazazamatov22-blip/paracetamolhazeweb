@@ -25,6 +25,23 @@ async function getStreamerId(token: string): Promise<string> {
   return data.data[0].id;
 }
 
+const BRAND_SUFFIX = 'paracetamolhaze.ru';
+
+function stripBrandSuffix(description: string): string {
+  let value = typeof description === 'string' ? description.trim() : '';
+
+  while (value.toLowerCase().endsWith(BRAND_SUFFIX.toLowerCase())) {
+    value = value.slice(0, -BRAND_SUFFIX.length).trim();
+  }
+
+  return value;
+}
+
+function appendBrandSuffix(description: string): string {
+  const clean = stripBrandSuffix(description);
+  return clean ? `${clean}\n\n${BRAND_SUFFIX}` : BRAND_SUFFIX;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const cookieStore = await cookies();
@@ -42,9 +59,9 @@ export async function GET(req: NextRequest) {
     const rewardsRes = await fetch(`https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${streamerId}`, {
       headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': clientId! },
     });
-    
+
     const rewardsData = await rewardsRes.json();
-    
+
     if (!rewardsRes.ok || rewardsData.error) {
        return NextResponse.json({ error: rewardsData.message || 'Twitch API Error' }, { status: rewardsRes.status || 500 });
     }
@@ -55,6 +72,7 @@ export async function GET(req: NextRequest) {
         id: r.id,
         title: r.title,
         prompt: r.prompt,
+        description: stripBrandSuffix(r.prompt || ''),
         userInputRequired: r.is_user_input_required,
         cost: r.cost,
         backgroundColor: r.background_color,
@@ -109,7 +127,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         title: title,
-        prompt: normalizedDescription || 'Введите число для Fate Roll',
+        prompt: appendBrandSuffix(normalizedDescription),
         cost: parsedCost,
         is_user_input_required: true,
         is_enabled: true,
@@ -158,7 +176,7 @@ export async function PATCH(req: NextRequest) {
     }
     if (description !== undefined) {
       if (typeof description !== 'string') return NextResponse.json({ error: 'description must be a string' }, { status: 400 });
-      payload.prompt = description.trim();
+      payload.prompt = appendBrandSuffix(description);
     }
     if (cost !== undefined) {
       const parsedCost = Number(cost);
