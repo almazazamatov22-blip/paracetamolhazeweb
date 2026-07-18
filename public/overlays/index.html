@@ -4,6 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FATE OVERLAYS — интерактивные оверлеи для Twitch и OBS</title>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-W1DK00RJXW"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-W1DK00RJXW');
+  </script>
   <meta name="description" content="Интерактивные Twitch-оверлеи и мини-игры для OBS. Зрители активируют награды за баллы канала и участвуют в событиях прямо на стриме.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://paracetamolhaze.ru/overlays">
@@ -374,9 +382,13 @@
   </section>
 
   <!-- FOOTER -->
-  <footer style="padding: 60px 20px; text-align: center; border-top: 1px solid var(--border); background: #000; display: flex; flex-direction: column; gap: 4px; align-items: center; position: relative; z-index: 2000;">
+  <footer style="padding: 60px 20px; text-align: center; border-top: 1px solid var(--border); background: #000; display: flex; flex-direction: column; gap: 8px; align-items: center; position: relative; z-index: 2000;">
     <div style="font-size: 13px; font-weight: 900; color: #fff; text-transform: uppercase; letter-spacing: 2px;">ФейтОверлей</div>
     <div style="font-size: 11px; color: var(--muted); position: relative; z-index: 2001;">Powered by <a href="https://t.me/paracetamolhaze" style="color: var(--accent2); font-weight: 800; text-decoration: none; pointer-events: auto;">PARACETAMOLHAZE</a></div>
+    <div style="font-size: 11px; color: var(--muted); margin-top: 8px; display: flex; gap: 16px; position: relative; z-index: 2001;">
+      <a href="/privacy" style="color: var(--muted); text-decoration: none; transition: color .2s;">Политика конфиденциальности</a>
+      <a href="/terms" style="color: var(--muted); text-decoration: none; transition: color .2s;">Условия использования</a>
+    </div>
   </footer>
 
   <script>
