@@ -16,7 +16,7 @@ function verifyTwitchSignature(req: NextRequest, rawBody: string): boolean {
   const msgId = req.headers.get('twitch-eventsub-message-id') || '';
   const msgTimestamp = req.headers.get('twitch-eventsub-message-timestamp') || '';
   const msgSignature = req.headers.get('twitch-eventsub-message-signature') || '';
-  
+
   const msgTime = new Date(msgTimestamp).getTime();
   if (!Number.isFinite(msgTime)) return false;
   const now = Date.now();
@@ -130,7 +130,7 @@ async function getTwitchUserAvatar(userId: string): Promise<string | null> {
       },
       signal: controller.signal
     });
-    
+
     clearTimeout(timeoutId);
 
     if (res.ok) {
@@ -160,7 +160,7 @@ function getWeightedResult(settings: any) {
     { name: 'Лимон', url: 'https://cdn-icons-png.flaticon.com/512/1135/1135540.png', chance: 10 },
     { name: 'ДЖЕКПОТ', url: 'https://cdn-icons-png.flaticon.com/512/1135/1135640.png', chance: 0.1, isJackpot: true }
   ];
-  
+
   const roll = Math.random() * 100;
   let cumulative = 0;
 
@@ -173,7 +173,7 @@ function getWeightedResult(settings: any) {
 
   const allUrls = symbols.map((s: any) => s.url);
   const pool = allUrls.length >= 2 ? allUrls : ['https://cdn-icons-png.flaticon.com/512/1135/1135520.png', 'https://cdn-icons-png.flaticon.com/512/1135/1135540.png'];
-  
+
   const r1 = pool[Math.floor(Math.random() * pool.length)];
   let r2 = pool[Math.floor(Math.random() * pool.length)];
   let r3 = pool[Math.floor(Math.random() * pool.length)];
@@ -199,7 +199,7 @@ export async function handleTwitchWebhook(req: NextRequest) {
 
     const data = JSON.parse(rawBody);
     const supabase = getSupabase();
-    
+
     // 1. Replay Protection
     if (messageId) {
       const { error: replayError } = await supabase
@@ -209,7 +209,7 @@ export async function handleTwitchWebhook(req: NextRequest) {
           subscription_id: data.subscription?.id,
           message_type: messageType
         });
-        
+
       if (replayError && replayError.code === '23505') { // Unique violation
         console.log(`[TWITCH_WEBHOOK] Duplicate message ignored: ${messageId}`);
         if (messageType === 'webhook_callback_verification') {
@@ -228,7 +228,7 @@ export async function handleTwitchWebhook(req: NextRequest) {
       const subType = data.subscription?.type;
       const subBroadcasterId = data.subscription?.condition?.broadcaster_user_id;
       const subCallback = data.subscription?.transport?.callback;
-      
+
       if (subId && subType && subBroadcasterId && subCallback) {
         const callbackHost = new URL(subCallback).host.toLowerCase();
         const { error: upsertError } = await supabase
@@ -244,7 +244,7 @@ export async function handleTwitchWebhook(req: NextRequest) {
             secret_version: 'client-secret-v1',
             updated_at: new Date().toISOString()
           }, { onConflict: 'broadcaster_id,subscription_type' });
-          
+
         if (upsertError) {
           console.error('[TWITCH_WEBHOOK] Challenge upsert error:', upsertError.message);
         }
@@ -298,9 +298,9 @@ export async function handleTwitchWebhook(req: NextRequest) {
       if (configsError) throw configsError;
       const { data: cs2, error: cs2Error } = await supabase.from('cs2_rewards').select('id').eq('streamer_id', streamerId).eq('twitch_reward_id', twitchRewardId).eq('enabled', true);
       if (cs2Error) throw cs2Error;
-      
+
       let foundOwners = [];
-      
+
       if (configs) {
         for (const c of configs) {
           if (c.settings?.reward_id === twitchRewardId || c.settings?.fate?.reward_id === twitchRewardId) {
@@ -317,7 +317,7 @@ export async function handleTwitchWebhook(req: NextRequest) {
           }
         }
       }
-      
+
       if (cs2 && cs2.length > 0) {
         foundOwners.push({ type: 'cs2', id: cs2[0].id });
       }
@@ -345,20 +345,62 @@ export async function handleTwitchWebhook(req: NextRequest) {
     // C. Dispatch
     if (productType === 'fate') {
       const viewerAvatar = await getTwitchUserAvatar(userId);
-      const { data: config, error: configError } = await supabase.from('overlay_configs').select('settings').eq('id', resourceId).eq('user_id', streamerId).eq('overlay_type', 'fate').maybeSingle();
+      const { data: config, error: configError } = await supabase.from('overlay_configs').select('settings, assets').eq('id', resourceId).eq('user_id', streamerId).eq('overlay_type', 'fate').maybeSingle();
       if (configError) throw configError;
-      const fateSettings = config?.settings?.fate || config?.settings || {};
-      
-      const parsedMin = Number(fateSettings.min_val);
-      const parsedMax = Number(fateSettings.max_val);
-      
+
+      const allSettings = config?.settings || {};
+      const globalAssets = config?.assets || {};
+      const fateSettings = allSettings.fate || allSettings;
+
+      let reward = null;
+      let isLegacy = false;
+      if (fateSettings.rewards && Array.isArray(fateSettings.rewards)) {
+         reward = fateSettings.rewards.find((r: any) => r.reward_id === twitchRewardId);
+      }
+
+      if (!reward) {
+         if (fateSettings.reward_id === twitchRewardId) {
+             isLegacy = true;
+             reward = {
+                 internal_id: 'legacy-reward',
+                 reward_id: fateSettings.reward_id,
+                 min_val: fateSettings.min_val,
+                 max_val: fateSettings.max_val,
+                 title: 'Legacy Reward',
+                 reward_name: 'Legacy Reward',
+             };
+         } else {
+             console.error(`[TWITCH_WEBHOOK] Config error: Fate reward ${twitchRewardId} found in bindings but missing in settings.rewards array for user ${streamerId}.`);
+             return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+         }
+      }
+
+      const parsedMin = Number(reward.min_val);
+      const parsedMax = Number(reward.max_val);
+
       const min = Number.isFinite(parsedMin) ? parsedMin : 1;
       const max = Number.isFinite(parsedMax) ? Math.max(parsedMax, min) : Math.max(100, min);
-      
+
       const match = userMessage.match(/\d+/);
       const userChoice = match ? parseInt(match[0]) : 0;
       const result = Math.floor(Math.random() * (max - min + 1)) + min;
-      
+
+      let rewardAssets = {};
+      if (isLegacy) {
+          rewardAssets = {
+              panel_bg: globalAssets.panel_bg,
+              reward_icon: globalAssets.reward_icon,
+              sound_in: globalAssets.sound_in,
+              sound_loop: globalAssets.sound_loop,
+              sound_win: globalAssets.sound_win,
+              sound_lose: globalAssets.sound_lose,
+              sound_out: globalAssets.sound_out
+          };
+      } else {
+          const fateRewardsAssets = globalAssets.fate_rewards || {};
+          rewardAssets = fateRewardsAssets[reward.internal_id] || {};
+      }
+
       const { error: eventError } = await supabase.from('overlay_events').insert({
         user_id: streamerId,
         overlay_type: 'fate',
@@ -366,12 +408,17 @@ export async function handleTwitchWebhook(req: NextRequest) {
         source: 'twitch',
         external_event_id: event.id,
         reward_id: twitchRewardId,
-        reward_name: event.reward?.title || '',
+        reward_name: event.reward?.title || reward.title || reward.reward_name || '',
         viewer_id: userId,
         viewer_name: userName,
         viewer_avatar: viewerAvatar,
         user_input: userMessage,
-        payload: { userChoice, result },
+        payload: {
+            fate_reward_internal_id: reward.internal_id,
+            userChoice,
+            result,
+            assets: rewardAssets
+        },
         status: 'pending'
       });
 
@@ -379,7 +426,7 @@ export async function handleTwitchWebhook(req: NextRequest) {
         if (eventError.code === '23505') return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         throw eventError;
       }
-    } 
+    }
     else if (productType === 'cs2') {
       const { data: reward, error: rewardError } = await supabase.from('cs2_rewards').select('*').eq('id', resourceId).eq('streamer_id', streamerId).eq('enabled', true).maybeSingle();
       if (rewardError) throw rewardError;
@@ -388,7 +435,7 @@ export async function handleTwitchWebhook(req: NextRequest) {
         if (!actionConfig) {
           return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
-        
+
         if (reward.cooldown_seconds > 0) {
           const cooldownAgo = new Date(Date.now() - reward.cooldown_seconds * 1000).toISOString();
           const { data: recentExec, error: recentExecError } = await supabase
@@ -407,7 +454,7 @@ export async function handleTwitchWebhook(req: NextRequest) {
             return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
           }
         }
-        
+
         const { error: queueError } = await supabase.from('cs2_reward_queue').insert({
           streamer_id: streamerId,
           reward_id: reward.id,
@@ -430,7 +477,7 @@ export async function handleTwitchWebhook(req: NextRequest) {
        const { data: configRow, error: configRowError } = await supabase.from('overlay_configs').select('settings, assets, overlay_type').eq('id', resourceId).single();
        if (configRowError) throw configRowError;
        if (!configRow) throw new Error('configRow missing');
-       
+
        if (configRow) {
          let allSettings = configRow.settings || {};
          let assets = configRow.assets || {};
@@ -478,7 +525,7 @@ export async function handleTwitchWebhook(req: NextRequest) {
              assets,
              updated_at: new Date().toISOString()
            }).eq('id', resourceId);
-           
+
            if (updateError) throw updateError;
          }
        }

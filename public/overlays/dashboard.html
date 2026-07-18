@@ -25,7 +25,7 @@
         body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
 
         /* --- SIDEBAR --- */
-        .sidebar { width: 260px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 24px; }
+        .sidebar { width: 260px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 24px; flex-shrink: 0; }
         .logo { font-size: 20px; font-weight: 800; color: var(--accent); letter-spacing: 1px; margin-bottom: 40px; }
         .nav-section { margin-bottom: 32px; }
         .nav-label { font-size: 10px; text-transform: uppercase; color: var(--text-dim); letter-spacing: 1.5px; margin-bottom: 16px; display: block; }
@@ -38,9 +38,9 @@
 
         /* --- CONTENT --- */
         .content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-        .header { padding: 24px 40px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .header { padding: 24px 40px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
         .header h2 { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 16px; }
-        .main-grid { display: grid; grid-template-columns: 420px 1fr; gap: 24px; padding: 40px; flex: 1; min-height: 0; overflow-y: auto; }
+        .main-grid { display: grid; grid-template-columns: 280px 420px 1fr; gap: 24px; padding: 40px; flex: 1; min-height: 0; overflow-y: auto; align-items: start; }
 
         .conn-status { font-size: 12px; color: var(--success); opacity: 0; transition: opacity 0.3s; padding: 4px 10px; background: rgba(34, 197, 94, 0.1); border-radius: 6px; font-weight: 600; }
 
@@ -52,19 +52,29 @@
         .label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; }
 
         .btn { background: var(--accent); color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; font-size: 14px; }
-        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-outline { background: transparent; border: 1px solid var(--border); color: #fff; }
-        .btn-outline:hover { background: var(--border); }
+        .btn-outline:hover:not(:disabled) { background: var(--border); }
+        .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--error); }
+        .btn-danger:hover:not(:disabled) { background: rgba(239, 68, 68, 0.2); }
 
         .asset-row { background: #1c1c21; padding: 16px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent; transition: 0.2s; }
         .asset-row:hover { border-color: rgba(255,255,255,0.05); }
         .asset-info { flex: 1; }
         .asset-name { font-weight: 600; font-size: 14px; color: #fff; }
         .asset-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
-        
+
+        .reward-item { padding: 16px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 8px; cursor: pointer; transition: 0.2s; display: flex; justify-content: space-between; align-items: center; }
+        .reward-item:hover { background: rgba(255,255,255,0.05); }
+        .reward-item.active { border-color: var(--accent); background: rgba(147, 51, 234, 0.1); }
+        .reward-item-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        .reward-item-id { font-size: 11px; color: var(--text-dim); }
+
         .toast { position: fixed; bottom: 24px; right: 24px; background: var(--accent); color: #fff; padding: 12px 24px; border-radius: 8px; transform: translateY(100px); transition: 0.3s; z-index: 10000; }
         .toast.show { transform: translateY(0); }
+
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -90,42 +100,94 @@
     <div class="content">
         <div class="header">
             <h2>ДАШБОРД — РОЛЛ <span id="conn-status" class="conn-status">Подключено</span></h2>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <button class="btn btn-outline" onclick="copyUrl()">КОПИРОВАТЬ OBS ССЫЛКУ</button>
+            </div>
         </div>
-        
+
         <div class="main-grid">
+            <!-- Column 1: Rewards List -->
+            <div class="card">
+                <div class="card-title">Список наград</div>
+                <div id="rewards-list-container" style="margin-bottom: 16px;"></div>
+                <button class="btn btn-outline" onclick="createReward()" style="width: 100%;">+ ДОБАВИТЬ НАГРАДУ</button>
+            </div>
+
+            <!-- Column 2: Settings -->
             <div>
-                <div class="card">
-                    <div class="card-title">OBS Browser Source</div>
-                    <div class="obs-box" id="obs-url">...</div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <button class="btn btn-outline" onclick="copyUrl()">КОПИРОВАТЬ</button>
-                        <button class="btn" style="background: var(--success);" onclick="testOverlay()">ТЕСТ</button>
-                    </div>
+                <div id="no-selection-msg" style="color: var(--text-dim); font-size: 14px; text-align: center; padding: 40px;">
+                    Выберите награду из списка или создайте новую
                 </div>
-                <div class="card">
-                    <div class="card-title">Настройки Награды</div>
-                    <form id="settings-form" onsubmit="saveSettings(event)">
-                        <label class="label">Награда Twitch (С вводом текста)</label>
-                        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
-                            <select id="reward-select" name="reward_id" style="margin-bottom: 0;"></select>
-                            <button type="button" class="btn btn-outline" onclick="fetchRewards()" style="padding: 10px;">↻</button>
+
+                <div id="editor-container" class="hidden">
+                    <div class="card">
+                        <div class="card-title">Настройки Награды</div>
+                        <form id="settings-form" onsubmit="saveSettings(event)">
+                            <label class="label">Награда Twitch (С вводом текста)</label>
+                            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                                <select id="reward-select" name="reward_id" onchange="onTwitchRewardChange()" style="margin-bottom: 0;"></select>
+                                <button type="button" class="btn btn-outline" onclick="fetchTwitchRewards()" style="padding: 10px;" title="Обновить список">↻</button>
+                                <button type="button" class="btn btn-outline" onclick="showCreateTwitchModal()" style="padding: 10px;" title="Создать новую награду в Twitch">+</button>
+                            </div>
+
+                            <label class="label">Название (отображается в Twitch)</label>
+                            <input type="text" id="tw_title" placeholder="Fate Roll" />
+
+                            <label class="label">Описание (отображается в Twitch)</label>
+                            <input type="text" id="tw_desc" placeholder="Введите число..." />
+
+                            <label class="label">Стоимость в баллах</label>
+                            <input type="number" id="tw_cost" />
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                                <div><label class="label">Мин Число</label><input type="number" name="min_val" id="min_val" value="1"></div>
+                                <div><label class="label">Макс Число</label><input type="number" name="max_val" id="max_val" value="100"></div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
+                                <button type="submit" id="save-btn" class="btn">СОХРАНИТЬ ВЫБОР</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">Действия</div>
+                        <div style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px;">
+                            <button class="btn" style="background: var(--success);" onclick="testOverlay()">ТЕСТ НАГРАДЫ</button>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
-                            <div><label class="label">Мин Число</label><input type="number" name="min_val" id="min_val" value="1"></div>
-                            <div><label class="label">Макс Число</label><input type="number" name="max_val" id="max_val" value="100"></div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <button class="btn btn-outline" onclick="deleteCurrentReward()" title="Удалить только эту карточку из Fate (Награда в Twitch останется)">УДАЛИТЬ ИЗ FATE</button>
+                            <button class="btn btn-danger" onclick="deleteTwitchReward()" title="Удалить текущую привязанную награду в Twitch">УДАЛИТЬ В TWITCH</button>
                         </div>
-                        <button type="submit" id="save-btn" class="btn" style="width: 100%;">СОХРАНИТЬ ВЫБОР</button>
-                    </form>
+                    </div>
                 </div>
             </div>
 
-            <div>
+            <!-- Column 3: Assets -->
+            <div id="assets-container" class="hidden">
                 <div class="card">
                     <div class="card-title">Ассеты (Обновляются мгновенно)</div>
-                    <div id="asset-list">
-                        <!-- Dynamic Assets -->
-                    </div>
+                    <div id="asset-list"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden OBS element for clipboard -->
+    <div id="obs-url" class="hidden"></div>
+
+    <div id="twitch-modal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center;">
+        <div class="card" style="width: 400px; margin: 0;">
+            <div class="card-title">Создать награду в Twitch</div>
+            <label class="label">Название</label>
+            <input type="text" id="tw-title-create" placeholder="Fate Roll" />
+            <label class="label">Описание</label>
+            <input type="text" id="tw-desc-create" placeholder="Введите число для Fate Roll" />
+            <label class="label">Стоимость (баллы)</label>
+            <input type="number" id="tw-cost-create" value="1000" />
+
+            <div style="display: flex; gap: 12px; margin-top: 16px;">
+                <button class="btn btn-outline" style="flex: 1;" onclick="document.getElementById('twitch-modal').classList.add('hidden')">ОТМЕНА</button>
+                <button class="btn" style="flex: 1;" onclick="createTwitchReward()">СОЗДАТЬ</button>
             </div>
         </div>
     </div>
@@ -137,6 +199,10 @@
         let supabaseClient = null;
         let realtimeChannel = null;
 
+        let fateRewards = [];
+        let currentRewardId = null;
+        let twitchRewardsList = [];
+
         const assetTemplates = [
             { id: 'panel_bg', name: 'Фон панели', meta: 'Рекомендуемо: 1600x210' },
             { id: 'reward_icon', name: 'Иконка награды', meta: 'Рекомендуемо: 200x200' },
@@ -147,6 +213,147 @@
             { id: 'sound_out', name: 'Звук исчезновения', meta: 'Длительность: 1 сек' }
         ];
 
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function showCreateTwitchModal() {
+            if (!currentRewardId) {
+                showToast('Сначала выберите или создайте карточку Fate', true);
+                return;
+            }
+            document.getElementById('tw-title-create').value = '';
+            document.getElementById('tw-desc-create').value = '';
+            document.getElementById('tw-cost-create').value = '1000';
+            document.getElementById('twitch-modal').classList.remove('hidden');
+        }
+
+        function onTwitchRewardChange() {
+            const sel = document.getElementById('reward-select');
+            const tw = twitchRewardsList.find(r => r.id === sel.value);
+            if (tw) {
+                document.getElementById('tw_title').value = tw.title;
+                document.getElementById('tw_desc').value = tw.prompt || '';
+                document.getElementById('tw_cost').value = tw.cost || 1000;
+            } else {
+                document.getElementById('tw_title').value = '';
+                document.getElementById('tw_desc').value = '';
+                document.getElementById('tw_cost').value = '';
+            }
+        }
+
+        async function createTwitchReward() {
+            const title = document.getElementById('tw-title-create').value.trim();
+            const desc = document.getElementById('tw-desc-create').value.trim();
+            const cost = parseInt(document.getElementById('tw-cost-create').value);
+
+            if (!title || isNaN(cost) || cost <= 0) {
+                showToast('Введите корректное название и стоимость', true);
+                return;
+            }
+
+            document.getElementById('twitch-modal').classList.add('hidden');
+            showToast('Создание в Twitch...');
+
+            try {
+                const res = await fetch('/api/ov_rewards', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, description: desc, cost })
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Ошибка создания награды');
+                }
+
+                const data = await res.json();
+                showToast('Twitch награда создана!');
+
+                await fetchTwitchRewards();
+
+                const sel = document.getElementById('reward-select');
+                if (data.reward && data.reward.id) {
+                    sel.value = data.reward.id;
+                    onTwitchRewardChange();
+                    const reward = fateRewards.find(r => r.internal_id === currentRewardId);
+                    if (reward) {
+                        reward.reward_id = data.reward.id;
+                        reward.title = data.reward.title;
+                        reward.reward_name = data.reward.title;
+                        reward.description = data.reward.prompt;
+                        reward.cost = data.reward.cost;
+                        await persistRewards();
+                        showToast('Карточка сохранена!');
+                        renderRewardsList();
+                    }
+                }
+            } catch (e) {
+                showToast(e.message, true);
+                console.error(e);
+            }
+        }
+
+        async function deleteTwitchReward() {
+            if (!currentRewardId) return;
+            const sel = document.getElementById('reward-select');
+            const twId = sel.value;
+            if (!twId) {
+                showToast('Эта карточка не привязана ни к одной Twitch-награде', true);
+                return;
+            }
+            if (!confirm('Вы уверены, что хотите удалить эту награду ИЗ TWITCH? Это действие необратимо.')) return;
+
+            showToast('Удаление из Twitch...');
+            let deletedInTwitch = false;
+            try {
+                const res = await fetch('/api/ov_rewards', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: twId })
+                });
+
+                if (!res.ok) {
+                    const d = await res.json();
+                    if (res.status === 404 || d.error?.includes('не найдена') || d.error?.includes('уже удалена')) {
+                        console.warn('Already deleted in Twitch');
+                        deletedInTwitch = true;
+                    } else {
+                        throw new Error(d.error || 'Ошибка удаления в Twitch');
+                    }
+                } else {
+                    deletedInTwitch = true;
+                }
+
+                if (deletedInTwitch) {
+                    fateRewards = fateRewards.filter(r => r.internal_id !== currentRewardId);
+
+                    try {
+                        await persistRewards();
+                        showToast('Награда удалена из Twitch и локально');
+                        await fetchTwitchRewards();
+
+                        currentRewardId = fateRewards.length > 0 ? fateRewards[0].internal_id : null;
+                        if (currentRewardId) {
+                            selectReward(currentRewardId);
+                        } else {
+                            renderRewardsList();
+                            hideEditor();
+                        }
+                    } catch (persistErr) {
+                        showToast('Награда удалена из Twitch, но локальную привязку удалить не удалось. Нажмите "Удалить из Fate" и повторите сохранение.', true);
+                        await loadSettings();
+                    }
+                }
+            } catch (e) {
+                showToast(e.message || 'Ошибка удаления!', true);
+                console.error(e);
+            }
+        }
+
         async function init() {
             try {
                 const resAuth = await fetch('/api/auth/me');
@@ -155,28 +362,24 @@
                     return;
                 }
                 const data = await resAuth.json();
-                if (!data.id) { 
-                    window.location.href = '/auth/twitch?source=overlays'; 
-                    return; 
+                if (!data.id) {
+                    window.location.href = '/auth/twitch?source=overlays';
+                    return;
                 }
                 currentUser = data;
-                
+
                 document.getElementById('username').textContent = data.display_name;
                 document.getElementById('user-avatar').src = data.profile_image_url;
                 document.getElementById('obs-url').textContent = `${window.location.origin}/overlays/roll.html?id=${data.id}`;
-                
-                renderAssets();
-                
-                await fetchRewards();
+
+                await fetchTwitchRewards();
                 await loadSettings();
                 await initSupabase();
-                
+
                 setupRealtime();
-                
-                // Silently ensure EventSub
                 ensureEventSub().catch(console.error);
 
-            } catch (e) { 
+            } catch (e) {
                 console.error('Init error:', e);
             }
         }
@@ -186,13 +389,12 @@
             if (!res.ok) throw new Error('Failed to fetch env variables');
             const env = await res.json();
             if(!env.supabaseUrl || !env.supabaseAnonKey) throw new Error('No Supabase Env');
-            
+
             supabaseClient = window.supabase.createClient(env.supabaseUrl, env.supabaseAnonKey);
         }
 
         function setupRealtime() {
             if(!supabaseClient || !currentUser) return;
-            
             const connStatus = document.getElementById('conn-status');
 
             realtimeChannel = supabaseClient.channel('dashboard_changes')
@@ -207,7 +409,6 @@
                     }
                 )
                 .subscribe((status) => {
-                    console.log('Realtime status:', status);
                     if (status === 'SUBSCRIBED') {
                         connStatus.style.opacity = '1';
                         connStatus.textContent = 'Подключено';
@@ -240,6 +441,37 @@
             }
         }
 
+        async function fetchTwitchRewards() {
+            try {
+                const res = await fetch('/api/ov_rewards');
+                if (!res.ok) throw new Error('Failed to fetch rewards');
+                twitchRewardsList = await res.json();
+                updateRewardSelect();
+            } catch (e) {
+                console.error('Fetch rewards error:', e);
+            }
+        }
+
+        function updateRewardSelect() {
+            const sel = document.getElementById('reward-select');
+            if(!sel) return;
+            const cur = sel.value;
+            sel.innerHTML = '';
+
+            const defOpt = document.createElement('option');
+            defOpt.value = '';
+            defOpt.textContent = 'Выберите награду...';
+            sel.appendChild(defOpt);
+
+            for (const r of twitchRewardsList) {
+                const opt = document.createElement('option');
+                opt.value = r.id;
+                opt.textContent = r.title;
+                if (r.id === cur) opt.selected = true;
+                sel.appendChild(opt);
+            }
+        }
+
         async function loadSettings() {
             if(!currentUser) return;
             const res = await fetch(`/api/ov_settings?userId=${currentUser.id}&type=fate`);
@@ -252,97 +484,271 @@
         }
 
         function applyConfigState(config) {
-            const s = config.settings || config; 
-            if (s.reward_id) {
-                const sel = document.getElementById('reward-select');
-                if (sel.options.length <= 1 || !Array.from(sel.options).some(o => o.value === s.reward_id)) {
-                   sel.innerHTML = `<option value="${s.reward_id}">${s.reward_name || 'Привязанная награда'}</option>` + sel.innerHTML;
-                }
-                sel.value = s.reward_id;
-            }
-            if (s.min_val !== undefined) document.getElementById('min_val').value = s.min_val;
-            if (s.max_val !== undefined) document.getElementById('max_val').value = s.max_val;
+            const settings = config.settings || config;
+            const rootAssets = config.assets || config;
+            const perRewardAssets = rootAssets.fate_rewards || {};
 
-            const assets = config.assets || config; 
-            assetTemplates.forEach(a => {
-                const badge = document.getElementById(`status-${a.id}`);
-                if (badge && assets[a.id]) {
-                    badge.innerHTML = `<span style="color:var(--success)">✔ Загружено</span>`;
+            fateRewards = (settings.rewards || []).map(reward => ({
+              ...reward,
+              assets: perRewardAssets[reward.internal_id] || {}
+            }));
+
+            if (fateRewards.length === 0) {
+                currentRewardId = null;
+            } else {
+                if (currentRewardId && !fateRewards.find(r => r.internal_id === currentRewardId)) {
+                    currentRewardId = fateRewards[0].internal_id;
+                } else if (!currentRewardId) {
+                    currentRewardId = fateRewards[0].internal_id;
                 }
-            });
+            }
+
+            renderRewardsList();
+            if (currentRewardId) {
+                selectReward(currentRewardId, false);
+            } else {
+                hideEditor();
+            }
         }
 
-        function renderAssets() {
+        function renderRewardsList() {
+            const container = document.getElementById('rewards-list-container');
+            if (fateRewards.length === 0) {
+                container.innerHTML = '';
+                const empty = document.createElement('div');
+                empty.style.cssText = 'font-size: 13px; color: var(--text-dim); text-align: center; padding: 20px;';
+                empty.textContent = 'Наград нет';
+                container.appendChild(empty);
+                return;
+            }
+
+            container.innerHTML = '';
+            for (const r of fateRewards) {
+                const title = r.reward_name || 'Без названия';
+                const idDisplay = r.reward_id ? r.reward_id.substring(0, 8) + '...' : 'Не привязана';
+
+                const item = document.createElement('div');
+                item.className = 'reward-item' + (r.internal_id === currentRewardId ? ' active' : '');
+                item.addEventListener('click', () => selectReward(r.internal_id));
+
+                const infoDiv = document.createElement('div');
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'reward-item-title';
+                titleDiv.textContent = title;
+
+                const idDiv = document.createElement('div');
+                idDiv.className = 'reward-item-id';
+                idDiv.textContent = idDisplay;
+
+                infoDiv.appendChild(titleDiv);
+                infoDiv.appendChild(idDiv);
+
+                const arrowDiv = document.createElement('div');
+                arrowDiv.style.cssText = 'font-size: 16px; color: var(--text-dim);';
+                arrowDiv.textContent = '›';
+
+                item.appendChild(infoDiv);
+                item.appendChild(arrowDiv);
+
+                container.appendChild(item);
+            }
+        }
+
+        function hideEditor() {
+            document.getElementById('no-selection-msg').classList.remove('hidden');
+            document.getElementById('editor-container').classList.add('hidden');
+            document.getElementById('assets-container').classList.add('hidden');
+        }
+
+        function selectReward(internal_id, scroll = true) {
+            currentRewardId = internal_id;
+            renderRewardsList();
+
+            const reward = fateRewards.find(r => r.internal_id === internal_id);
+            if (!reward) return;
+
+            document.getElementById('no-selection-msg').classList.add('hidden');
+            document.getElementById('editor-container').classList.remove('hidden');
+            document.getElementById('assets-container').classList.remove('hidden');
+
+            const sel = document.getElementById('reward-select');
+
+            if (reward.reward_id && !Array.from(sel.options).some(o => o.value === reward.reward_id)) {
+                const opt = document.createElement('option');
+                opt.value = reward.reward_id;
+                opt.textContent = reward.reward_name || 'Неизвестно';
+                sel.appendChild(opt);
+            }
+
+            sel.value = reward.reward_id || '';
+            const twitchReward = twitchRewardsList.find(item => item.id === reward.reward_id);
+            document.getElementById('tw_title').value = reward.title ?? reward.reward_name ?? twitchReward?.title ?? '';
+            document.getElementById('tw_desc').value = reward.description ?? twitchReward?.prompt ?? '';
+            document.getElementById('tw_cost').value = reward.cost ?? twitchReward?.cost ?? '';
+            document.getElementById('min_val').value = reward.min_val !== undefined ? reward.min_val : 1;
+            document.getElementById('max_val').value = reward.max_val !== undefined ? reward.max_val : 100;
+
+            renderAssets(reward.assets || {});
+        }
+
+        function createReward() {
+            const newReward = {
+                internal_id: generateUUID(),
+                reward_id: '',
+                title: 'Новая награда',
+                reward_name: 'Новая награда',
+                description: '',
+                cost: 1000,
+                min_val: 1,
+                max_val: 100,
+                enabled: true,
+                assets: {},
+                _isNew: true
+            };
+            fateRewards.push(newReward);
+            selectReward(newReward.internal_id);
+            showToast('Создана новая карточка. Выберите или создайте награду в Twitch.');
+        }
+
+        function syncCurrentRewardFromEditor() {
+            const reward = fateRewards.find(r => r.internal_id === currentRewardId);
+            if (!reward) throw new Error('Награда не выбрана');
+
+            const select = document.getElementById('reward-select');
+
+            reward.reward_id = select.value;
+            reward.title = document.getElementById('tw_title').value.trim() || 'Без названия';
+            reward.reward_name = reward.title;
+            reward.description = document.getElementById('tw_desc').value.trim();
+            reward.cost = Number(document.getElementById('tw_cost').value);
+            reward.min_val = Number(document.getElementById('min_val').value);
+            reward.max_val = Number(document.getElementById('max_val').value);
+        }
+
+        async function persistRewards() {
+            const response = await fetch('/api/ov_settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'fate',
+                    settings: {
+                        version: 2,
+                        rewards: fateRewards.map(({ assets, _isNew, ...reward }) => reward)
+                    }
+                })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || 'Ошибка сохранения локальных настроек');
+            }
+
+            fateRewards.forEach(r => delete r._isNew);
+        }
+
+        async function saveSettings(event) {
+            if (event) event.preventDefault();
+            try {
+                const btn = document.getElementById('save-btn');
+                btn.disabled = true; btn.textContent = 'СОХРАНЕНИЕ...';
+
+                const sel = document.getElementById('reward-select');
+                const selectedTwitchId = sel.value;
+
+                if (!selectedTwitchId) {
+                    throw new Error('Привяжите карточку к награде в Twitch перед сохранением!');
+                }
+
+                const newTitle = document.getElementById('tw_title').value.trim();
+                const newDesc = document.getElementById('tw_desc').value.trim();
+                const newCost = Number(document.getElementById('tw_cost').value);
+
+                const twitchReward = twitchRewardsList.find(r => r.id === selectedTwitchId);
+
+                if (twitchReward && (twitchReward.title !== newTitle || twitchReward.prompt !== newDesc || twitchReward.cost !== newCost)) {
+                    const patchRes = await fetch('/api/ov_rewards', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: selectedTwitchId, title: newTitle, description: newDesc, cost: newCost })
+                    });
+                    if (!patchRes.ok) {
+                        const d = await patchRes.json().catch(()=>({}));
+                        throw new Error(d.error || 'Ошибка обновления Twitch награды');
+                    }
+                    await fetchTwitchRewards();
+                }
+
+                syncCurrentRewardFromEditor();
+                await persistRewards();
+
+                showToast('Настройки сохранены');
+                renderRewardsList();
+                renderAssets(fateRewards.find(r => r.internal_id === currentRewardId)?.assets || {});
+
+            } catch(e) {
+                showToast(e.message || 'Ошибка!', true);
+            } finally {
+                const btn = document.getElementById('save-btn');
+                btn.disabled = false; btn.textContent = 'СОХРАНИТЬ ВЫБОР';
+            }
+        }
+
+        async function deleteCurrentReward() {
+            if (!currentRewardId) return;
+            if (!confirm('Удалить эту награду ИЗ FATE? Награда в самом Twitch останется нетронутой.')) return;
+
+            fateRewards = fateRewards.filter(r => r.internal_id !== currentRewardId);
+            currentRewardId = fateRewards.length > 0 ? fateRewards[0].internal_id : null;
+
+            const btn = document.getElementById('save-btn');
+            btn.disabled = true; btn.textContent = 'УДАЛЕНИЕ...';
+
+            try {
+                await persistRewards();
+                showToast('Награда удалена из Fate');
+            } catch (e) {
+                showToast(e.message || 'Ошибка!', true);
+                console.error('Delete error:', e);
+                loadSettings();
+            } finally {
+                btn.disabled = false; btn.textContent = 'СОХРАНИТЬ ВЫБОР';
+                if (currentRewardId) selectReward(currentRewardId);
+                else {
+                    renderRewardsList();
+                    hideEditor();
+                }
+            }
+        }
+
+        function renderAssets(assets) {
             const container = document.getElementById('asset-list');
             if(!container) return;
-            container.innerHTML = assetTemplates.map(a => `
-                <div class="asset-row">
-                    <div class="asset-info">
-                        <div class="asset-name">${a.name}</div>
-                        <div class="asset-meta">${a.meta}</div>
-                    </div>
-                    <div id="status-${a.id}" style="font-size: 11px; margin-right: 15px; color: var(--text-dim);">
-                        Ожидание
-                    </div>
-                    <button class="btn btn-outline" onclick="document.getElementById('file-${a.id}').click()" style="padding: 8px 16px; font-size: 12px;">ЗАГРУЗИТЬ</button>
-                    <input type="file" id="file-${a.id}" hidden onchange="uploadFile(this, '${a.id}')">
-                </div>
-            `).join('');
-        }
 
-        async function fetchRewards() {
-            try {
-                const res = await fetch('/api/ov_rewards');
-                if (!res.ok) throw new Error('Failed to fetch rewards');
-                const rewards = await res.json();
-                const sel = document.getElementById('reward-select');
-                if(!sel) return;
-                
-                const cur = sel.value;
-                sel.innerHTML = '<option value="">Выберите награду...</option>' + 
-                    rewards.map(r => `<option value="${r.id}" ${r.id === cur ? 'selected' : ''}>${r.title}</option>`).join('');
-            } catch (e) {
-                console.error('Fetch rewards error:', e);
-            }
-        }
+            const reward = fateRewards.find(r => r.internal_id === currentRewardId);
+            const isDisabled = reward && reward._isNew;
 
-        async function saveSettings(e) {
-            e.preventDefault();
-            const btn = document.getElementById('save-btn');
-            btn.disabled = true; btn.textContent = 'СОХРАНЕНИЕ...';
-            const f = e.target;
-            const sel = document.getElementById('reward-select');
-            const opt = sel.options[sel.selectedIndex];
-            
-            try {
-                const res = await fetch('/api/ov_settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: 'fate',
-                        settings: {
-                            reward_id: sel.value,
-                            reward_name: opt ? opt.textContent : '',
-                            min_val: parseInt(f.min_val.value),
-                            max_val: parseInt(f.max_val.value)
-                        }
-                    })
-                });
-                if (!res.ok) {
-                    const data = await res.json();
-                    throw new Error(data.error || 'Ошибка сохранения');
-                }
-                
-                showToast('Настройки сохранены');
-            } catch (e) { 
-                showToast(e.message || 'Ошибка!', true); 
-                console.error('Save settings error:', e);
-            } finally { 
-                btn.disabled = false; btn.textContent = 'СОХРАНИТЬ ВЫБОР'; 
-            }
+            container.innerHTML = assetTemplates.map(a => {
+                const isLoaded = !!assets[a.id];
+                const statusHtml = isLoaded ? `<span style="color:var(--success)">✔ Загружено</span>` : `Ожидание`;
+                const btnDisabled = isDisabled ? 'disabled title="Сначала сохраните награду"' : '';
+                return `
+                    <div class="asset-row">
+                        <div class="asset-info">
+                            <div class="asset-name">${a.name}</div>
+                            <div class="asset-meta">${a.meta}</div>
+                        </div>
+                        <div id="status-${a.id}" style="font-size: 11px; margin-right: 15px; color: var(--text-dim);">
+                            ${statusHtml}
+                        </div>
+                        <button class="btn btn-outline" ${btnDisabled} onclick="document.getElementById('file-${a.id}').click()" style="padding: 8px 16px; font-size: 12px;">ЗАГРУЗИТЬ</button>
+                        <input type="file" ${btnDisabled} id="file-${a.id}" hidden accept="image/*, audio/*" onchange="uploadFile(this, '${a.id}')">
+                    </div>
+                `;
+            }).join('');
         }
 
         async function uploadFile(input, key) {
+            if (!currentRewardId) return;
             const file = input.files[0]; if (!file) return;
             const badge = document.getElementById(`status-${key}`);
             badge.innerHTML = `<span style="color:var(--warning)">Загрузка...</span>`;
@@ -353,22 +759,27 @@
                     const res = await fetch('/api/ov_upload', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            name: file.name, 
-                            type: file.type, 
-                            data: reader.result.split(',')[1], 
+                        body: JSON.stringify({
+                            name: file.name,
+                            type: file.type,
+                            data: reader.result.split(',')[1],
                             key,
-                            overlay_type: 'fate'
+                            overlay_type: 'fate',
+                            internal_id: currentRewardId
                         })
                     });
+                    const d = await res.json().catch(()=>({}));
                     if (!res.ok) {
-                        const d = await res.json();
                         throw new Error(d.error || 'Upload failed');
                     }
                     showToast('Файл загружен');
-                } catch (e) { 
+                    const reward = fateRewards.find(r => r.internal_id === currentRewardId);
+                    reward.assets = reward.assets || {};
+                    reward.assets[key] = d.url;
+                    renderAssets(reward.assets);
+                } catch (e) {
                     badge.innerHTML = `<span style="color:var(--error)">Ошибка</span>`;
-                    showToast(e.message || 'Ошибка загрузки', true); 
+                    showToast(e.message || 'Ошибка загрузки', true);
                     console.error('Upload error:', e);
                 }
             };
@@ -382,21 +793,22 @@
         }
 
         async function testOverlay() {
-            try { 
+            if (!currentRewardId) return;
+            try {
                 showToast('Отправка теста...');
-                const res = await fetch('/api/ov_test', { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify({ type: 'fate' }) 
-                }); 
+                const res = await fetch('/api/ov_test', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ type: 'fate', internal_id: currentRewardId })
+                });
                 if (!res.ok) {
                     const data = await res.json();
                     throw new Error(data.error || 'Test failed');
                 }
-                showToast('Событие теста создано'); 
+                showToast('Событие теста создано');
             }
-            catch (e) { 
-                showToast(e.message || 'Ошибка теста', true); 
+            catch (e) {
+                showToast(e.message || 'Ошибка теста', true);
                 console.error('Test overlay error:', e);
             }
         }
@@ -404,7 +816,7 @@
         function showToast(msg, isError = false) {
             const t = document.getElementById('toast');
             if(!t) return;
-            t.textContent = msg; 
+            t.textContent = msg;
             t.style.background = isError ? 'var(--error)' : 'var(--success)';
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 4000);
