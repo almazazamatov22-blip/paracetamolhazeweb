@@ -16,6 +16,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/67/ui/button';
 import { AuthProvider, signIn, signOut, useSession } from '@/lib/67/authHook';
+import { TwitchConsentNotice } from '@/components/legal/TwitchConsentNotice';
 
 interface Movie {
   id: string;
@@ -800,14 +801,17 @@ function KinoQuizContent() {
 
                   <div className="mt-3">
                     {!session ? (
-                      <Button
-                        onClick={() => signIn('kinoquiz')}
-                        disabled={isAuthLoading}
-                        className="w-full h-13 rounded-xl border border-[#7b5f2c] bg-[#9146FF] hover:bg-[#7e37ea] text-white text-[32px] uppercase disabled:opacity-70"
-                      >
-                        <HugeiconsIcon icon={Login01Icon} size={20} color="currentColor" strokeWidth={2} className="mr-2" />
-                        Авторизовать через Twitch
-                      </Button>
+                      <div className="flex flex-col items-center">
+                        <Button
+                          onClick={() => signIn('kinoquiz')}
+                          disabled={isAuthLoading}
+                          className="w-full h-13 rounded-xl border border-[#7b5f2c] bg-[#9146FF] hover:bg-[#7e37ea] text-white text-[32px] uppercase disabled:opacity-70"
+                        >
+                          <HugeiconsIcon icon={Login01Icon} size={20} color="currentColor" strokeWidth={2} className="mr-2" />
+                          Авторизовать через Twitch
+                        </Button>
+                        <TwitchConsentNotice />
+                      </div>
                     ) : (
                       <div className="flex gap-3">
                         <Button

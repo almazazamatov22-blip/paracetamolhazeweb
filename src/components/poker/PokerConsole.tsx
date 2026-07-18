@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { Plus, Users, Monitor, Search, ArrowLeft, LogIn } from 'lucide-react'
+import { TwitchConsentNotice } from '@/components/legal/TwitchConsentNotice'
 
 type TableSize = 2 | 4 | 5 | 6 | 9
 type View = 'lobby' | 'create' | 'game' | 'lobbies'
@@ -157,6 +158,7 @@ export default function PokerConsole() {
             <LogIn className="w-5 h-5" />
             ВОЙТИ ЧЕРЕЗ TWITCH
           </button>
+          <TwitchConsentNotice />
         </motion.div>
       </div>
     )

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from 'react'
 import { Download, Twitch, Settings2 } from 'lucide-react'
+import { TwitchConsentNotice } from '@/components/legal/TwitchConsentNotice'
 
 import { ACTION_REGISTRY } from '@/lib/cs2-actions'
 
@@ -135,12 +136,15 @@ export default function cs2xtwitchPage() {
                 </a>
               </div>
             ) : (
-              <a href="/auth/twitch?source=cs2xtwitch" className="cs2-btn cs2-btn-twitch">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true">
-                  <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z" />
-                </svg>
-                Войти через Twitch
-              </a>
+              <div className="flex flex-col items-center gap-2">
+                <a href="/auth/twitch?source=cs2xtwitch" className="cs2-btn cs2-btn-twitch">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true">
+                    <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z" />
+                  </svg>
+                  Войти через Twitch
+                </a>
+                <TwitchConsentNotice />
+              </div>
             )}
           </div>
         </header>
@@ -181,9 +185,12 @@ export default function cs2xtwitchPage() {
                 Для работы нужно привязать аккаунт. Откройте приложение и нажмите кнопку <strong>Login with Twitch</strong>.
               </p>
               {!user ? (
-                <a href="/auth/twitch?source=cs2xtwitch" className="cs2-btn cs2-btn-twitch" style={{marginTop: 'auto', width: '100%', minHeight: 'auto', padding: '7px 10px', fontSize: '12px'}}>
-                  Войти через Twitch
-                </a>
+                <div className="flex flex-col items-center mt-auto w-full">
+                  <a href="/auth/twitch?source=cs2xtwitch" className="cs2-btn cs2-btn-twitch" style={{width: '100%', minHeight: 'auto', padding: '7px 10px', fontSize: '12px'}}>
+                    Войти через Twitch
+                  </a>
+                  <TwitchConsentNotice />
+                </div>
               ) : (
                 <span className="cs2-card-complete">Готово · {user.login}</span>
               )}
