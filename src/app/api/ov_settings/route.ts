@@ -31,35 +31,60 @@ export async function GET(req: Request) {
             .maybeSingle();
 
         if (error) {
-            // Backward compatibility if old schema or type doesn't match directly
             console.error('GET overlay_configs error:', error.message);
         }
 
+        let settings = config?.settings || {};
+        let assets = config?.assets || {};
+        let eventsub_status = config?.eventsub_status;
+
         if (!config) {
-            // Try fallback to legacy generic fetch without type if type wasn't explicitly found
             const { data: legacyConfig, error: legacyError } = await supabase
                 .from('overlay_configs')
                 .select('settings, assets')
                 .eq('user_id', userId)
                 .maybeSingle();
-            
-            if (legacyError || !legacyConfig) return NextResponse.json({});
-            
+
+            if (legacyError || !legacyConfig) return NextResponse.json(type === 'fate' ? { version: 2, rewards: [] } : {});
+
             const allSettings = legacyConfig.settings || {};
-            const assets = legacyConfig.assets || {};
-            let settings = allSettings[type] || {};
+            assets = legacyConfig.assets || {};
+            settings = allSettings[type] || {};
 
             if (type === 'fate' && Object.keys(settings).length === 0 && allSettings.reward_id) {
                 settings = allSettings;
             }
-
-            return NextResponse.json({ ...settings, ...assets });
         }
 
-        const settings = config.settings || {};
-        const assets = config.assets || {};
+        if (type === 'fate') {
+            if (!settings.rewards && settings.reward_id) {
+                settings.version = 2;
+                settings.rewards = [{
+                    internal_id: 'legacy-reward',
+                    reward_id: settings.reward_id,
+                    reward_name: settings.reward_name || 'Награда',
+                    min_val: settings.min_val || 1,
+                    max_val: settings.max_val || 100,
+                    enabled: true
+                }];
+                // Link legacy global assets visually to this legacy reward
+                assets.fate_rewards = assets.fate_rewards || {};
+                assets.fate_rewards['legacy-reward'] = {
+                    panel_bg: assets.panel_bg,
+                    reward_icon: assets.reward_icon,
+                    sound_in: assets.sound_in,
+                    sound_loop: assets.sound_loop,
+                    sound_win: assets.sound_win,
+                    sound_lose: assets.sound_lose,
+                    sound_out: assets.sound_out,
+                };
+            } else if (!settings.rewards) {
+                settings.version = 2;
+                settings.rewards = [];
+            }
+        }
 
-        return NextResponse.json({ ...settings, ...assets, eventsub_status: config.eventsub_status });
+        return NextResponse.json({ ...settings, ...assets, eventsub_status });
     } catch (err: any) {
         console.error('[OV_SETTINGS] GET Error:', err);
         return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
@@ -91,21 +116,36 @@ export async function POST(req: Request) {
 
         if (!type || !settings) return NextResponse.json({ error: 'Отсутствуют настройки или тип' }, { status: 400 });
 
-        // Validation for fate
         if (type === 'fate') {
-            if (!settings.reward_id) {
-                return NextResponse.json({ error: 'Не выбрана награда Twitch' }, { status: 400 });
+            if (!settings.rewards && settings.reward_id) {
+                settings.rewards = [{
+                    internal_id: 'legacy-reward',
+                    reward_id: settings.reward_id,
+                    reward_name: settings.reward_name || '',
+                    min_val: settings.min_val || 1,
+                    max_val: settings.max_val || 100,
+                    enabled: true
+                }];
             }
-            const min_val = Number(settings.min_val);
-            const max_val = Number(settings.max_val);
-            if (isNaN(min_val) || isNaN(max_val)) {
-                return NextResponse.json({ error: 'Мин и Макс значения должны быть числами' }, { status: 400 });
+
+            settings.version = 2;
+            const rewards = settings.rewards;
+            if (!Array.isArray(rewards)) {
+                return NextResponse.json({ error: 'Неверный формат наград (ожидается массив)' }, { status: 400 });
             }
-            if (min_val >= max_val) {
-                return NextResponse.json({ error: 'Минимальное значение должно быть меньше максимального' }, { status: 400 });
+
+            for (const r of rewards) {
+                const min_val = Number(r.min_val);
+                const max_val = Number(r.max_val);
+                if (isNaN(min_val) || isNaN(max_val)) {
+                    return NextResponse.json({ error: 'Мин и Макс значения должны быть числами' }, { status: 400 });
+                }
+                if (min_val >= max_val) {
+                    return NextResponse.json({ error: 'Минимальное значение должно быть меньше максимального' }, { status: 400 });
+                }
+                r.min_val = min_val;
+                r.max_val = max_val;
             }
-            settings.min_val = min_val;
-            settings.max_val = max_val;
         }
 
         const supabase = getSupabase();
@@ -113,10 +153,13 @@ export async function POST(req: Request) {
         let rpcError = null;
 
         if (type === 'fate') {
-            const rewardId = settings.reward_id || settings.fate?.reward_id;
-            const { error } = await supabase.rpc('save_fate_reward_binding', {
+            const rewardIds = (settings.rewards || [])
+                .filter((r: any) => r.reward_id && r.reward_id.trim() !== '')
+                .map((r: any) => r.reward_id);
+
+            const { error } = await supabase.rpc('save_fate_reward_bindings', {
                 p_broadcaster_id: userId,
-                p_reward_id: rewardId || '',
+                p_reward_ids: rewardIds,
                 p_settings: settings
             });
             rpcError = error;
@@ -130,7 +173,6 @@ export async function POST(req: Request) {
                 });
                 rpcError = error;
             } else {
-                // Delete old bindings if no reward is set
                 await supabase.from('twitch_reward_bindings').delete().eq('broadcaster_id', userId).eq('product_type', 'slots');
                 const { error } = await supabase.from('overlay_configs').upsert({
                     user_id: userId, overlay_type: type, settings, updated_at: new Date().toISOString()
@@ -163,9 +205,12 @@ export async function POST(req: Request) {
             if (rpcError.message?.includes('уже используется в')) {
                 return NextResponse.json({ error: rpcError.message }, { status: 409 });
             }
-            return NextResponse.json({ error: 'Ошибка при сохранении в базу данных' }, { status: 500 });
+            if (rpcError.code === '23505') {
+                 return NextResponse.json({ error: 'Награда уже используется в другом оверлее' }, { status: 409 });
+            }
+            return NextResponse.json({ error: 'Ошибка при сохранении в базу данных: ' + rpcError.message }, { status: 500 });
         }
-        
+
         return NextResponse.json({ success: true, settingsSaved: true });
     } catch (err: any) {
         console.error('[OV_SETTINGS] POST Error:', err);
