@@ -41,6 +41,119 @@ function verifyTwitchSignature(req: NextRequest, rawBody: string): boolean {
   return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
 }
 
+let appAccessToken: { token: string; expiresAt: number } | null = null;
+const avatarCache = new Map<string, { avatar: string | null; expiresAt: number }>();
+
+async function getAppAccessToken(): Promise<string | null> {
+  const clientId = process.env.TWITCH_CLIENT_ID;
+  const clientSecret = process.env.TWITCH_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) return null;
+
+  if (appAccessToken && Date.now() < appAccessToken.expiresAt) {
+    return appAccessToken.token;
+  }
+
+  try {
+    const res = await fetch('https://id.twitch.tv/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'client_credentials',
+      }),
+      signal: AbortSignal.timeout(3000),
+    });
+
+    if (!res.ok) {
+      console.warn(
+        `[TWITCH_API] App token request failed: ${res.status}`
+      );
+      return null;
+    }
+
+    const data = await res.json();
+    const expiresIn = Number(data.expires_in);
+
+    if (
+      typeof data.access_token !== 'string' ||
+      !data.access_token
+    ) {
+      return null;
+    }
+
+    appAccessToken = {
+      token: data.access_token,
+      expiresAt:
+        Date.now() +
+        Math.max(
+          (Number.isFinite(expiresIn) ? expiresIn : 3600) - 300,
+          60
+        ) * 1000,
+    };
+
+    return appAccessToken.token;
+  } catch (err) {
+    console.warn(
+      '[TWITCH_API] Failed to get app access token:',
+      err
+    );
+    return null;
+  }
+}
+
+async function getTwitchUserAvatar(userId: string): Promise<string | null> {
+  const now = Date.now();
+  const cached = avatarCache.get(userId);
+  if (cached && now < cached.expiresAt) {
+    return cached.avatar;
+  }
+
+  const clientId = process.env.TWITCH_CLIENT_ID;
+  const token = await getAppAccessToken();
+  if (!clientId || !token) {
+    if (clientId) avatarCache.set(userId, { avatar: null, expiresAt: now + 300 * 1000 });
+    return null;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+    const res = await fetch(`https://api.twitch.tv/helix/users?id=${userId}`, {
+      headers: {
+        'Client-Id': clientId,
+        'Authorization': `Bearer ${token}`
+      },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      const avatarUrl = data.data?.[0]?.profile_image_url || null;
+      if (avatarUrl) {
+        avatarCache.set(userId, { avatar: avatarUrl, expiresAt: now + 3600 * 1000 });
+      } else {
+        avatarCache.set(userId, { avatar: null, expiresAt: now + 300 * 1000 });
+      }
+      return avatarUrl;
+    } else {
+      console.warn(`[TWITCH_API] Failed to fetch user ${userId}: ${res.status}`);
+      avatarCache.set(userId, { avatar: null, expiresAt: now + 300 * 1000 });
+      return null;
+    }
+  } catch (err) {
+    console.warn(`[TWITCH_API] Exception fetching user ${userId}:`, err);
+    avatarCache.set(userId, { avatar: null, expiresAt: now + 300 * 1000 });
+    return null;
+  }
+}
+
 function getWeightedResult(settings: any) {
   const symbols = (settings.symbols || []).length > 0 ? settings.symbols : [
     { name: 'Вишня', url: 'https://cdn-icons-png.flaticon.com/512/1135/1135520.png', chance: 15 },
@@ -231,6 +344,7 @@ export async function handleTwitchWebhook(req: NextRequest) {
 
     // C. Dispatch
     if (productType === 'fate') {
+      const viewerAvatar = await getTwitchUserAvatar(userId);
       const { data: config, error: configError } = await supabase.from('overlay_configs').select('settings').eq('id', resourceId).eq('user_id', streamerId).eq('overlay_type', 'fate').maybeSingle();
       if (configError) throw configError;
       const fateSettings = config?.settings?.fate || config?.settings || {};
@@ -255,7 +369,7 @@ export async function handleTwitchWebhook(req: NextRequest) {
         reward_name: event.reward?.title || '',
         viewer_id: userId,
         viewer_name: userName,
-        viewer_avatar: null,
+        viewer_avatar: viewerAvatar,
         user_input: userMessage,
         payload: { userChoice, result },
         status: 'pending'

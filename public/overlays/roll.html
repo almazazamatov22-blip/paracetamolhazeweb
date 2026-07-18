@@ -356,7 +356,19 @@
             rollEl.style.color = "var(--white)";
 
             userEl.textContent = evt.viewer_name || "PLAYER";
-            if (evt.viewer_avatar) avatarEl.src = evt.viewer_avatar;
+            if (evt.viewer_avatar) {
+                avatarEl.src = evt.viewer_avatar;
+                avatarEl.style.display = '';
+            } else {
+                avatarEl.removeAttribute('src');
+                avatarEl.style.display = 'none';
+            }
+
+            avatarEl.onerror = () => {
+                avatarEl.removeAttribute('src');
+                avatarEl.style.display = 'none';
+            };
+
             pickEl.textContent = (data.userChoice || 0).toString().padStart(2, '0');
             rollEl.textContent = "00";
 
