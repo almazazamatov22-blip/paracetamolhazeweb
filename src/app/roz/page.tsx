@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { TwitchConsentNotice } from '@/components/legal/TwitchConsentNotice'
 import {
   Dices,
   Settings2,
@@ -1358,6 +1359,7 @@ export default function Home() {
                       <Plug className="w-4 h-4 mr-2" />
                       Войти через Twitch
                     </Button>
+                    <TwitchConsentNotice />
                   </div>
                 )}
               </div>

@@ -4,52 +4,108 @@ export const metadata = generateBaseMetadata({
   title: "Политика конфиденциальности",
   description: "Политика конфиденциальности проекта Paracetamol Haze.",
   path: "/privacy",
-  noindex: true,
+  noindex: false,
 });
 
 export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-background text-foreground py-16 px-4 sm:px-8 max-w-4xl mx-auto">
-      <div className="bg-yellow-900/30 border border-yellow-500/50 p-4 rounded-xl mb-8 text-yellow-200">
-        <strong>Черновик.</strong> В базе данных отсутствует механизм автоматического удаления старше 90 дней (ввиду риска поломки глобальных лидербордов). До его реализации документ остается в статусе черновика.
-      </div>
       <h1 className="text-4xl font-bold mb-8 text-white">Политика конфиденциальности</h1>
+      <p className="text-sm text-gray-500 mb-8">Дата последнего обновления: 18 июля 2026 года</p>
       
       <div className="space-y-6 text-gray-300 leading-relaxed">
-        <p>
-          Настоящая Политика конфиденциальности описывает, как проект Paracetamol Haze (далее — «Сервис») собирает, использует и защищает вашу информацию. Сервис управляется физическим лицом, находящимся в Республике Казахстан, г. Астана.
-        </p>
-        <p>
-          Сервис предназначен для лиц старше 13 лет. Лица в возрасте от 13 до 17 лет могут использовать Сервис только под надзором родителей или законных представителей.
-        </p>
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">1. Общая информация</h2>
+        <p>Настоящая Политика конфиденциальности описывает обработку данных в сервисах проекта Paracetamol Haze. Оператор проекта — физическое лицо, управляющее проектом Paracetamol Haze, Республика Казахстан, город Астана.</p>
+        <p>Контакт: <a href="mailto:support@aicarry.online" className="text-twitch-purple hover:underline">support@aicarry.online</a></p>
 
-        <h2 className="text-2xl font-bold text-white mt-8 mb-4">1. Сбор информации</h2>
-        <p>При авторизации через Twitch мы запрашиваем доступ к следующим данным и функциям (в зависимости от проекта):</p>
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">2. Какие данные могут обрабатываться</h2>
         <ul className="list-disc list-inside space-y-2 ml-4">
-          <li><strong>Базовый профиль:</strong> ваш Twitch ID, имя пользователя (login/display name) и URL аватара. Запрашивается разрешение <code>user:read:email</code>. Email-адрес технически доступен сервису, но не передается третьим лицам.</li>
-          <li><strong>Чат:</strong> права <code>chat:read</code> и <code>chat:edit</code> для работы интерактивных игр (Бредовуха, Киноквиз, РОЗ).</li>
-          <li><strong>Награды канала:</strong> права <code>channel:read:redemptions</code> и <code>channel:manage:redemptions</code> для создания и управления пользовательскими наградами за баллы канала (CS2 Interactive, Оверлеи).</li>
+          <li>Twitch ID;</li>
+          <li>Twitch login;</li>
+          <li>отображаемое имя;</li>
+          <li>URL аватара;</li>
+          <li>email, если Twitch передаёт его согласно разрешению <code>user:read:email</code>;</li>
+          <li>сообщения Twitch-чата, необходимые для работы игр и розыгрышей;</li>
+          <li>информация о наградах Channel Points и их активациях;</li>
+          <li>игровые результаты, очки и данные рейтингов;</li>
+          <li>данные участников розыгрышей, билетов, ставок и победителей;</li>
+          <li>техническая информация, необходимая для работы сайта и устранения ошибок.</li>
+        </ul>
+        <p>Разрешение <code>user:read:email</code> позволяет Twitch предоставить email пользователя. В настоящее время email не сохраняется в основной таблице пользовательских профилей, если это не требуется отдельной функцией сервиса.</p>
+
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">3. Цели обработки</h2>
+        <ul className="list-disc list-inside space-y-2 ml-4">
+          <li>Twitch-авторизация;</li>
+          <li>работа игр и интерактивов;</li>
+          <li>обработка сообщений чата;</li>
+          <li>работа Channel Points;</li>
+          <li>создание и управление наградами;</li>
+          <li>розыгрыши и аукционы;</li>
+          <li>игровые рейтинги;</li>
+          <li>оверлеи;</li>
+          <li>поддержка и исправление технических ошибок.</li>
         </ul>
 
-        <h2 className="text-2xl font-bold text-white mt-8 mb-4">2. Использование и хранение данных</h2>
-        <p>Собранные данные используются исключительно для обеспечения функционала сервиса (сохранение результатов, управление наградами, работа оверлеев). Мы храним данные в базах данных (Supabase PostgreSQL и SQLite/Prisma). Кэширование осуществляется через Upstash Redis.</p>
-        <p><strong>Политика хранения:</strong> Мы стремимся хранить данные профилей и статистики не более 90 дней с момента вашей последней активности, после чего данные подлежат удалению.</p>
-        <p><strong>Файлы cookie:</strong> Для поддержания сессии мы используем защищенные файлы cookie (например, <code>twitch_token</code> и токены NextAuth) с флагами HttpOnly, Secure и SameSite=Lax. Они не используются для межсайтового отслеживания.</p>
-
-        <h2 className="text-2xl font-bold text-white mt-8 mb-4">3. Передача третьим лицам</h2>
-        <p>Мы не продаем и не передаем ваши личные данные сторонним маркетинговым компаниям. Однако техническая инфраструктура Сервиса обеспечивается сторонними провайдерами:</p>
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">4. Twitch OAuth</h2>
+        <p>Мы используем следующие разрешения (scopes):</p>
         <ul className="list-disc list-inside space-y-2 ml-4">
-          <li><strong>Vercel:</strong> хостинг основного приложения.</li>
-          <li><strong>Cloudflare Workers:</strong> хостинг подпроекта Лотомаль.</li>
-          <li><strong>Supabase / Upstash:</strong> облачные базы данных и кэш.</li>
-          <li><strong>Twitch API:</strong> для синхронизации наград и статуса.</li>
+          <li><code>user:read:email</code> — для получения базового профиля и email.</li>
+          <li><code>chat:read</code> — для чтения сообщений в чате (необходимо для интерактивов).</li>
+          <li><code>chat:edit</code> — для отправки ответов бота или результатов в чат.</li>
+          <li><code>channel:read:redemptions</code> — для отслеживания активации наград пользователями.</li>
+          <li><code>channel:manage:redemptions</code> — для создания и управления пользовательскими наградами канала.</li>
         </ul>
 
-        <h2 className="text-2xl font-bold text-white mt-8 mb-4">4. Аналитика</h2>
-        <p>В Сервисе <strong>не используются</strong> сторонние системы отслеживания и аналитики, такие как Google Analytics или Яндекс.Метрика.</p>
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">5. Cookies</h2>
+        <p>Для Twitch-авторизации используется cookie <code>twitch_token</code>, содержащая Twitch access token. Cookie имеет защиту HttpOnly, используется только для работы авторизованных функций и хранится до окончания срока действия токена или выхода пользователя из сервиса.</p>
 
-        <h2 className="text-2xl font-bold text-white mt-8 mb-4">5. Контакты</h2>
-        <p>Если у вас есть вопросы по поводу конфиденциальности или вы хотите запросить удаление своих данных, напишите нам на email: <a href="mailto:support@aicarry.online" className="text-twitch-purple hover:underline">support@aicarry.online</a>.</p>
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">6. Хранение данных</h2>
+        <p>Пользовательские данные хранятся только в объёме, необходимом для работы функций сервиса. Профильные данные и временная игровая информация могут храниться до 90 дней с момента последней активности. Данные рейтингов и результаты игр могут храниться дольше, пока они необходимы для работы соответствующей функции или до получения подтверждённого запроса на удаление.</p>
+
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">7. Сторонние сервисы</h2>
+        <ul className="list-disc list-inside space-y-2 ml-4">
+          <li>Twitch — авторизация, профиль, чат, Channel Points и события;</li>
+          <li>Vercel — хостинг сайта и серверных функций;</li>
+          <li>Supabase — хранение части пользовательских и игровых данных;</li>
+          <li>Cloudflare — работа отдельных проектов и серверных функций;</li>
+          <li>GitHub — распространение официальных релизов CS2Haze.</li>
+        </ul>
+        <p>Эти сервисы могут обрабатывать технические и пользовательские данные в соответствии со своими политиками конфиденциальности.</p>
+
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">8. Аналитика</h2>
+        <p>На дату последнего обновления Google Analytics и Яндекс Метрика не подключены. Перед их подключением Политика конфиденциальности будет обновлена.</p>
+
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">9. Удаление данных</h2>
+        <p>Для запроса доступа, исправления или удаления данных пользователь может написать на <a href="mailto:support@aicarry.online" className="text-twitch-purple hover:underline">support@aicarry.online</a> и указать свой Twitch login или Twitch ID.</p>
+        <ul className="list-disc list-inside space-y-2 ml-4">
+          <li>не нужно отправлять пароль;</li>
+          <li>не нужно отправлять access token;</li>
+          <li>не нужно отправлять cookie;</li>
+          <li>для подтверждения владения аккаунтом может потребоваться дополнительная проверка.</li>
+        </ul>
+
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">10. Отзыв Twitch-доступа</h2>
+        <p>Пользователь может в любой момент:</p>
+        <ul className="list-disc list-inside space-y-2 ml-4">
+          <li>выйти из сервиса;</li>
+          <li>удалить cookies сайта;</li>
+          <li>отозвать доступ приложения в настройках подключений Twitch;</li>
+          <li>написать на email для удаления сохранённых данных.</li>
+        </ul>
+
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">11. Возраст</h2>
+        <p>Сервис предназначен для пользователей в возрасте 13 лет и старше. Несовершеннолетние должны использовать сервис под надзором родителя или законного представителя.</p>
+
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">12. Безопасность</h2>
+        <p>Оператор принимает разумные технические меры для защиты данных, однако ни один способ передачи или хранения информации в интернете не может гарантировать абсолютную безопасность.</p>
+
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">13. Изменения политики</h2>
+        <p>Настоящий документ может обновляться, а новая версия публикуется на этой странице.</p>
+
+        <h2 className="text-2xl font-bold text-white mt-8 mb-4">14. Контакты</h2>
+        <p>Paracetamol Haze<br/>
+        Республика Казахстан, Астана<br/>
+        <a href="mailto:support@aicarry.online" className="text-twitch-purple hover:underline">support@aicarry.online</a></p>
       </div>
     </main>
   );

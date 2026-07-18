@@ -20,6 +20,8 @@ export const PUBLIC_INDEXABLE_ROUTES = [
   "/guides/cs2-twitch-setup",
   "/guides/obs-twitch-overlays",
   "/about",
+  "/privacy",
+  "/terms",
 ];
 
 export function getCanonicalUrl(path: string): string {

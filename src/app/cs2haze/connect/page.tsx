@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TwitchConsentNotice } from "@/components/legal/TwitchConsentNotice";
 
 export default function ConnectPage() {
   const [user, setUser] = useState<any>(null);
@@ -72,6 +73,7 @@ export default function ConnectPage() {
             <a href="/auth/twitch?source=cs2haze" style={{ display: 'inline-block', background: '#9146ff', color: '#fff', padding: '12px 24px', borderRadius: 8, textDecoration: 'none', fontWeight: 'bold' }}>
               Войти через Twitch
             </a>
+            <TwitchConsentNotice />
           </div>
         ) : (
           <div>
