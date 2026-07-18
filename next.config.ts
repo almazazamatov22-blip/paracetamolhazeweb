@@ -28,6 +28,11 @@ const nextConfig: NextConfig = {
         destination: `${lotomalUrl}/:path*`,
         permanent: false,
       },
+      {
+        source: "/projects/twitch-overlays",
+        destination: "/overlays",
+        permanent: true,
+      },
     ];
   },
   async rewrites() {
@@ -130,16 +135,7 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/overlays",
-        headers: [
-          {
-            key: "X-Robots-Tag",
-            value: "noindex, nofollow",
-          },
-        ],
-      },
-      {
-        source: "/overlays/:path*",
+        source: "/overlays/:path+",
         headers: [
           {
             key: "X-Robots-Tag",

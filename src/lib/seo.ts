@@ -16,7 +16,7 @@ export const PUBLIC_INDEXABLE_ROUTES = [
   "/bred",
   "/emojino",
   "/projects/lotomal",
-  "/projects/twitch-overlays",
+  "/overlays",
   "/guides/cs2-twitch-setup",
   "/guides/obs-twitch-overlays",
   "/about",
