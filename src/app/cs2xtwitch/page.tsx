@@ -61,25 +61,27 @@ export default function cs2xtwitchPage() {
       .catch(() => {})
   }, [])
 
+  const refreshSubscriptionStatus = async () => {
+    try {
+      const response = await fetch('/api/cs2/subscribe')
+      const data = await response.json()
+      if (typeof data.isSubscribed === 'boolean') {
+        setIsSubscribed(data.isSubscribed)
+        setIsCurrentOrigin(!!data.isCurrentOrigin)
+        setCallbackOrigin(data.callbackOrigin || '')
+      } else if (data.error) {
+        setIsSubscribed(false)
+        setSubscribeMsg(`Ошибка проверки статуса: ${data.error}`)
+      }
+    } catch {
+      setIsSubscribed(false)
+      setSubscribeMsg('Не удалось проверить статус подписки')
+    }
+  }
+
   useEffect(() => {
     if (!user) return
-
-    fetch('/api/cs2/subscribe')
-      .then(response => response.json())
-      .then(data => {
-        if (typeof data.isSubscribed === 'boolean') {
-          setIsSubscribed(data.isSubscribed)
-          setIsCurrentOrigin(!!data.isCurrentOrigin)
-          setCallbackOrigin(data.callbackOrigin || '')
-        } else if (data.error) {
-          setIsSubscribed(false)
-          setSubscribeMsg(`Ошибка проверки статуса: ${data.error}`)
-        }
-      })
-      .catch(() => {
-        setIsSubscribed(false)
-        setSubscribeMsg('Не удалось проверить статус подписки')
-      })
+    refreshSubscriptionStatus()
   }, [user])
 
   async function handleSubscribe(mode?: 'reconnect') {
@@ -96,15 +98,19 @@ export default function cs2xtwitchPage() {
       const data = await response.json()
 
       if (data.success) {
+        await refreshSubscriptionStatus()
         setSubscribeMsg('Интеграция успешно активирована')
-        setIsSubscribed(true)
-        setIsCurrentOrigin(true)
-        setCallbackOrigin(data.currentOrigin || '')
       } else {
-        setSubscribeMsg(`Ошибка подключения: ${data.error}`)
+        if (data.rollbackRestored !== undefined) {
+           setSubscribeMsg(`Ошибка подключения: ${data.error}. ${data.rollbackRestored ? 'Прежняя подписка сохранена.' : 'Внимание: старая подписка потеряна!'}`)
+        } else {
+           setSubscribeMsg(`Ошибка подключения: ${data.error}`)
+        }
+        await refreshSubscriptionStatus()
       }
     } catch (error: unknown) {
       setSubscribeMsg(error instanceof Error ? error.message : 'Не удалось подключиться')
+      await refreshSubscriptionStatus()
     } finally {
       setSubscribing(false)
     }

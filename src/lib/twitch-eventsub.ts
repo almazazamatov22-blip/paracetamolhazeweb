@@ -40,9 +40,11 @@ const ALLOWED_EVENTSUB_HOSTS = new Set([
   'paracetamolhaze.ru',
   'www.paracetamolhaze.ru',
   'paracetamolhaze-six.vercel.app',
-  'paracetamolhaze.online',
-  'localhost:3000'
+  'paracetamolhaze.online'
 ]);
+if (process.env.NODE_ENV !== 'production') {
+  ALLOWED_EVENTSUB_HOSTS.add('localhost:3000');
+}
 
 export async function sharedSubscribeHandler(req: NextRequest, webhookPath: string = '/api/twitch/webhook') {
   const mode = req.nextUrl.searchParams.get('mode') === 'reconnect' ? 'reconnect' : 'ensure';
@@ -119,6 +121,8 @@ export async function sharedSubscribeHandler(req: NextRequest, webhookPath: stri
       let finalCallbackUrl = callbackUrl;
       let finalCallbackHost = normalizedHost;
 
+      let oldSubToDelete: any = null;
+
       for (const sub of allSubs) {
         if (
           sub.type === 'channel.channel_points_custom_reward_redemption.add' && 
@@ -151,11 +155,15 @@ export async function sharedSubscribeHandler(req: NextRequest, webhookPath: stri
                 continue;
               }
               if (ALLOWED_EVENTSUB_HOSTS.has(subHostname) && subPathname === webhookPath) {
-                console.log(`[TWITCH_EVENTSUB] Deleting old CS2 sub on another allowed host ${sub.id}`);
-                await fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?id=${sub.id}`, {
-                  method: 'DELETE',
-                  headers: { 'Authorization': `Bearer ${appToken}`, 'Client-Id': clientId! }
-                });
+                if (!oldSubToDelete) {
+                  oldSubToDelete = sub;
+                } else {
+                  console.log(`[TWITCH_EVENTSUB] Deleting additional old CS2 sub on another allowed host ${sub.id}`);
+                  await fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?id=${sub.id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${appToken}`, 'Client-Id': clientId! }
+                  });
+                }
                 continue;
               }
             }
@@ -172,7 +180,7 @@ export async function sharedSubscribeHandler(req: NextRequest, webhookPath: stri
       let subId = existingSub?.id;
       let status = existingSub?.status === 'enabled' ? 'enabled' : existingSub?.status === 'webhook_callback_verification_pending' ? 'webhook_callback_verification_pending' : 'pending';
 
-      const createSub = async (tokenStr: string) => {
+      const createSub = async (tokenStr: string, cbUrl: string) => {
         return fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
           method: 'POST',
           headers: {
@@ -186,7 +194,7 @@ export async function sharedSubscribeHandler(req: NextRequest, webhookPath: stri
             condition: { broadcaster_user_id: broadcasterId },
             transport: {
               method: 'webhook',
-              callback: finalCallbackUrl,
+              callback: cbUrl,
               secret: webhookSecret
             }
           })
@@ -194,7 +202,19 @@ export async function sharedSubscribeHandler(req: NextRequest, webhookPath: stri
       };
 
       if (needsNewSub) {
-        let subRes = await createSub(appToken);
+        if (oldSubToDelete && mode === 'reconnect') {
+          console.log(`[TWITCH_EVENTSUB] Deleting old CS2 sub ${oldSubToDelete.id} before reconnect...`);
+          const delRes = await fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?id=${oldSubToDelete.id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${appToken}`, 'Client-Id': clientId! }
+          });
+          if (!delRes.ok) {
+             console.error(`[TWITCH_EVENTSUB] Failed to delete old sub ${oldSubToDelete.id}`);
+             return Response.json({ success: false, error: 'Не удалось удалить старую подписку', status: delRes.status }, { status: 500 });
+          }
+        }
+
+        let subRes = await createSub(appToken, finalCallbackUrl);
         let subResData = await subRes.json();
 
         if (subRes.status === 403) {
@@ -205,7 +225,6 @@ export async function sharedSubscribeHandler(req: NextRequest, webhookPath: stri
            const conflictId = subResData.id || subResData.message?.match(/([a-f0-9\-]{36})/)?.[0];
            if (conflictId) {
                console.log(`[TWITCH_EVENTSUB] Conflict 409, verifying id ${conflictId}`);
-               // Fetch it to see if it's the exact same we just couldn't find?
                const fetchConflict = await fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?subscription_id=${conflictId}`, {
                  headers: { 'Authorization': `Bearer ${appToken}`, 'Client-Id': clientId! }
                });
@@ -228,7 +247,7 @@ export async function sharedSubscribeHandler(req: NextRequest, webhookPath: stri
                      headers: { 'Authorization': `Bearer ${appToken}`, 'Client-Id': clientId! }
                    });
                    console.log(`[TWITCH_EVENTSUB] Retrying creation...`);
-                   subRes = await createSub(appToken);
+                   subRes = await createSub(appToken, finalCallbackUrl);
                    subResData = await subRes.json();
                  }
                }
@@ -238,6 +257,21 @@ export async function sharedSubscribeHandler(req: NextRequest, webhookPath: stri
         if (needsNewSub) {
           if (!subRes.ok) {
              console.error('[TWITCH_EVENTSUB] Registration failed:', subRes.status, subResData);
+             
+             // Rollback
+             if (oldSubToDelete && mode === 'reconnect') {
+               console.log(`[TWITCH_EVENTSUB] Attempting Rollback for old sub...`);
+               const rollbackRes = await createSub(appToken, oldSubToDelete.transport.callback);
+               if (rollbackRes.ok) {
+                 const rollbackData = await rollbackRes.json();
+                 console.log(`[TWITCH_EVENTSUB] Rollback success: ${rollbackData.data?.[0]?.id}`);
+                 return Response.json({ success: false, error: subResData.message || 'Ошибка создания подписки', rollbackRestored: true }, { status: subRes.status === 409 ? 409 : 500 });
+               } else {
+                 console.error(`[TWITCH_EVENTSUB] Rollback failed! User left without active sub.`);
+                 return Response.json({ success: false, error: subResData.message || 'Ошибка создания подписки', rollbackRestored: false }, { status: subRes.status === 409 ? 409 : 500 });
+               }
+             }
+
              return Response.json({ success: false, error: subResData.message || 'Ошибка подписки Twitch', status: subRes.status }, { status: subRes.status === 409 ? 409 : 500 });
           }
           subId = subResData.data?.[0]?.id;
