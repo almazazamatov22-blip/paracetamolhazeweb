@@ -61,6 +61,7 @@ global.fetch = async (url: any, options: any) => {
 
 async function runTests() {
   console.log('--- Running Tests ---');
+  let failedTests = 0;
 
   // Helper to create req
   const createReq = (mode = 'ensure') => {
@@ -103,6 +104,7 @@ async function runTests() {
     console.log('✅ 403 triggers rollback');
   } catch (err: any) {
     console.error('❌ Test 1 failed:', err.message);
+    failedTests++;
   }
 
   // Test 2: Network exception triggers rollback
@@ -125,6 +127,7 @@ async function runTests() {
     console.log('✅ Network exception triggers rollback');
   } catch (err: any) {
     console.error('❌ Test 2 failed:', err.message);
+    failedTests++;
   }
 
   // Test 3: Multiple subs, additional deleted, /api/ov_webhook ignored
@@ -168,6 +171,74 @@ async function runTests() {
     console.log('✅ ov_webhook preserved, multiple subs collected and deleted safely');
   } catch (err: any) {
     console.error('❌ Test 3 failed:', err.message);
+    failedTests++;
+  }
+
+  // Test 4: 409 conflict with /api/ov_webhook
+  try {
+    fetchCalls = [];
+    fetchMocks = [
+      { ok: true, body: { data: [{ id: 'old_sub_active', status: 'enabled', type: 'channel.channel_points_custom_reward_redemption.add', condition: { broadcaster_user_id: 'user_123' }, transport: { method: 'webhook', callback: 'https://paracetamolhaze-six.vercel.app/api/cs2/webhook' } }] } },
+      // DELETE old
+      { ok: true, body: {} },
+      // POST new sub on .ru -> FAILS WITH 409
+      { ok: false, status: 409, body: { message: 'subscription already exists - id: 12345678-1234-1234-1234-123456789012', error: 'Conflict' } },
+      // GET conflict details -> returns ov_webhook
+      { ok: true, body: { data: [{ id: '12345678-1234-1234-1234-123456789012', status: 'enabled', type: 'channel.channel_points_custom_reward_redemption.add', condition: { broadcaster_user_id: 'user_123' }, transport: { method: 'webhook', callback: 'https://paracetamolhaze.ru/api/ov_webhook' } }] } },
+      // No DELETE should happen for ov_webhook!
+      // But we still need ROLLBACK!
+      { ok: true, status: 202, body: { data: [{ id: 'restored_sub_id' }] } }
+    ];
+
+    const req = createReq('reconnect');
+    const res = await sharedSubscribeHandler(req, '/api/cs2/webhook');
+    const data = await res.json();
+    console.log('DATA 4:', data);
+    
+    assert.strictEqual(data.success, false);
+    assert.strictEqual(data.conflictWithOtherIntegration, true);
+
+    const delConflict = fetchCalls.find(c => c.url.includes('id=12345678-1234-1234-1234-123456789012') && c.options?.method === 'DELETE');
+    assert.ok(!delConflict, 'ov_webhook should NEVER be deleted');
+    console.log('✅ 409 with ov_webhook preserved and returned as conflict');
+  } catch (err: any) {
+    console.error('❌ Test 4 failed:', err.message);
+    failedTests++;
+  }
+
+  // Test 5: 500 on DELETE stops reconnect
+  try {
+    fetchCalls = [];
+    fetchMocks = [
+      { ok: true, body: { data: [
+        { id: 'broken_sub', status: 'pending', type: 'channel.channel_points_custom_reward_redemption.add', condition: { broadcaster_user_id: 'user_123' }, transport: { method: 'webhook', callback: 'https://paracetamolhaze-six.vercel.app/api/cs2/webhook' } },
+        { id: 'old_sub_active', status: 'enabled', type: 'channel.channel_points_custom_reward_redemption.add', condition: { broadcaster_user_id: 'user_123' }, transport: { method: 'webhook', callback: 'https://paracetamolhaze-six.vercel.app/api/cs2/webhook' } }
+      ] } },
+      // DELETE broken_sub -> FAILS 500
+      { ok: false, status: 500, body: {} }
+    ];
+
+    const req = createReq('reconnect');
+    const res = await sharedSubscribeHandler(req, '/api/cs2/webhook');
+    const data = await res.json();
+    console.log('DATA 5:', data);
+    
+    assert.strictEqual(data.success, false);
+    assert.strictEqual(data.status, 500);
+
+    const delActive = fetchCalls.find(c => c.url.includes('id=old_sub_active') && c.options?.method === 'DELETE');
+    assert.ok(!delActive, 'Active sub should not be deleted if previous DELETE failed');
+    console.log('✅ 500 on DELETE safely stops operation');
+  } catch (err: any) {
+    console.error('❌ Test 5 failed:', err.message);
+    failedTests++;
+  }
+
+  if (failedTests > 0) {
+    console.error(`\n❌ ${failedTests} tests failed.`);
+    process.exit(1);
+  } else {
+    console.log(`\n✅ All tests passed!`);
   }
 
 }
