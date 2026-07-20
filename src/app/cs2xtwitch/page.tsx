@@ -69,13 +69,17 @@ export default function cs2xtwitchPage() {
         setIsSubscribed(data.isSubscribed)
         setIsCurrentOrigin(!!data.isCurrentOrigin)
         setCallbackOrigin(data.callbackOrigin || '')
+        return { ok: true, isSubscribed: data.isSubscribed, isCurrentOrigin: !!data.isCurrentOrigin, callbackOrigin: data.callbackOrigin || '', error: null }
       } else if (data.error) {
         setIsSubscribed(false)
         setSubscribeMsg(`Ошибка проверки статуса: ${data.error}`)
+        return { ok: false, isSubscribed: false, isCurrentOrigin: false, callbackOrigin: '', error: data.error }
       }
-    } catch {
+      return { ok: false, isSubscribed: false, isCurrentOrigin: false, callbackOrigin: '', error: 'Неизвестный ответ' }
+    } catch (err: any) {
       setIsSubscribed(false)
       setSubscribeMsg('Не удалось проверить статус подписки')
+      return { ok: false, isSubscribed: false, isCurrentOrigin: false, callbackOrigin: '', error: err.message }
     }
   }
 
@@ -98,8 +102,16 @@ export default function cs2xtwitchPage() {
       const data = await response.json()
 
       if (data.success) {
-        await refreshSubscriptionStatus()
-        setSubscribeMsg('Интеграция успешно активирована')
+        const status = await refreshSubscriptionStatus()
+        if (status.ok && status.isSubscribed) {
+           if (mode === 'reconnect' && !status.isCurrentOrigin) {
+               setSubscribeMsg('Внимание: статус обновился, но подписка осталась на другом домене.')
+           } else {
+               setSubscribeMsg('Интеграция успешно активирована')
+           }
+        } else {
+           setSubscribeMsg(`Ошибка: ${status.error || 'состояние не подтверждено после POST'}`)
+        }
       } else {
         if (data.rollbackRestored !== undefined) {
            setSubscribeMsg(`Ошибка подключения: ${data.error}. ${data.rollbackRestored ? 'Прежняя подписка сохранена.' : 'Внимание: старая подписка потеряна!'}`)
