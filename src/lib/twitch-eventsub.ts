@@ -124,7 +124,12 @@ export async function sharedSubscribeHandler(req: NextRequest, webhookPath: stri
           sub.type === 'channel.channel_points_custom_reward_redemption.add' && 
           sub.condition?.broadcaster_user_id === broadcasterId
         ) {
-          const subUrl = new URL(sub.transport?.callback);
+          let subUrl: URL;
+          try {
+            subUrl = new URL(sub.transport?.callback);
+          } catch {
+            continue;
+          }
           const subHostname = subUrl.host.toLowerCase();
           const subPathname = subUrl.pathname;
 
@@ -137,9 +142,6 @@ export async function sharedSubscribeHandler(req: NextRequest, webhookPath: stri
                 finalCallbackHost = subHostname;
                 continue;
               }
-              if (ALLOWED_EVENTSUB_HOSTS.has(subHostname)) {
-                continue;
-              }
             } else {
               if (subHostname === normalizedHost && subPathname === webhookPath) {
                 existingSub = sub;
@@ -148,7 +150,12 @@ export async function sharedSubscribeHandler(req: NextRequest, webhookPath: stri
                 finalCallbackHost = subHostname;
                 continue;
               }
-              if (ALLOWED_EVENTSUB_HOSTS.has(subHostname)) {
+              if (ALLOWED_EVENTSUB_HOSTS.has(subHostname) && subPathname === webhookPath) {
+                console.log(`[TWITCH_EVENTSUB] Deleting old CS2 sub on another allowed host ${sub.id}`);
+                await fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?id=${sub.id}`, {
+                  method: 'DELETE',
+                  headers: { 'Authorization': `Bearer ${appToken}`, 'Client-Id': clientId! }
+                });
                 continue;
               }
             }
@@ -268,7 +275,21 @@ export async function sharedSubscribeHandler(req: NextRequest, webhookPath: stri
         throw saveSubError;
       }
 
-      return Response.json({ success: true, status, subscriptionId: subId, callback: finalCallbackUrl });
+      const actualCurrentOrigin = `${protocol}://${normalizedHost}`;
+      let finalCallbackOrigin = actualCurrentOrigin;
+      try {
+          const parsedCb = new URL(finalCallbackUrl);
+          finalCallbackOrigin = `${parsedCb.protocol}//${parsedCb.host}`;
+      } catch {}
+
+      return Response.json({ 
+        success: true, 
+        status, 
+        subscriptionId: subId, 
+        callback: finalCallbackUrl,
+        currentOrigin: actualCurrentOrigin,
+        isCurrentOrigin: finalCallbackOrigin === actualCurrentOrigin
+      });
     } finally {
       await supabase.rpc('release_eventsub_lease', {
         p_broadcaster_id: broadcasterId,
@@ -306,6 +327,8 @@ export async function getSubscriptionStatus(req: NextRequest, webhookPath: strin
     const appToken = await getAppToken();
 
     let isSubscribed = false;
+    let callbackUrlStr: string | null = null;
+    let callbackOrigin: string | null = null;
     let cursor: string | undefined = undefined;
 
     do {
@@ -326,11 +349,21 @@ export async function getSubscriptionStatus(req: NextRequest, webhookPath: strin
             sub.type === 'channel.channel_points_custom_reward_redemption.add' && 
             sub.condition?.broadcaster_user_id === broadcasterId &&
             sub.status === 'enabled' &&
-            sub.transport?.method === 'webhook' &&
-            sub.transport?.callback === callbackUrl
+            sub.transport?.method === 'webhook'
           ) {
-            isSubscribed = true;
-            break;
+            let subUrl: URL;
+            try { subUrl = new URL(sub.transport.callback); } catch { continue; }
+            
+            if (
+                subUrl.protocol === 'https:' &&
+                ALLOWED_EVENTSUB_HOSTS.has(subUrl.host.toLowerCase()) &&
+                subUrl.pathname === webhookPath
+            ) {
+              isSubscribed = true;
+              callbackUrlStr = sub.transport.callback;
+              callbackOrigin = `${subUrl.protocol}//${subUrl.host}`;
+              break;
+            }
           }
         }
       }
@@ -338,7 +371,14 @@ export async function getSubscriptionStatus(req: NextRequest, webhookPath: strin
       cursor = subsData.pagination?.cursor;
     } while (cursor);
 
-    return Response.json({ isSubscribed, callbackUrl });
+    const actualCurrentOrigin = `${protocol}://${normalizedHost}`;
+    return Response.json({ 
+        isSubscribed, 
+        callbackUrl: callbackUrlStr,
+        callbackOrigin: callbackOrigin,
+        currentOrigin: actualCurrentOrigin,
+        isCurrentOrigin: callbackOrigin === actualCurrentOrigin
+    });
   } catch (err: any) {
     console.error('[TWITCH_EVENTSUB_GET] Internal Error:', err.message);
     return Response.json({ isSubscribed: false, error: 'Внутренняя ошибка сервера' }, { status: 500 });

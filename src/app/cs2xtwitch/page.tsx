@@ -47,6 +47,8 @@ export default function cs2xtwitchPage() {
   const [subscribeMsg, setSubscribeMsg] = useState('')
   const [copiedOverlay, setCopiedOverlay] = useState(false)
   const [isSubscribed, setIsSubscribed] = useState(false)
+  const [isCurrentOrigin, setIsCurrentOrigin] = useState(true)
+  const [callbackOrigin, setCallbackOrigin] = useState('')
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -67,6 +69,8 @@ export default function cs2xtwitchPage() {
       .then(data => {
         if (typeof data.isSubscribed === 'boolean') {
           setIsSubscribed(data.isSubscribed)
+          setIsCurrentOrigin(!!data.isCurrentOrigin)
+          setCallbackOrigin(data.callbackOrigin || '')
         } else if (data.error) {
           setIsSubscribed(false)
           setSubscribeMsg(`Ошибка проверки статуса: ${data.error}`)
@@ -78,17 +82,24 @@ export default function cs2xtwitchPage() {
       })
   }, [user])
 
-  async function handleSubscribe() {
+  async function handleSubscribe(mode?: 'reconnect') {
+    if (mode === 'reconnect') {
+       if (!confirm(`Вы уверены, что хотите перенести обработку наград на этот домен?\nНа старом зеркале интеграция перестанет работать.`)) return;
+    }
+
     setSubscribing(true)
     setSubscribeMsg('')
 
     try {
-      const response = await fetch('/api/cs2/subscribe', { method: 'POST' })
+      const url = mode === 'reconnect' ? '/api/cs2/subscribe?mode=reconnect' : '/api/cs2/subscribe'
+      const response = await fetch(url, { method: 'POST' })
       const data = await response.json()
 
       if (data.success) {
         setSubscribeMsg('Интеграция успешно активирована')
         setIsSubscribed(true)
+        setIsCurrentOrigin(true)
+        setCallbackOrigin(data.currentOrigin || '')
       } else {
         setSubscribeMsg(`Ошибка подключения: ${data.error}`)
       }
@@ -229,21 +240,42 @@ export default function cs2xtwitchPage() {
             <div className="cs2-control-grid">
               <article className="cs2-control-card">
                 <div className="cs2-control-topline">
-                  <span className={`cs2-status-dot ${isSubscribed ? 'is-ready' : ''}`} />
-                  <span>{isSubscribed ? 'EventSub активен' : 'Требуется подключение'}</span>
+                  <span className={`cs2-status-dot ${isSubscribed && isCurrentOrigin ? 'is-ready' : isSubscribed ? 'is-warning' : ''}`} />
+                  <span>
+                    {!isSubscribed 
+                       ? 'Требуется подключение' 
+                       : (isCurrentOrigin ? 'EventSub активен' : `Интеграция активна через ${callbackOrigin}`)}
+                  </span>
                 </div>
                 <h3>События Twitch</h3>
                 <p>Разрешите серверу получать активации наград канала.</p>
-                <button
-                  className="cs2-btn cs2-btn-primary"
-                  onClick={handleSubscribe}
-                  disabled={subscribing || isSubscribed}
-                  id="subscribe-btn"
-                >
-                  {subscribing ? 'Подключаем…' : isSubscribed ? 'Интеграция активна' : 'Активировать интеграцию'}
-                </button>
+                
+                <div className="flex gap-2">
+                  <button
+                    className="cs2-btn cs2-btn-primary"
+                    onClick={() => handleSubscribe()}
+                    disabled={subscribing || (isSubscribed && isCurrentOrigin)}
+                    id="subscribe-btn"
+                    style={{ flex: 1, minHeight: 'auto', padding: '8px' }}
+                  >
+                    {subscribing 
+                      ? 'Подключаем…' 
+                      : (isSubscribed && isCurrentOrigin ? 'Интеграция активна' : 'Активировать интеграцию')}
+                  </button>
+                  {isSubscribed && !isCurrentOrigin && (
+                     <button
+                        className="cs2-btn cs2-btn-ghost"
+                        onClick={() => handleSubscribe('reconnect')}
+                        disabled={subscribing}
+                        style={{ padding: '8px 12px', fontSize: '13px' }}
+                     >
+                        Переключить на текущий домен
+                     </button>
+                  )}
+                </div>
+
                 {subscribeMsg && (
-                  <span className={`cs2-inline-message ${isSubscribed ? 'is-success' : 'is-error'}`}>
+                  <span className={`cs2-inline-message ${isSubscribed && isCurrentOrigin ? 'is-success' : 'is-error'}`}>
                     {subscribeMsg}
                   </span>
                 )}
@@ -594,6 +626,7 @@ export default function cs2xtwitchPage() {
         .cs2-control-topline { display: flex; align-items: center; gap: 8px; color: #8f96a8; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
         .cs2-status-dot { width: 10px; height: 10px; border-radius: 50%; background: #f0ad4e; box-shadow: 0 0 0 4px rgba(240,173,78,.15); }
         .cs2-status-dot.is-ready { background: #4bd38a; box-shadow: 0 0 0 4px rgba(75,211,138,.2); }
+        .cs2-status-dot.is-warning { background: #eab308; box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.2); }
         .cs2-inline-message { color: #f29a9a; font-size: 14px; font-weight: 500; }
         .cs2-inline-message.is-success { color: #62d997; }
         .cs2-copy-wrapper { width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: auto; }
