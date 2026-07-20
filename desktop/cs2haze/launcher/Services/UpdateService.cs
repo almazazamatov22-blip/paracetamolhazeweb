@@ -22,26 +22,61 @@ public sealed class UpdateService(HttpClient http, LauncherConfig config)
     private const string DefaultUpdateRepository = "almazazamatov22-blip/paracetamolhazeweb";
     private static readonly string UpdateRepository = GetUpdateRepository();
 
+    private static readonly string[] AllowedDomains = [
+        "https://paracetamolhaze.ru",
+        "https://paracetamolhaze-six.vercel.app",
+        "https://paracetamolhaze.online"
+    ];
+
     public async Task<UpdateManifest> GetManifestAsync(
         string launcherVersion,
         string? runtimeVersion,
+        string? selectedBaseUrl,
         CancellationToken cancellationToken
     )
     {
-        var url =
-            $"{config.ApiBaseUrl}{config.ManifestPath}"
-            + $"?platform=win-x64&launcherVersion={Uri.EscapeDataString(launcherVersion)}"
+        var candidates = new List<string>();
+        if (!string.IsNullOrWhiteSpace(selectedBaseUrl)) candidates.Add(selectedBaseUrl.TrimEnd('/'));
+        if (!string.IsNullOrWhiteSpace(config.ApiBaseUrl)) candidates.Add(config.ApiBaseUrl.TrimEnd('/'));
+        candidates.AddRange(AllowedDomains);
+
+        candidates = candidates
+            .Where(c => AllowedDomains.Contains(c, StringComparer.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var query = $"?platform=win-x64&launcherVersion={Uri.EscapeDataString(launcherVersion)}"
             + $"&runtimeVersion={Uri.EscapeDataString(runtimeVersion ?? "")}";
 
-        using var response = await http.GetAsync(url, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        List<Exception> exceptions = new();
+
+        foreach (var candidate in candidates)
         {
-            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException($"Сервер обновлений вернул HTTP {(int)response.StatusCode}: {responseBody}");
+            var url = $"{candidate}{config.ManifestPath}{query}";
+            try
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(TimeSpan.FromSeconds(5));
+
+                using var response = await http.GetAsync(url, cts.Token);
+                if (response.IsSuccessStatusCode)
+                {
+                    var manifest = await response.Content.ReadFromJsonAsync<UpdateManifest>(cancellationToken: cancellationToken);
+                    if (manifest != null) return manifest;
+                }
+                else
+                {
+                    var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                    exceptions.Add(new InvalidOperationException($"Сервер {candidate} вернул HTTP {(int)response.StatusCode}: {responseBody}"));
+                }
+            }
+            catch (Exception ex)
+            {
+                exceptions.Add(ex);
+            }
         }
 
-        return await response.Content.ReadFromJsonAsync<UpdateManifest>(cancellationToken: cancellationToken)
-            ?? throw new InvalidOperationException("Пустой манифест обновления.");
+        throw new AggregateException("Не удалось загрузить манифест ни с одного из резервных доменов.", exceptions);
     }
 
     public static bool IsLauncherUpdateAvailable(string currentVersion, string availableVersion)

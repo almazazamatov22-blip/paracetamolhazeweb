@@ -33,6 +33,72 @@ try
     if (UpdateService.IsAllowedLauncherUrl("https://example.com/cs2haze-launcher.zip"))
         throw new InvalidOperationException("A third-party update URL was accepted.");
 
+    // Fallback tests
+    var emptyManifestBytes = Encoding.UTF8.GetBytes("{}");
+    {
+        // 1. .ru недоступен, манифест успешно загружается через Vercel.
+        var mock = new HttpClient(new StaticResponseHandler(emptyManifestBytes, req => {
+            if (req.RequestUri!.Host.EndsWith(".ru")) throw new HttpRequestException("Simulated DNS error");
+            return null;
+        }));
+        var srv = new UpdateService(mock, new LauncherConfig { ApiBaseUrl = "https://paracetamolhaze.ru" });
+        await srv.GetManifestAsync("1.0.0", null, null, CancellationToken.None);
+    }
+    {
+        // 2. .ru и Vercel недоступны, используется .online.
+        var mock = new HttpClient(new StaticResponseHandler(emptyManifestBytes, req => {
+            if (req.RequestUri!.Host.EndsWith(".ru") || req.RequestUri.Host.EndsWith("vercel.app")) 
+                return new HttpResponseMessage(HttpStatusCode.BadGateway);
+            return null;
+        }));
+        var srv = new UpdateService(mock, new LauncherConfig { ApiBaseUrl = "https://paracetamolhaze.ru" });
+        await srv.GetManifestAsync("1.0.0", null, null, CancellationToken.None);
+    }
+    {
+        // 3. Все три недоступны — показывается понятная ошибка.
+        var mock = new HttpClient(new StaticResponseHandler(emptyManifestBytes, req => {
+            throw new HttpRequestException("All down");
+        }));
+        var srv = new UpdateService(mock, new LauncherConfig { ApiBaseUrl = "https://paracetamolhaze.ru" });
+        try {
+            await srv.GetManifestAsync("1.0.0", null, null, CancellationToken.None);
+            throw new InvalidOperationException("Should have failed when all down.");
+        } catch (AggregateException) { }
+    }
+    {
+        // 4. SelectedBaseUrl=Vercel имеет первый приоритет.
+        string? hitUrl = null;
+        var mock = new HttpClient(new StaticResponseHandler(emptyManifestBytes, req => {
+            hitUrl ??= req.RequestUri!.ToString();
+            return null;
+        }));
+        var srv = new UpdateService(mock, new LauncherConfig { ApiBaseUrl = "https://paracetamolhaze.ru" });
+        await srv.GetManifestAsync("1.0.0", null, "https://paracetamolhaze-six.vercel.app", CancellationToken.None);
+        if (hitUrl == null || !hitUrl.Contains("vercel.app")) throw new InvalidOperationException("SelectedBaseUrl was not prioritized.");
+    }
+    {
+        // 5. SelectedBaseUrl=.online имеет первый приоритет.
+        string? hitUrl = null;
+        var mock = new HttpClient(new StaticResponseHandler(emptyManifestBytes, req => {
+            hitUrl ??= req.RequestUri!.ToString();
+            return null;
+        }));
+        var srv = new UpdateService(mock, new LauncherConfig { ApiBaseUrl = "https://paracetamolhaze.ru" });
+        await srv.GetManifestAsync("1.0.0", null, "https://paracetamolhaze.online", CancellationToken.None);
+        if (hitUrl == null || !hitUrl.Contains(".online")) throw new InvalidOperationException("SelectedBaseUrl was not prioritized.");
+    }
+    {
+        // 6. Неизвестный домен никогда не используется.
+        string? hitUrl = null;
+        var mock = new HttpClient(new StaticResponseHandler(emptyManifestBytes, req => {
+            hitUrl ??= req.RequestUri!.ToString();
+            return null;
+        }));
+        var srv = new UpdateService(mock, new LauncherConfig { ApiBaseUrl = "https://paracetamolhaze.ru" });
+        await srv.GetManifestAsync("1.0.0", null, "https://malicious.com", CancellationToken.None);
+        if (hitUrl != null && hitUrl.Contains("malicious.com")) throw new InvalidOperationException("Unknown domain was used!");
+    }
+
     var testExecutable = Path.Combine(AppContext.BaseDirectory, "CS2Haze.UpdateSmoke.exe");
     if (!File.Exists(testExecutable))
         throw new InvalidOperationException("The test executable path is unavailable.");
@@ -445,13 +511,19 @@ static void AddText(ZipArchive archive, string name, string value)
     writer.Write(value);
 }
 
-sealed class StaticResponseHandler(byte[] content) : HttpMessageHandler
+sealed class StaticResponseHandler(byte[] content, Func<HttpRequestMessage, HttpResponseMessage?>? interceptor = null) : HttpMessageHandler
 {
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken
     )
     {
+        if (interceptor != null)
+        {
+            var intercept = interceptor(request);
+            if (intercept != null) return Task.FromResult(intercept);
+        }
+
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new ByteArrayContent(content),

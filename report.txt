@@ -1,0 +1,72 @@
+
+--- SCENARIO 1 ---
+MAIN BOUNDS:
+  Wrap: 1600 (L:10 R:1610)
+  User: R:351 (SW:300 CW:300)
+  Avatar: L:371 R:511
+  Center: L:511 R:941
+  Title: L:941 R:1391
+  Img: L:1411
+  Checks: user<avatar(-10): true, avatar<center: true, center<title: true, title<img(-10): true, wrap1600: true
+PR9 BOUNDS:
+  Wrap: 1600 (L:10 R:1610)
+  User: R:371 (SW:320 CW:320)
+  Avatar: L:387 R:517
+  Center: L:531 R:1091
+  Title: L:1091 R:1411
+  Img: L:1427
+  Checks: user<avatar(-10): true, avatar<center: true, center<title: true, title<img(-10): true, wrap1600: true
+
+--- SCENARIO 2 ---
+MAIN BOUNDS:
+  Wrap: 1600 (L:10 R:1610)
+  User: R:351 (SW:300 CW:300)
+  Avatar: L:371 R:511
+  Center: L:511 R:941
+  Title: L:941 R:1391
+  Img: L:1411
+  Checks: user<avatar(-10): true, avatar<center: true, center<title: true, title<img(-10): true, wrap1600: true
+PR9 BOUNDS:
+  Wrap: 1600 (L:10 R:1610)
+  User: R:371 (SW:320 CW:320)
+  Avatar: L:387 R:517
+  Center: L:531 R:1091
+  Title: L:1091 R:1411
+  Img: L:1427
+  Checks: user<avatar(-10): true, avatar<center: true, center<title: true, title<img(-10): true, wrap1600: true
+
+--- SCENARIO 3 ---
+MAIN BOUNDS:
+  Wrap: 1600 (L:10 R:1610)
+  User: R:351 (SW:300 CW:300)
+  Avatar: L:371 R:511
+  Center: L:511 R:941
+  Title: L:941 R:1391
+  Img: L:1411
+  Checks: user<avatar(-10): true, avatar<center: true, center<title: true, title<img(-10): true, wrap1600: true
+PR9 BOUNDS:
+  Wrap: 1600 (L:10 R:1610)
+  User: R:371 (SW:320 CW:320)
+  Avatar: L:387 R:517
+  Center: L:531 R:1091
+  Title: L:1091 R:1411
+  Img: L:1427
+  Checks: user<avatar(-10): true, avatar<center: true, center<title: true, title<img(-10): true, wrap1600: true
+
+--- SCENARIO 4 ---
+MAIN BOUNDS:
+  Wrap: 1600 (L:10 R:1610)
+  User: R:351 (SW:858 CW:300)
+  Avatar: L:371 R:511
+  Center: L:511 R:941
+  Title: L:941 R:1391
+  Img: L:1411
+  Checks: user<avatar(-10): true, avatar<center: true, center<title: true, title<img(-10): true, wrap1600: true
+PR9 BOUNDS:
+  Wrap: 1600 (L:10 R:1610)
+  User: R:371 (SW:817 CW:320)
+  Avatar: L:387 R:517
+  Center: L:531 R:1091
+  Title: L:1091 R:1411
+  Img: L:1427
+  Checks: user<avatar(-10): true, avatar<center: true, center<title: true, title<img(-10): true, wrap1600: true
