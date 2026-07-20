@@ -44,7 +44,7 @@ const ALLOWED_EVENTSUB_HOSTS = new Set([
   'localhost:3000'
 ]);
 
-export async function sharedSubscribeHandler(req: NextRequest) {
+export async function sharedSubscribeHandler(req: NextRequest, webhookPath: string = '/api/twitch/webhook') {
   const mode = req.nextUrl.searchParams.get('mode') === 'reconnect' ? 'reconnect' : 'ensure';
   
   try {
@@ -71,7 +71,7 @@ export async function sharedSubscribeHandler(req: NextRequest) {
       return Response.json({ error: 'Invalid callback host' }, { status: 400 });
     }
 
-    const callbackUrl = `${protocol}://${normalizedHost}/api/twitch/webhook`;
+    const callbackUrl = `${protocol}://${normalizedHost}${webhookPath}`;
     const lockToken = randomUUID();
     const supabase = getSupabase();
     
@@ -124,33 +124,41 @@ export async function sharedSubscribeHandler(req: NextRequest) {
           sub.type === 'channel.channel_points_custom_reward_redemption.add' && 
           sub.condition?.broadcaster_user_id === broadcasterId
         ) {
+          const subUrl = new URL(sub.transport?.callback);
+          const subHostname = subUrl.host.toLowerCase();
+          const subPathname = subUrl.pathname;
+
           if (sub.status === 'enabled' || sub.status === 'webhook_callback_verification_pending') {
-            const subHostname = new URL(sub.transport?.callback).host.toLowerCase();
-            
             if (mode === 'ensure') {
-              if (ALLOWED_EVENTSUB_HOSTS.has(subHostname)) {
+              if (ALLOWED_EVENTSUB_HOSTS.has(subHostname) && subPathname === webhookPath) {
                 existingSub = sub;
                 needsNewSub = false;
                 finalCallbackUrl = sub.transport.callback;
                 finalCallbackHost = subHostname;
+                continue;
+              }
+              if (ALLOWED_EVENTSUB_HOSTS.has(subHostname)) {
                 continue;
               }
             } else {
-              if (subHostname === normalizedHost) {
+              if (subHostname === normalizedHost && subPathname === webhookPath) {
                 existingSub = sub;
                 needsNewSub = false;
                 finalCallbackUrl = sub.transport.callback;
                 finalCallbackHost = subHostname;
                 continue;
               }
+              if (ALLOWED_EVENTSUB_HOSTS.has(subHostname)) {
+                continue;
+              }
             }
+          } else if (subPathname === webhookPath && subHostname === normalizedHost) {
+            console.log(`[TWITCH_EVENTSUB] Deleting our broken sub ${sub.id}`);
+            await fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?id=${sub.id}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${appToken}`, 'Client-Id': clientId! }
+            });
           }
-          
-          console.log(`[TWITCH_EVENTSUB] Deleting mismatched or old sub ${sub.id}`);
-          await fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?id=${sub.id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${appToken}`, 'Client-Id': clientId! }
-          });
         }
       }
 
@@ -274,3 +282,66 @@ export async function sharedSubscribeHandler(req: NextRequest) {
     return Response.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }
+
+export async function getSubscriptionStatus(req: NextRequest, webhookPath: string = '/api/twitch/webhook') {
+  try {
+    const token = req.cookies.get('twitch_token')?.value;
+    if (!token) return Response.json({ isSubscribed: false, error: 'Необходима авторизация Twitch' }, { status: 401 });
+
+    const broadcasterId = await getBroadcasterId(token);
+    if (!broadcasterId) return Response.json({ isSubscribed: false, error: 'Ошибка авторизации Twitch' }, { status: 401 });
+
+    const clientId = process.env.TWITCH_CLIENT_ID;
+    
+    const forwardedHost = req.headers.get('x-forwarded-host');
+    const host = forwardedHost || req.headers.get('host');
+    const protocol = req.headers.get('x-forwarded-proto') || 'https';
+    const normalizedHost = host?.split(',')[0].trim().toLowerCase();
+
+    if (!normalizedHost || !ALLOWED_EVENTSUB_HOSTS.has(normalizedHost)) {
+      return Response.json({ isSubscribed: false, error: 'Invalid callback host' }, { status: 400 });
+    }
+
+    const callbackUrl = `${protocol}://${normalizedHost}${webhookPath}`;
+    const appToken = await getAppToken();
+
+    let isSubscribed = false;
+    let cursor: string | undefined = undefined;
+
+    do {
+      const url = new URL('https://api.twitch.tv/helix/eventsub/subscriptions');
+      if (cursor) url.searchParams.set('after', cursor);
+      const getSubsRes = await fetch(url.toString(), {
+        headers: { 'Authorization': `Bearer ${appToken}`, 'Client-Id': clientId! }
+      });
+      
+      if (!getSubsRes.ok) {
+         return Response.json({ isSubscribed: false, error: 'Ошибка получения подписок Twitch' }, { status: 500 });
+      }
+
+      const subsData = await getSubsRes.json();
+      if (subsData.data && Array.isArray(subsData.data)) {
+        for (const sub of subsData.data) {
+          if (
+            sub.type === 'channel.channel_points_custom_reward_redemption.add' && 
+            sub.condition?.broadcaster_user_id === broadcasterId &&
+            sub.status === 'enabled' &&
+            sub.transport?.method === 'webhook' &&
+            sub.transport?.callback === callbackUrl
+          ) {
+            isSubscribed = true;
+            break;
+          }
+        }
+      }
+      if (isSubscribed) break;
+      cursor = subsData.pagination?.cursor;
+    } while (cursor);
+
+    return Response.json({ isSubscribed, callbackUrl });
+  } catch (err: any) {
+    console.error('[TWITCH_EVENTSUB_GET] Internal Error:', err.message);
+    return Response.json({ isSubscribed: false, error: 'Внутренняя ошибка сервера' }, { status: 500 });
+  }
+}
+

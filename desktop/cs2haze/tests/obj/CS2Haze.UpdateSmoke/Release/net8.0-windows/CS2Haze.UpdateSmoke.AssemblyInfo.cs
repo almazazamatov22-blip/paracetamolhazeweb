@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CS2Haze.UpdateSmoke")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d646fa4bd03c012847e65af4bc0981427049f78e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+80b220bd8d10fd83d02415f3120ff55703b4e25e")]
 [assembly: System.Reflection.AssemblyProductAttribute("CS2Haze.UpdateSmoke")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CS2Haze.UpdateSmoke")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

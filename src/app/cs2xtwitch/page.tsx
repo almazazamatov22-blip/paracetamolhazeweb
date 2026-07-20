@@ -67,9 +67,15 @@ export default function cs2xtwitchPage() {
       .then(data => {
         if (typeof data.isSubscribed === 'boolean') {
           setIsSubscribed(data.isSubscribed)
+        } else if (data.error) {
+          setIsSubscribed(false)
+          setSubscribeMsg(`Ошибка проверки статуса: ${data.error}`)
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        setIsSubscribed(false)
+        setSubscribeMsg('Не удалось проверить статус подписки')
+      })
   }, [user])
 
   async function handleSubscribe() {

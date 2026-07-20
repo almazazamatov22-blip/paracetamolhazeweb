@@ -143,6 +143,7 @@ public sealed class MainForm : Form
             var manifest = await updateService.GetManifestAsync(
                 launcherVersion,
                 state.RuntimeVersion,
+                state.SelectedBaseUrl,
                 cancellation.Token
             );
 
