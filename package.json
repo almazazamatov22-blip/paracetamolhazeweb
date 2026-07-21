@@ -19,7 +19,9 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
-    "kinoquiz:seed": "node ./scripts/kinoquiz/seed_tmdb_dataset.mjs"
+    "kinoquiz:seed": "node ./scripts/kinoquiz/seed_tmdb_dataset.mjs",
+    "kino-images:download": "node scripts/download-kino-images.mjs",
+    "kino-images:verify": "node scripts/verify-kino-images.mjs"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.1.1",
