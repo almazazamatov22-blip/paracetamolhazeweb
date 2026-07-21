@@ -297,32 +297,29 @@ function KinokadrContent() {
     setIsLoading(true);
     try {
       const seenIds = getSeenIds();
-      let query = supabase.from('kinokadr_movies').select('*').eq('is_textless', true);
+      const res = await fetch(`/api/kinokadr/rounds?mode=${mode}&seenIds=${encodeURIComponent(JSON.stringify(seenIds))}`);
+      const json = await res.json();
 
-      if (mode === 'movie') query = query.eq('type', 'movie');
-      else if (mode === 'series') query = query.eq('type', 'series');
+      if (!res.ok) {
+        throw new Error(json.error || 'Failed to fetch from API');
+      }
 
-      const { data, error } = await query.order('id', { ascending: Math.random() > 0.5 }).limit(200);
-      if (error) throw error;
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Loaded Kinokadr rounds, source: ${json.source}`);
+      }
 
-      if (data && data.length > 0) {
-        let pool = data.filter(m => !seenIds.includes(String(m.id)));
-        if (pool.length < 10) pool = data;
-
-        const targetRounds = Math.min(30, Math.max(1, pool.length));
-        const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, targetRounds).map(m => ({
-          ...m,
-          image_url: toLocalKinoImageUrl(m.image_url)
-        }));
-        setMovies(shuffled);
-        saveSeenIds(shuffled.map(m => String(m.id)));
+      if (json.movies && json.movies.length > 0) {
+        setMovies(json.movies);
+        saveSeenIds(json.movies.map((m: any) => String(m.id)));
       } else {
-        setMovies(buildFallbackMovies(mode));
-        setLoadError('Kinokadr dataset is empty, demo mode enabled.');
+        throw new Error('Kinokadr dataset is empty');
       }
     } catch (e: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Loaded Kinokadr rounds, source: fallback`);
+      }
       setMovies(buildFallbackMovies(mode));
-      setLoadError(e?.message || 'Failed to load Kinokadr dataset, demo mode enabled.');
+      setLoadError('Не удалось загрузить основную базу. Запущен демонстрационный режим.');
     }
     setIsLoading(false);
   };
