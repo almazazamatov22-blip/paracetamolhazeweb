@@ -31,7 +31,7 @@ async function fetchRandomSample(supabase: any, type: 'movie' | 'series', seenId
   if (!data) return [];
 
   let pool = data.filter((m: any) => !seenIds.includes(String(m.id)));
-  if (pool.length < 10 && data.length >= 10) {
+  if (pool.length < Math.min(10, data.length)) {
     pool = data;
   }
 
