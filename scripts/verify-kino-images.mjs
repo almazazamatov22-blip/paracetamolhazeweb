@@ -8,8 +8,9 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseKey;
 const supabase = createClient(supabaseUrl, supabaseKey);
-const supabaseKinoquiz = createClient(supabaseUrl, supabaseKey, { db: { schema: 'kinoquiz' } });
+const supabaseKinoquiz = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'kinoquiz' } });
 
 const outDir = path.join(process.cwd(), 'public', 'kino-images');
 const mapFile = path.join(process.cwd(), 'src', 'generated', 'kino-image-map.json');
@@ -50,10 +51,23 @@ async function run() {
       }
       
       const ext = path.extname(fullPath).toLowerCase();
-      // We assume extensions are correct based on download script, but can't fully verify content-type without reading magic bytes.
-      // At least we check if it has a valid extension
       if (!['.jpg', '.png', '.webp', '.avif', '.gif', '.jpeg'].includes(ext)) {
         logError(`Invalid extension: ${ext} for ${localPath}`);
+      }
+
+      // Check magic bytes
+      const buffer = await fs.readFile(fullPath);
+      let isValidSignature = false;
+      if (buffer.length > 4) {
+        if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) isValidSignature = true; // JPEG
+        else if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) isValidSignature = true; // PNG
+        else if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 && buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) isValidSignature = true; // WebP
+        else if (buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) isValidSignature = true; // AVIF/HEIC/MP4 container
+        else if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) isValidSignature = true; // GIF
+      }
+      
+      if (!isValidSignature) {
+        logError(`Invalid file signature (magic bytes) for ${localPath}`);
       }
     }
   }
@@ -68,14 +82,29 @@ async function run() {
     } catch {}
   };
 
-  const { data: d1 } = await supabase.from('kinokadr_movies').select('image_url');
-  if (d1) d1.forEach(r => processUrl(r.image_url));
+  const { data: d1, error: e1 } = await supabase.from('kinokadr_movies').select('image_url');
+  if (e1) {
+    logError(`kinokadr_movies fetch failed: ${e1.message}`);
+  } else if (d1) d1.forEach(r => processUrl(r.image_url));
 
-  const { data: d2 } = await supabase.from('kinoquiz_questions').select('image_url');
-  if (d2) d2.forEach(r => processUrl(r.image_url));
+  const { data: d2, error: e2 } = await supabase.from('kinoquiz_questions').select('image_url');
+  if (e2) {
+    logError(`kinoquiz_questions fetch failed: ${e2.message}`);
+  } else if (d2) d2.forEach(r => processUrl(r.image_url));
 
-  const { data: d3 } = await supabaseKinoquiz.from('questions').select('image_url');
-  if (d3) d3.forEach(r => processUrl(r.image_url));
+  const { data: d3, error: e3 } = await supabaseKinoquiz.from('questions').select('image_url');
+  if (e3) {
+    logError(`kinoquiz.questions fetch failed: ${e3.message}`);
+  } else if (d3) d3.forEach(r => processUrl(r.image_url));
+
+  const fallbackUrls = [
+    'https://image.tmdb.org/t/p/w1280/8IB2e4r4oVhHnANbnm7O3Tj6tF8.jpg',
+    'https://image.tmdb.org/t/p/w1280/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
+    'https://image.tmdb.org/t/p/w1280/qJ2tW6WMUDux911r6m7haRef0WH.jpg',
+    'https://image.tmdb.org/t/p/w1280/ztkUQFLlC19CCMYHW9o1zWhJRNq.jpg',
+    'https://image.tmdb.org/t/p/w1280/uOOtwVbSr4QDjAGIifLDwpb2Pdl.jpg'
+  ];
+  fallbackUrls.forEach(url => processUrl(url));
 
   let missingInMap = 0;
   for (const url of urls) {
@@ -95,5 +124,5 @@ async function run() {
 
 run().catch(err => {
   console.error(err);
-  process.exit(1);
+  process.exitCode = 1;
 });

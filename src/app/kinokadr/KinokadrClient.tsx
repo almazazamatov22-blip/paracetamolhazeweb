@@ -34,7 +34,7 @@ interface KinokadrState {
   mode: string;
 }
 
-type Screen = 'home' | 'game' | 'leaderboard' | 'result';
+type Screen = 'home' | 'game' | 'leaderboard' | 'result' | 'loading';
 
 function AnimatedBg() {
   return (
@@ -327,8 +327,9 @@ function KinokadrContent() {
     setIsLoading(false);
   };
 
-  const startNewGame = (mode: string) => {
-    fetchMovies(mode);
+  const startNewGame = async (mode: string) => {
+    setScreen('loading');
+    await fetchMovies(mode);
     setScreen('game');
     setCurrentIndex(0);
     setIsImageLoading(true);
@@ -562,6 +563,13 @@ function KinokadrContent() {
                     )}
                  </div>
               </div>
+            </motion.div>
+          )}
+
+          {screen === 'loading' && (
+            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center text-center space-y-4">
+              <Loader2 className="w-12 h-12 text-cyan-400 animate-spin" />
+              <h2 className="text-2xl font-black uppercase italic tracking-widest text-white/50">Загрузка раундов...</h2>
             </motion.div>
           )}
 

@@ -12,16 +12,17 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseKey;
 const supabase = createClient(supabaseUrl, supabaseKey);
-const supabaseKinoquiz = createClient(supabaseUrl, supabaseKey, { db: { schema: 'kinoquiz' } });
+const supabaseKinoquiz = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'kinoquiz' } });
 
 const outDir = path.join(process.cwd(), 'public', 'kino-images');
 const mapFile = path.join(process.cwd(), 'src', 'generated', 'kino-image-map.json');
 
 async function downloadFile(url, destPath) {
   return new Promise((resolve, reject) => {
-    const protocol = url.startsWith('https') ? https : http;
-    const req = protocol.get(url, { timeout: 10000 }, (res) => {
+    if (!url.startsWith('https://')) return reject(new Error('Only HTTPS is allowed'));
+    const req = https.get(url, { timeout: 10000 }, (res) => {
       if (res.statusCode !== 200) {
         req.destroy();
         return reject(new Error(`Status ${res.statusCode}`));
@@ -94,8 +95,17 @@ async function run() {
   const sourceStats = {
     kinokadr_movies: { rows: 0, nonNullUrls: 0, unique: 0, invalid: 0 },
     public_kinoquiz_questions: { rows: 0, nonNullUrls: 0, unique: 0, invalid: 0 },
-    kinoquiz_questions: { rows: 0, nonNullUrls: 0, unique: 0, invalid: 0 }
+    kinoquiz_questions: { rows: 0, nonNullUrls: 0, unique: 0, invalid: 0 },
+    fallback_pool: { rows: 5, nonNullUrls: 5, unique: 0, invalid: 0 }
   };
+
+  const fallbackUrls = [
+    'https://image.tmdb.org/t/p/w1280/8IB2e4r4oVhHnANbnm7O3Tj6tF8.jpg',
+    'https://image.tmdb.org/t/p/w1280/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
+    'https://image.tmdb.org/t/p/w1280/qJ2tW6WMUDux911r6m7haRef0WH.jpg',
+    'https://image.tmdb.org/t/p/w1280/ztkUQFLlC19CCMYHW9o1zWhJRNq.jpg',
+    'https://image.tmdb.org/t/p/w1280/uOOtwVbSr4QDjAGIifLDwpb2Pdl.jpg'
+  ];
 
   const processUrl = (urlStr, sourceKey) => {
     if (!urlStr) return;
@@ -111,27 +121,37 @@ async function run() {
 
   try {
     const { data: d1, error: e1 } = await supabase.from('kinokadr_movies').select('image_url');
-    if (!e1 && d1) {
+    if (e1) {
+      console.error('Supabase query failed for kinokadr_movies:', e1.message);
+      process.exitCode = 1;
+    } else if (d1) {
       sourceStats.kinokadr_movies.rows = d1.length;
       d1.forEach(r => processUrl(r.image_url, 'kinokadr_movies'));
     }
-  } catch(e) {}
 
-  try {
     const { data: d2, error: e2 } = await supabase.from('kinoquiz_questions').select('image_url');
-    if (!e2 && d2) {
+    if (e2) {
+      console.error('Supabase query failed for kinoquiz_questions:', e2.message);
+      process.exitCode = 1;
+    } else if (d2) {
       sourceStats.public_kinoquiz_questions.rows = d2.length;
       d2.forEach(r => processUrl(r.image_url, 'public_kinoquiz_questions'));
     }
-  } catch(e) {}
 
-  try {
     const { data: d3, error: e3 } = await supabaseKinoquiz.from('questions').select('image_url');
-    if (!e3 && d3) {
+    if (e3) {
+      console.error('Supabase query failed for kinoquiz.questions:', e3.message);
+      process.exitCode = 1;
+    } else if (d3) {
       sourceStats.kinoquiz_questions.rows = d3.length;
       d3.forEach(r => processUrl(r.image_url, 'kinoquiz_questions'));
     }
-  } catch(e) {}
+    
+    fallbackUrls.forEach(url => processUrl(url, 'fallback_pool'));
+  } catch(e) {
+    console.error('Supabase query failed:', e.message);
+    process.exitCode = 1;
+  }
 
   console.log('--- AUDIT REPORT ---');
   console.log(JSON.stringify(sourceStats, null, 2));
@@ -208,6 +228,14 @@ async function run() {
   console.log(`Min size: ${(min / 1024).toFixed(2)} KB`);
   console.log(`Max size: ${(max / 1024).toFixed(2)} KB`);
   console.log(`Avg size: ${((totalSize / files.length) / 1024).toFixed(2)} KB`);
+  
+  if (failed > 0) {
+    console.error('Download finished with errors.');
+    process.exitCode = 1;
+  }
 }
 
-run().catch(console.error);
+run().catch(err => {
+  console.error(err);
+  process.exitCode = 1;
+});
