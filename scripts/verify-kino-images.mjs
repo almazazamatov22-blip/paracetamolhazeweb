@@ -27,7 +27,8 @@ async function run() {
     map = JSON.parse(await fs.readFile(mapFile, 'utf8'));
   } catch (err) {
     logError('Cannot read kino-image-map.json');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   // Check map for duplicates
@@ -116,7 +117,7 @@ async function run() {
 
   if (hasError) {
     console.error('Verification failed.');
-    process.exit(1);
+    process.exitCode = 1;
   } else {
     console.log(`Verification passed. Total unique URLs checked: ${urls.size}`);
   }
