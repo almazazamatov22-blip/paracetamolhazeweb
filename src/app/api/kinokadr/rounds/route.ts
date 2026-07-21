@@ -3,6 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import { getSupabaseUrl, getSupabaseServerKey } from '@/lib/supabase-env';
 import { toLocalKinoImageUrl } from '@/lib/kino-local-images';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -29,11 +32,40 @@ export async function GET(request: Request) {
     const serverKey = getSupabaseServerKey();
 
     if (!supabaseUrl || !serverKey) {
-      return NextResponse.json({ error: 'Supabase configuration missing' }, { status: 500 });
+      console.error('[Kinokadr API] Supabase configuration missing');
+      return NextResponse.json({ error: 'Не удалось загрузить базу Kinokadr' }, { status: 500 });
     }
 
     const supabase = createClient(supabaseUrl, serverKey);
 
+    // 1. Get exact count
+    let countQuery = supabase
+      .from('kinokadr_movies')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_textless', true);
+
+    if (mode === 'movie') countQuery = countQuery.eq('type', 'movie');
+    else if (mode === 'series') countQuery = countQuery.eq('type', 'series');
+
+    const { count, error: countError } = await countQuery;
+
+    if (countError) {
+      console.error('[Kinokadr API] Count error:', countError);
+      return NextResponse.json({ error: 'Не удалось загрузить базу Kinokadr' }, { status: 500 });
+    }
+
+    if (count === null || count === 0) {
+      console.error('[Kinokadr API] Dataset is empty');
+      return NextResponse.json({ error: 'Не удалось загрузить базу Kinokadr' }, { status: 404 });
+    }
+
+    // 2. Select random offset
+    // We want a random window of up to 200 items. 
+    // If count <= 200, offset is 0. If count > 200, max offset is count - 200.
+    const maxOffset = Math.max(0, count - 200);
+    const offset = Math.floor(Math.random() * (maxOffset + 1));
+
+    // 3. Fetch the window
     let query = supabase
       .from('kinokadr_movies')
       .select('id, title, title_ru, image_url, type, category, year')
@@ -42,14 +74,16 @@ export async function GET(request: Request) {
     if (mode === 'movie') query = query.eq('type', 'movie');
     else if (mode === 'series') query = query.eq('type', 'series');
 
-    const { data, error } = await query.limit(200);
+    const { data, error } = await query.range(offset, offset + 199);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('[Kinokadr API] Fetch error:', error);
+      return NextResponse.json({ error: 'Не удалось загрузить базу Kinokadr' }, { status: 500 });
     }
 
     if (!data || data.length === 0) {
-      return NextResponse.json({ error: 'Kinokadr dataset is empty' }, { status: 404 });
+      console.error('[Kinokadr API] No data returned from range');
+      return NextResponse.json({ error: 'Не удалось загрузить базу Kinokadr' }, { status: 404 });
     }
 
     let pool = data.filter(m => !seenIds.includes(String(m.id)));
@@ -71,6 +105,7 @@ export async function GET(request: Request) {
     });
 
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Internal error' }, { status: 500 });
+    console.error('[Kinokadr API] Internal error:', err);
+    return NextResponse.json({ error: 'Не удалось загрузить базу Kinokadr' }, { status: 500 });
   }
 }
