@@ -11,6 +11,7 @@ import { Button } from '@/components/67/ui/button';
 import { AuthProvider, useSession, signIn, signOut } from '@/lib/67/authHook'; 
 import { supabase } from '@/lib/supabase';
 import { TwitchConsentNotice } from "@/components/legal/TwitchConsentNotice";
+import { toLocalKinoImageUrl } from '@/lib/kino-local-images';
 
 // ============ TYPES ============
 interface KinokadrMovie {
@@ -106,7 +107,7 @@ function buildFallbackMovies(mode: string): KinokadrMovie[] {
   const items: KinokadrMovie[] = [];
   for (let i = 0; i < 30; i++) {
     const base = pool[i % pool.length];
-    items.push({ ...base, id: `${base.id}-${i}` });
+    items.push({ ...base, id: `${base.id}-${i}`, image_url: toLocalKinoImageUrl(base.image_url) });
   }
   return items;
 }
@@ -309,7 +310,10 @@ function KinokadrContent() {
         if (pool.length < 10) pool = data;
 
         const targetRounds = Math.min(30, Math.max(1, pool.length));
-        const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, targetRounds);
+        const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, targetRounds).map(m => ({
+          ...m,
+          image_url: toLocalKinoImageUrl(m.image_url)
+        }));
         setMovies(shuffled);
         saveSeenIds(shuffled.map(m => String(m.id)));
       } else {
@@ -467,7 +471,7 @@ function KinokadrContent() {
                   <Button className="bg-[#9146FF] hover:bg-[#7c3aed] text-white rounded-xl h-11 px-6 text-sm font-bold shadow-lg shadow-purple-500/20" onClick={twitchLogin}>
                     Войти через Twitch
                   </Button>
-                  <TwitchConsentNotice />
+                  {screen === 'home' && <TwitchConsentNotice />}
                 </div>
              )}
           </div>

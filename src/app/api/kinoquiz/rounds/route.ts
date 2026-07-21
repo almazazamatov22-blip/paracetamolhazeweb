@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { kinoquizAdmin, KINOQUIZ_TABLE } from '@/lib/kinoquizSupabase';
 import { supabase } from '@/lib/supabase';
+import { toLocalKinoImageUrl } from '@/lib/kino-local-images';
 
 type MediaType = 'movie' | 'series' | 'anime';
 type Difficulty = 'easy' | 'medium' | 'hard';
@@ -203,7 +204,7 @@ export async function GET(request: Request) {
     id: `tmdb-${row.media_type}-${row.tmdb_id}`,
     title: row.original_title || row.title,
     title_ru: row.title_ru || row.title || row.original_title,
-    imageUrl: row.image_url,
+    imageUrl: toLocalKinoImageUrl(row.image_url),
     type: row.media_type,
     difficulty: row.difficulty,
     year: row.year || undefined
