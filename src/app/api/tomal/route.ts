@@ -189,6 +189,7 @@ async function readStoredState(): Promise<TomalState> {
     .from('overlay_configs')
     .select('settings')
     .eq('user_id', TOMAL_USER_ID)
+    .eq('overlay_type', 'tomal')
     .maybeSingle();
 
   if (error) {
@@ -206,6 +207,7 @@ async function writeStoredState(nextState: TomalState): Promise<TomalState> {
     .from('overlay_configs')
     .select('settings, assets')
     .eq('user_id', TOMAL_USER_ID)
+    .eq('overlay_type', 'tomal')
     .maybeSingle();
 
   if (currentError && currentError.code !== 'PGRST116') {
@@ -223,7 +225,7 @@ async function writeStoredState(nextState: TomalState): Promise<TomalState> {
       settings,
       assets: current?.assets || {},
       updated_at: nextState.updatedAt,
-    }, { onConflict: 'user_id' });
+    }, { onConflict: 'user_id,overlay_type' });
 
   if (error) {
     throw error;

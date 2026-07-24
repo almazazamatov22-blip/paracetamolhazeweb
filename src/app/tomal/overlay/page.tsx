@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 const DEFAULT_MAX_VALUE = 100;
 const MIN_MAX_VALUE = 1;
@@ -204,6 +205,8 @@ export default function TomalOverlayPage() {
     let active = true;
     let isFetching = false;
     let lastUpdatedAt = '';
+    let pollingIntervalId: number | null = null;
+    let channel: any = null;
 
     const fetchState = async () => {
       if (isFetching) return;
@@ -223,20 +226,68 @@ export default function TomalOverlayPage() {
           }
         }
       } catch {
-        // on error, we just keep the last known state working
+        // on error, keep the last known state working
       } finally {
         isFetching = false;
       }
     };
 
+    const startPolling = () => {
+      if (pollingIntervalId === null) {
+        pollingIntervalId = window.setInterval(fetchState, POLLING_INTERVAL);
+      }
+    };
+
+    const stopPolling = () => {
+      if (pollingIntervalId !== null) {
+        window.clearInterval(pollingIntervalId);
+        pollingIntervalId = null;
+      }
+    };
+
     void fetchState();
 
-    const pollingSync = window.setInterval(fetchState, POLLING_INTERVAL);
+    channel = supabase
+      .channel('tomal-overlay-hybrid')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'overlay_configs',
+          filter: 'user_id=eq.tomal-global',
+        },
+        (payload) => {
+          if (!active) return;
+          const nextRow = payload.new as { overlay_type?: string; settings?: Record<string, unknown> } | null;
+
+          if (nextRow?.overlay_type === 'tomal') {
+            const nextState = nextRow.settings?.tomal;
+            if (nextState && typeof nextState === 'object') {
+              const normalized = normalizeState(nextState as Partial<TomalState>);
+              if (!lastUpdatedAt || normalized.updatedAt >= lastUpdatedAt) {
+                lastUpdatedAt = normalized.updatedAt;
+                applyState(normalized);
+              }
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (!active) return;
+        if (status === 'SUBSCRIBED') {
+          stopPolling();
+          void fetchState();
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          startPolling();
+        }
+      });
 
     return () => {
       active = false;
-      window.clearInterval(pollingSync);
+      stopPolling();
       if (animationTimerRef.current) window.clearTimeout(animationTimerRef.current);
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [applyState]);
 
