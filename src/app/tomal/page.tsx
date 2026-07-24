@@ -252,10 +252,20 @@ export default function TomalPage() {
         body: JSON.stringify(nextState),
       });
 
-      if (!response.ok) throw new Error('Failed to save overlay state');
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Save failed');
+      }
+
+      const confirmedState = normalizeState(result);
+      setState(confirmedState);
+      setDraftValue(String(confirmedState.value));
+      setDraftMaxValue(String(confirmedState.maxValue));
+
       setStatus('Сохранено');
     } catch {
-      setStatus('Не сохранено');
+      setStatus('Ошибка сохранения');
     }
   };
 
@@ -291,7 +301,7 @@ export default function TomalPage() {
     if (nextCounter !== state.value) {
       triggerPreviewAnimation();
     }
-    updateState({ value: nextCounter }, true);
+    updateState({ value: nextCounter });
   };
 
   const handleManualChange = (nextDraftValue: string) => {

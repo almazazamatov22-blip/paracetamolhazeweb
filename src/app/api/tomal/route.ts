@@ -5,7 +5,7 @@ import { getSupabaseServerKey, getSupabaseUrl } from '@/lib/supabase-env';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const TOMAL_USER_ID = 'tomal-overlay';
+const TOMAL_USER_ID = 'tomal-global';
 const TOMAL_SETTINGS_KEY = 'tomal';
 const DEFAULT_MAX_VALUE = 100;
 const MIN_MAX_VALUE = 1;
@@ -69,16 +69,15 @@ const DEFAULT_STATE: TomalState = {
   updatedAt: new Date(0).toISOString(),
 };
 
-let memoryState: TomalState = DEFAULT_STATE;
-
 function jsonNoStore(body: unknown, init?: ResponseInit) {
   return NextResponse.json(body, {
     ...init,
     headers: {
       'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
       'Content-Type': 'application/json',
-      Expires: '0',
-      Pragma: 'no-cache',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Surrogate-Control': 'no-store',
       ...(init?.headers || {}),
     },
   });
@@ -182,9 +181,9 @@ function getSupabase() {
   return createClient(supabaseUrl, supabaseKey);
 }
 
-async function readStoredState() {
+async function readStoredState(): Promise<TomalState> {
   const supabase = getSupabase();
-  if (!supabase) return memoryState;
+  if (!supabase) return DEFAULT_STATE;
 
   const { data, error } = await supabase
     .from('overlay_configs')
@@ -192,16 +191,16 @@ async function readStoredState() {
     .eq('user_id', TOMAL_USER_ID)
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
 
-  return normalizeState(data?.settings?.[TOMAL_SETTINGS_KEY] || memoryState);
+  return normalizeState(data?.settings?.[TOMAL_SETTINGS_KEY] || DEFAULT_STATE);
 }
 
-async function writeStoredState(nextState: TomalState) {
+async function writeStoredState(nextState: TomalState): Promise<TomalState> {
   const supabase = getSupabase();
-  memoryState = nextState;
-
-  if (!supabase) return nextState;
+  if (!supabase) throw new Error('Supabase configuration missing');
 
   const { data: current, error: currentError } = await supabase
     .from('overlay_configs')
@@ -209,7 +208,9 @@ async function writeStoredState(nextState: TomalState) {
     .eq('user_id', TOMAL_USER_ID)
     .maybeSingle();
 
-  if (currentError) return nextState;
+  if (currentError && currentError.code !== 'PGRST116') {
+    throw currentError;
+  }
 
   const settings = current?.settings || {};
   settings[TOMAL_SETTINGS_KEY] = nextState;
@@ -218,12 +219,15 @@ async function writeStoredState(nextState: TomalState) {
     .from('overlay_configs')
     .upsert({
       user_id: TOMAL_USER_ID,
+      overlay_type: 'tomal',
       settings,
       assets: current?.assets || {},
       updated_at: nextState.updatedAt,
     }, { onConflict: 'user_id' });
 
-  if (error) return nextState;
+  if (error) {
+    throw error;
+  }
 
   return nextState;
 }
@@ -231,24 +235,40 @@ async function writeStoredState(nextState: TomalState) {
 export async function GET() {
   try {
     const state = await readStoredState();
-    memoryState = state;
     return jsonNoStore(state);
-  } catch {
-    return jsonNoStore(memoryState);
+  } catch (error) {
+    return jsonNoStore(DEFAULT_STATE);
   }
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+
+    if (!body || typeof body !== 'object') {
+      return jsonNoStore({ success: false, error: 'Invalid body' }, { status: 400 });
+    }
+
+    if ('value' in body && typeof body.value !== 'number') {
+      return jsonNoStore({ success: false, error: 'value must be a number' }, { status: 400 });
+    }
+
+    if ('maxValue' in body && typeof body.maxValue !== 'number') {
+      return jsonNoStore({ success: false, error: 'maxValue must be a number' }, { status: 400 });
+    }
+
+    if ('value' in body && (!Number.isFinite(body.value) || Number.isNaN(body.value))) {
+      return jsonNoStore({ success: false, error: 'value must be finite' }, { status: 400 });
+    }
+
     const nextState = normalizeState({
       ...body,
       updatedAt: new Date().toISOString(),
     });
 
     const savedState = await writeStoredState(nextState);
-    return jsonNoStore(savedState);
+    return jsonNoStore({ success: true, ...savedState });
   } catch (error) {
-    return jsonNoStore({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
+    return jsonNoStore({ success: false, error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
   }
 }

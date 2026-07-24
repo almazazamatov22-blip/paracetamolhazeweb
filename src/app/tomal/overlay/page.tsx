@@ -2,14 +2,11 @@
 
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 
 const DEFAULT_MAX_VALUE = 100;
 const MIN_MAX_VALUE = 1;
 const MAX_MAX_VALUE = 9999;
-const TOMAL_USER_ID = 'tomal-overlay';
-const TOMAL_SETTINGS_KEY = 'tomal';
-const SAFETY_SYNC_INTERVAL = 60_000;
+const POLLING_INTERVAL = 30_000;
 const CHANGE_ANIMATION_DURATION_MS = 620;
 const DEFAULT_COLOR = '#ffffff';
 const DEFAULT_OUTLINE_COLOR = '#000000';
@@ -51,6 +48,7 @@ type TomalState = {
   outlineColor: string;
   outlineWidth: number;
   animation: OverlayAnimation;
+  updatedAt: string;
 };
 
 const DEFAULT_STATE: TomalState = {
@@ -66,6 +64,7 @@ const DEFAULT_STATE: TomalState = {
   outlineColor: DEFAULT_OUTLINE_COLOR,
   outlineWidth: 3,
   animation: 'none',
+  updatedAt: new Date(0).toISOString(),
 };
 
 const FONT_MAP: Record<FontFamily, string> = {
@@ -171,6 +170,7 @@ function normalizeState(state: Partial<TomalState>): TomalState {
     outlineColor: normalizeColor(state.outlineColor, DEFAULT_OUTLINE_COLOR),
     outlineWidth: Number.isFinite(rawOutlineWidth) ? Math.min(14, Math.max(0, Math.trunc(rawOutlineWidth))) : DEFAULT_STATE.outlineWidth,
     animation: normalizeAnimation(state.animation),
+    updatedAt: typeof state.updatedAt === 'string' ? state.updatedAt : new Date(0).toISOString(),
   };
 }
 
@@ -202,45 +202,41 @@ export default function TomalOverlayPage() {
 
   useEffect(() => {
     let active = true;
+    let isFetching = false;
+    let lastUpdatedAt = '';
 
     const fetchState = async () => {
+      if (isFetching) return;
+      isFetching = true;
       try {
-        const response = await fetch('/api/tomal', { cache: 'no-store' });
+        const response = await fetch(`/api/tomal?t=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) {
+          isFetching = false;
+          return;
+        }
         const data = await response.json();
-        if (active) applyState(data);
+        if (active && data) {
+          const normalized = normalizeState(data);
+          if (!lastUpdatedAt || normalized.updatedAt >= lastUpdatedAt) {
+            lastUpdatedAt = normalized.updatedAt;
+            applyState(normalized);
+          }
+        }
       } catch {
-        if (active) setState((currentState) => currentState);
+        // on error, we just keep the last known state working
+      } finally {
+        isFetching = false;
       }
     };
 
     void fetchState();
-    const channel = supabase
-      .channel('tomal-overlay-state')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'overlay_configs',
-          filter: `user_id=eq.${TOMAL_USER_ID}`,
-        },
-        (payload) => {
-          const nextRow = payload.new as { settings?: Record<string, unknown> } | null;
-          const nextState = nextRow?.settings?.[TOMAL_SETTINGS_KEY];
-          if (active && nextState && typeof nextState === 'object') {
-            applyState(nextState as Partial<TomalState>);
-          }
-        }
-      )
-      .subscribe();
 
-    const safetySync = window.setInterval(fetchState, SAFETY_SYNC_INTERVAL);
+    const pollingSync = window.setInterval(fetchState, POLLING_INTERVAL);
 
     return () => {
       active = false;
-      window.clearInterval(safetySync);
+      window.clearInterval(pollingSync);
       if (animationTimerRef.current) window.clearTimeout(animationTimerRef.current);
-      void supabase.removeChannel(channel);
     };
   }, [applyState]);
 
